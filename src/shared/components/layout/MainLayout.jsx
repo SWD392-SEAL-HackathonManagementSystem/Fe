@@ -1,14 +1,25 @@
 import React, { useState } from 'react';
-import { Layout, Menu, Button, theme, Breadcrumb } from 'antd';
-import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
+import { Layout, Menu, Button, theme, Input, Badge, Avatar, Space } from 'antd';
+import { 
+  MenuFoldOutlined, 
+  MenuUnfoldOutlined, 
+  SearchOutlined, 
+  BellOutlined, 
+  SettingOutlined, 
+  QuestionCircleOutlined,
+  LogoutOutlined,
+  PlusOutlined
+} from '@ant-design/icons';
 import {
   LayoutDashboard,
   Trophy,
-  GitBranch,
-  Layers,
-  ChevronRight
+  Users,
+  Activity,
+  BarChart3,
+  Settings,
+  HelpCircle,
 } from 'lucide-react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
 
 const { Header, Sider, Content } = Layout;
@@ -30,134 +41,173 @@ const MainLayout = ({ children }) => {
     {
       key: ROUTES.HACKATHONS,
       icon: <Trophy size={18} />,
-      label: 'Hackathons',
+      label: 'Event Config',
+    },
+    {
+      key: 'teams',
+      icon: <Users size={18} />,
+      label: 'Team Management',
+    },
+    {
+      key: 'monitor',
+      icon: <Activity size={18} />,
+      label: 'Real-time Monitor',
+    },
+    {
+      key: 'analytics',
+      icon: <BarChart3 size={18} />,
+      label: 'Analytics',
+    },
+    {
+      key: 'settings',
+      icon: <Settings size={18} />,
+      label: 'System Settings',
+    },
+  ];
+
+  const bottomMenuItems = [
+    {
+      key: 'help',
+      icon: <HelpCircle size={18} />,
+      label: 'Help Center',
+    },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: 'Log Out',
+      danger: true
     },
   ];
 
   const handleMenuClick = ({ key }) => {
-    navigate(key);
-  };
-
-  const getBreadcrumbs = () => {
-    const paths = location.pathname.split('/').filter(x => x);
-    const breadcrumbs = [{ title: <Link to="/">Home</Link> }];
-    
-    let currentPath = '';
-    paths.forEach((path, index) => {
-      currentPath += `/${path}`;
-      const isLast = index === paths.length - 1;
-      
-      // Basic logic for breadcrumb names
-      let title = path.charAt(0).toUpperCase() + path.slice(1);
-      if (path === 'hackathons') title = 'Hackathons';
-      if (path === 'create') title = 'New Hackathon';
-      if (path === 'setup') title = 'Setup';
-      if (path === 'tracks') title = 'Tracks';
-      if (path === 'rounds') title = 'Rounds';
-      
-      // If it's an ID, maybe show "Details" or similar
-      if (!isNaN(path)) title = `ID: ${path}`;
-
-      breadcrumbs.push({
-        title: isLast ? title : <Link to={currentPath}>{title}</Link>
-      });
-    });
-    
-    return breadcrumbs;
+    if (key === ROUTES.DASHBOARD || key === ROUTES.HACKATHONS) {
+      navigate(key);
+    }
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ minHeight: '100vh', background: '#f8f9fa' }}>
       <Sider 
         trigger={null} 
         collapsible 
         collapsed={collapsed}
         theme="light"
+        width={260}
         style={{
-          boxShadow: '2px 0 8px 0 rgba(29,35,41,.05)',
+          boxShadow: '2px 0 8px 0 rgba(29,35,41,.03)',
           zIndex: 10,
+          position: 'fixed',
+          height: '100vh',
+          left: 0,
+          top: 0,
+          bottom: 0,
         }}
       >
         <div style={{ 
-          height: 64, 
+          height: 80, 
           display: 'flex', 
           alignItems: 'center', 
-          justifyContent: 'center',
-          borderBottom: '1px solid #f0f0f0',
+          padding: '0 24px',
           marginBottom: 8
         }}>
           <div style={{ 
-            width: 32, 
-            height: 32, 
+            width: 36, 
+            height: 36, 
             background: 'linear-gradient(135deg, #1677ff 0%, #003eb3 100%)',
-            borderRadius: 6,
-            marginRight: collapsed ? 0 : 12,
+            borderRadius: 8,
+            marginRight: 12,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontWeight: 'bold'
-          }}>S</div>
-          {!collapsed && <span style={{ fontSize: 18, fontWeight: 700, color: '#141414' }}>SEAL System</span>}
+            fontWeight: 'bold',
+            fontSize: 20
+          }}>H</div>
+          {!collapsed && (
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#141414', lineHeight: '1.2' }}>HackOS</div>
+              <div style={{ fontSize: 12, color: '#8c8c8c' }}>Enterprise Admin</div>
+            </div>
+          )}
         </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={handleMenuClick}
-          style={{ borderRight: 0 }}
-        />
+
+        {!collapsed && (
+          <div style={{ padding: '0 16px 24px' }}>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />} 
+              block 
+              size="large"
+              style={{ height: 48, borderRadius: 8, fontWeight: 600 }}
+              onClick={() => navigate(ROUTES.HACKATHON_CREATE)}
+            >
+              Create New Event
+            </Button>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)', justifyContent: 'space-between' }}>
+          <Menu
+            mode="inline"
+            selectedKeys={[location.pathname]}
+            items={menuItems}
+            onClick={handleMenuClick}
+            style={{ borderRight: 0 }}
+          />
+          <Menu
+            mode="inline"
+            items={bottomMenuItems}
+            style={{ borderRight: 0, marginBottom: 24 }}
+          />
+        </div>
       </Sider>
-      <Layout>
+      <Layout style={{ marginLeft: collapsed ? 80 : 260, transition: 'all 0.2s' }}>
         <Header
           style={{
-            padding: 0,
+            padding: '0 24px',
             background: colorBgContainer,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            paddingRight: 24,
-            boxShadow: '0 1px 4px rgba(0,21,41,.08)',
+            boxShadow: '0 1px 4px rgba(0,21,41,.05)',
+            position: 'sticky',
+            top: 0,
             zIndex: 9,
+            height: 72
           }}
         >
-          <Button
-            type="text"
-            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setCollapsed(!collapsed)}
-            style={{
-              fontSize: '16px',
-              width: 64,
-              height: 64,
-            }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ color: '#8c8c8c' }}>Admin Role</span>
-            <div style={{ 
-              width: 32, 
-              height: 32, 
-              borderRadius: '50%', 
-              background: '#f0f0f0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer'
-            }}>A</div>
+          <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            <Button
+              type="text"
+              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              onClick={() => setCollapsed(!collapsed)}
+              style={{ fontSize: '16px', width: 40, height: 40, marginRight: 16 }}
+            />
+            <Input 
+              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} 
+              placeholder="Tìm kiếm nhóm, giám khảo, cài đặt..." 
+              style={{ maxWidth: 400, borderRadius: 8, background: '#f5f5f5', border: 'none', height: 40 }}
+            />
           </div>
+          <Space size={20}>
+            <Badge dot color="#ff4d4f">
+              <Button type="text" icon={<BellOutlined style={{ fontSize: 20 }} />} />
+            </Badge>
+            <Button type="text" icon={<SettingOutlined style={{ fontSize: 20 }} />} />
+            <Button type="text" icon={<QuestionCircleOutlined style={{ fontSize: 20 }} />} />
+            <Avatar 
+              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" 
+              style={{ cursor: 'pointer', border: '2px solid #f0f0f0' }} 
+            />
+          </Space>
         </Header>
         <Content
           style={{
-            margin: '24px 16px',
-            padding: 24,
+            margin: '24px',
             minHeight: 280,
-            background: colorBgContainer,
             borderRadius: borderRadiusLG,
-            overflow: 'initial'
           }}
         >
-          <div style={{ marginBottom: 16 }}>
-            <Breadcrumb items={getBreadcrumbs()} separator={<ChevronRight size={14} style={{ marginTop: 4 }} />} />
-          </div>
           {children}
         </Content>
       </Layout>

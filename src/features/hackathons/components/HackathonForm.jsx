@@ -87,7 +87,11 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
             name="registration_start"
             label="Registration Start"
           >
-            <DatePicker showTime style={{ width: '100%' }} />
+            <DatePicker 
+              showTime 
+              style={{ width: '100%' }} 
+              disabledDate={(current) => current && current < dayjs().startOf('day')}
+            />
           </Form.Item>
         </Col>
         <Col span={12}>
@@ -107,7 +111,11 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
               }),
             ]}
           >
-            <DatePicker showTime style={{ width: '100%' }} />
+            <DatePicker 
+              showTime 
+              style={{ width: '100%' }} 
+              disabledDate={(current) => current && current < dayjs().startOf('day')}
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -130,7 +138,11 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
               }),
             ]}
           >
-            <DatePicker showTime style={{ width: '100%' }} />
+            <DatePicker 
+              showTime 
+              style={{ width: '100%' }} 
+              disabledDate={(current) => current && current < dayjs().startOf('day')}
+            />
           </Form.Item>
         </Col>
         <Col span={12}>
@@ -150,7 +162,11 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
               }),
             ]}
           >
-            <DatePicker showTime style={{ width: '100%' }} />
+            <DatePicker 
+              showTime 
+              style={{ width: '100%' }} 
+              disabledDate={(current) => current && current < dayjs().startOf('day')}
+            />
           </Form.Item>
         </Col>
       </Row>
