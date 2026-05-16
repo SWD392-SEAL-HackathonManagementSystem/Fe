@@ -1,6 +1,6 @@
-import React from 'react';
-import { Button, Card, Col, Row, Empty, Space, Typography, Popconfirm, message, Tag } from 'antd';
-import { Plus, Edit, Trash2, Settings } from 'lucide-react';
+import React, { useState } from 'react';
+import { Button, Card, Col, Row, Empty, Space, Typography, Popconfirm, message, Tag, Input, Select } from 'antd';
+import { Plus, Edit, Trash2, Settings, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../shared/components/ui/PageHeader';
 import StatusBadge from '../../../shared/components/ui/StatusBadge';
@@ -8,47 +8,91 @@ import { ROUTES } from '../../../shared/constants/routes';
 import { useAppContext } from '../../../app/AppContext';
 
 const { Title, Text, Paragraph } = Typography;
+const { Option } = Select;
+const { Search: AntSearch } = Input;
 
 const HackathonListPage = () => {
   const navigate = useNavigate();
   const { hackathons, deleteHackathon } = useAppContext();
+  const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const handleDelete = (id) => {
     deleteHackathon(id);
     message.success('Hackathon deleted successfully');
   };
 
+  const filteredHackathons = hackathons.filter(h => {
+    const matchesSearch = h.name.toLowerCase().includes(searchText.toLowerCase()) || 
+                          h.slug.toLowerCase().includes(searchText.toLowerCase());
+    const matchesStatus = statusFilter === 'ALL' || h.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div>
       <PageHeader 
-        title="Hackathons" 
-        subtitle="Manage all your hackathons here"
+        title="Event Configuration" 
+        subtitle="Manage and configure your hackathon events"
         extra={
           <Button 
             type="primary" 
             icon={<Plus size={16} />} 
             onClick={() => navigate(ROUTES.HACKATHON_CREATE)}
           >
-            Create Hackathon
+            Create Event
           </Button>
         }
       />
 
-      {hackathons.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: '40px 0' }}>
-          <Empty description="No hackathons found" />
-          <Button 
-            type="primary" 
-            icon={<Plus size={16} />} 
-            style={{ marginTop: 16 }}
-            onClick={() => navigate(ROUTES.HACKATHON_CREATE)}
-          >
-            Create Your First Hackathon
-          </Button>
+      <Card style={{ marginBottom: 24, borderRadius: 12 }}>
+        <Row gutter={16} align="middle">
+          <Col xs={24} md={12} lg={8}>
+            <AntSearch
+              placeholder="Search by name or slug..."
+              allowClear
+              enterButton={<Search size={16} />}
+              onSearch={setSearchText}
+              onChange={e => setSearchText(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} md={6} lg={4}>
+            <Select 
+              defaultValue="ALL" 
+              style={{ width: '100%' }} 
+              onChange={setStatusFilter}
+            >
+              <Option value="ALL">All Status</Option>
+              <Option value="DRAFT">Draft</Option>
+              <Option value="PUBLISHED">Published</Option>
+              <Option value="ONGOING">Ongoing</Option>
+              <Option value="COMPLETED">Completed</Option>
+            </Select>
+          </Col>
+          <Col xs={24} md={6} lg={4}>
+            <Text type="secondary">{filteredHackathons.length} events found</Text>
+          </Col>
+        </Row>
+      </Card>
+
+      {filteredHackathons.length === 0 ? (
+        <Card style={{ textAlign: 'center', padding: '40px 0', borderRadius: 12 }}>
+          <Empty description={searchText || statusFilter !== 'ALL' ? "No matches found" : "No events found"} />
+          {!searchText && statusFilter === 'ALL' && (
+            <Button 
+              type="primary" 
+              icon={<Plus size={16} />} 
+              style={{ marginTop: 16 }}
+              onClick={() => navigate(ROUTES.HACKATHON_CREATE)}
+            >
+              Create Your First Event
+            </Button>
+          )}
         </Card>
       ) : (
         <Row gutter={[24, 24]}>
-          {hackathons.map((hackathon) => (
+          {filteredHackathons.map((hackathon) => (
             <Col xs={24} sm={12} lg={8} key={hackathon.id}>
               <Card
                 hoverable
