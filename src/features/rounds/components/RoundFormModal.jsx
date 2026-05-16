@@ -96,8 +96,13 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
             <Form.Item
               name="submission_open"
               label="Submission Open"
+              dependencies={['submission_deadline']}
             >
-              <DatePicker showTime style={{ width: '100%' }} />
+              <DatePicker 
+                showTime 
+                style={{ width: '100%' }} 
+                disabledDate={(current) => current && current < dayjs().startOf('day')}
+              />
             </Form.Item>
           </Col>
           <Col span={12}>
@@ -105,6 +110,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
               name="submission_deadline"
               label="Submission Deadline"
               dependencies={['submission_open']}
+              validateTrigger={['onChange', 'onBlur']}
               rules={[
                 { required: true, message: 'Required' },
                 ({ getFieldValue }) => ({
@@ -118,7 +124,11 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
                 }),
               ]}
             >
-              <DatePicker showTime style={{ width: '100%' }} />
+              <DatePicker 
+                showTime 
+                style={{ width: '100%' }} 
+                disabledDate={(current) => current && current < dayjs().startOf('day')}
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -128,13 +138,14 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
             <Form.Item
               name="coding_duration_hours"
               label="Coding Duration (Hours)"
+              validateTrigger={['onChange', 'onBlur']}
               rules={[
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     if (value === undefined || value === null || value > 0) {
                       return Promise.resolve();
                     }
-                    return Promise.reject(new Error('Duration must be greater than 0'));
+                    return Promise.reject(new Error('Duration must be > 0'));
                   },
                 }),
               ]}

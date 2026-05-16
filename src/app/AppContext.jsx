@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import dayjs from 'dayjs';
 import { MOCK_HACKATHONS } from '../features/hackathons/data/hackathon.mock';
 import { MOCK_TRACKS } from '../features/tracks/data/track.mock';
 import { MOCK_ROUNDS } from '../features/rounds/data/round.mock';
@@ -32,6 +33,53 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('rounds', JSON.stringify(rounds));
   }, [rounds]);
+
+  // Auto-update status based on real time
+  useEffect(() => {
+    const checkStatus = () => {
+      const now = dayjs();
+      let changed = false;
+
+      // Update Hackathons
+      const updatedHackathons = hackathons.map(h => {
+        if (h.event_end && dayjs(h.event_end).isBefore(now) && h.status !== 'COMPLETED') {
+          changed = true;
+          return { ...h, status: 'COMPLETED' };
+        }
+        return h;
+      });
+
+      // Update Tracks (Close if hackathon completed)
+      const updatedTracks = tracks.map(t => {
+        const hackathon = updatedHackathons.find(h => h.id === t.hackathon_id);
+        if (hackathon?.status === 'COMPLETED' && t.status !== 'CLOSED') {
+          changed = true;
+          return { ...t, status: 'CLOSED' };
+        }
+        return t;
+      });
+
+      // Update Rounds (Deactivate if deadline passed)
+      const updatedRounds = rounds.map(r => {
+        if (r.submission_deadline && dayjs(r.submission_deadline).isBefore(now) && r.is_active) {
+          changed = true;
+          return { ...r, is_active: false };
+        }
+        return r;
+      });
+
+      if (changed) {
+        setHackathons(updatedHackathons);
+        setTracks(updatedTracks);
+        setRounds(updatedRounds);
+      }
+    };
+
+    // Check immediately and then every minute
+    checkStatus();
+    const interval = setInterval(checkStatus, 60000);
+    return () => clearInterval(interval);
+  }, [hackathons, tracks, rounds]);
 
   // Hackathon actions
   const addHackathon = (hackathon) => {

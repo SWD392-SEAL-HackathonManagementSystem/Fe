@@ -63,6 +63,7 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
             <Form.Item
               name="max_teams"
               label="Max Teams"
+              dependencies={['max_teams_per_group']}
             >
               <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
@@ -72,6 +73,7 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
               name="max_teams_per_group"
               label="Max Teams Per Group"
               dependencies={['max_teams']}
+              validateTrigger={['onChange', 'onBlur']}
               rules={[
                 ({ getFieldValue }) => ({
                   validator(_, value) {
@@ -79,7 +81,7 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
                     if (!value || !maxTeams || value <= maxTeams) {
                       return Promise.resolve();
                     }
-                    return Promise.reject(new Error('Max teams per group must be less than or equal to total max teams'));
+                    return Promise.reject(new Error('Max teams per group must be ≤ total max teams'));
                   },
                 }),
               ]}
@@ -95,6 +97,7 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
               name="min_team_size"
               label="Min Team Size"
               rules={[{ required: true, message: 'Required' }]}
+              dependencies={['max_team_size']}
             >
               <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
@@ -104,6 +107,7 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
               name="max_team_size"
               label="Max Team Size"
               dependencies={['min_team_size']}
+              validateTrigger={['onChange', 'onBlur']}
               rules={[
                 { required: true, message: 'Required' },
                 ({ getFieldValue }) => ({
@@ -112,7 +116,7 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
                     if (!value || !minSize || value >= minSize) {
                       return Promise.resolve();
                     }
-                    return Promise.reject(new Error('Max size must be greater than or equal to min size'));
+                    return Promise.reject(new Error('Max size must be ≥ min size'));
                   },
                 }),
               ]}
