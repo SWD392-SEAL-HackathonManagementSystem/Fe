@@ -32,15 +32,15 @@ const HackathonListPage = () => {
   return (
     <div>
       <PageHeader 
-        title="Event Configuration" 
-        subtitle="Manage and configure your hackathon events"
+        title="Cấu hình Sự kiện" 
+        subtitle="Quản lý và cấu hình các sự kiện hackathon của bạn"
         extra={
           <Button 
             type="primary" 
             icon={<Plus size={16} />} 
             onClick={() => navigate(ROUTES.HACKATHON_CREATE)}
           >
-            Create Event
+            Tạo Sự kiện
           </Button>
         }
       />
@@ -49,7 +49,7 @@ const HackathonListPage = () => {
         <Row gutter={16} align="middle">
           <Col xs={24} md={12} lg={8}>
             <AntSearch
-              placeholder="Search by name or slug..."
+              placeholder="Tìm kiếm theo tên hoặc slug..."
               allowClear
               enterButton={<Search size={16} />}
               onSearch={setSearchText}
@@ -63,22 +63,22 @@ const HackathonListPage = () => {
               style={{ width: '100%' }} 
               onChange={setStatusFilter}
             >
-              <Option value="ALL">All Status</Option>
-              <Option value="DRAFT">Draft</Option>
-              <Option value="PUBLISHED">Published</Option>
-              <Option value="ONGOING">Ongoing</Option>
-              <Option value="COMPLETED">Completed</Option>
+              <Option value="ALL">Tất cả trạng thái</Option>
+              <Option value="DRAFT">Nháp</Option>
+              <Option value="PUBLISHED">Đã công bố</Option>
+              <Option value="ONGOING">Đang diễn ra</Option>
+              <Option value="COMPLETED">Đã hoàn thành</Option>
             </Select>
           </Col>
           <Col xs={24} md={6} lg={4}>
-            <Text type="secondary">{filteredHackathons.length} events found</Text>
+            <Text type="secondary">Tìm thấy {filteredHackathons.length} sự kiện</Text>
           </Col>
         </Row>
       </Card>
 
       {filteredHackathons.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: '40px 0', borderRadius: 12 }}>
-          <Empty description={searchText || statusFilter !== 'ALL' ? "No matches found" : "No events found"} />
+          <Empty description={searchText || statusFilter !== 'ALL' ? "Không tìm thấy kết quả phù hợp" : "Chưa có sự kiện nào"} />
           {!searchText && statusFilter === 'ALL' && (
             <Button 
               type="primary" 
@@ -86,7 +86,7 @@ const HackathonListPage = () => {
               style={{ marginTop: 16 }}
               onClick={() => navigate(ROUTES.HACKATHON_CREATE)}
             >
-              Create Your First Event
+              Tạo Sự kiện Đầu tiên
             </Button>
           )}
         </Card>
@@ -115,18 +115,18 @@ const HackathonListPage = () => {
                     key="setup"
                     onClick={() => navigate(`/hackathons/${hackathon.id}/setup`)}
                   >
-                    Setup
+                    Thiết lập
                   </Button>,
                   <Popconfirm
-                    title="Delete Hackathon"
-                    description="Are you sure you want to delete this hackathon? This action cannot be undone."
+                    title="Xóa Sự kiện"
+                    description="Bạn có chắc chắn muốn xóa sự kiện này? Hành động này không thể hoàn tác."
                     onConfirm={() => handleDelete(hackathon.id)}
-                    okText="Yes"
-                    cancelText="No"
+                    okText="Xóa"
+                    cancelText="Hủy"
                     key="delete"
                   >
                     <Button type="text" danger icon={<Trash2 size={16} />}>
-                      Delete
+                      Xóa
                     </Button>
                   </Popconfirm>
                 ]}

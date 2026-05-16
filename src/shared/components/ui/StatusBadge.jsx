@@ -5,21 +5,21 @@ const StatusBadge = ({ status }) => {
   const getStatusConfig = (status) => {
     switch (status?.toUpperCase()) {
       case 'DRAFT':
-        return { color: 'default', text: 'Draft' };
+        return { color: 'default', text: 'Nháp' };
       case 'PUBLISHED':
-        return { color: 'blue', text: 'Published' };
+        return { color: 'blue', text: 'Đã công bố' };
       case 'ONGOING':
-        return { color: 'green', text: 'Ongoing' };
+        return { color: 'green', text: 'Đang diễn ra' };
       case 'COMPLETED':
-        return { color: 'purple', text: 'Completed' };
+        return { color: 'purple', text: 'Đã hoàn thành' };
       case 'OPEN':
-        return { color: 'green', text: 'Open' };
+        return { color: 'green', text: 'Mở' };
       case 'CLOSED':
-        return { color: 'red', text: 'Closed' };
+        return { color: 'red', text: 'Đóng' };
       case 'ACTIVE':
-        return { color: 'green', text: 'Active' };
+        return { color: 'green', text: 'Đang hoạt động' };
       case 'INACTIVE':
-        return { color: 'default', text: 'Inactive' };
+        return { color: 'default', text: 'Ngưng hoạt động' };
       default:
         return { color: 'default', text: status };
     }

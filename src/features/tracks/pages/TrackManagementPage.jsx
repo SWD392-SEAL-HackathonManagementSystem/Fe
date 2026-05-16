@@ -24,45 +24,45 @@ const TrackManagementPage = ({ hackathonId }) => {
 
   const handleDelete = (id) => {
     deleteTrack(id);
-    message.success('Track deleted successfully');
+    message.success('Đã xóa track thành công');
   };
 
   const handleModalFinish = (values) => {
     if (editingTrack) {
       updateTrack(editingTrack.id, values);
-      message.success('Track updated successfully');
+      message.success('Đã cập nhật track thành công');
     } else {
       addTrack({ ...values, hackathon_id: hackathonId });
-      message.success('Track created successfully');
+      message.success('Đã tạo track mới thành công');
     }
     setIsModalVisible(false);
   };
 
   const columns = [
     {
-      title: 'Name',
+      title: 'Tên Track',
       dataIndex: 'name',
       key: 'name',
       render: (text) => <strong>{text}</strong>,
     },
     {
-      title: 'Teams',
+      title: 'Số đội tối đa',
       key: 'teams',
-      render: (_, record) => `${record.max_teams || '∞'} (Max)`,
+      render: (_, record) => `${record.max_teams || 'Không giới hạn'}`,
     },
     {
-      title: 'Team Size',
+      title: 'Sĩ số đội',
       key: 'team_size',
-      render: (_, record) => `${record.min_team_size} - ${record.max_team_size}`,
+      render: (_, record) => `${record.min_team_size} - ${record.max_team_size} người`,
     },
     {
-      title: 'Status',
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       render: (status) => <StatusBadge status={status} />,
     },
     {
-      title: 'Actions',
+      title: 'Thao tác',
       key: 'actions',
       render: (_, record) => (
         <Space size="middle">
@@ -72,11 +72,11 @@ const TrackManagementPage = ({ hackathonId }) => {
             onClick={() => handleEdit(record)}
           />
           <Popconfirm
-            title="Delete Track"
-            description="Are you sure you want to delete this track? All associated rounds will also be deleted."
+            title="Xóa Track"
+            description="Bạn có chắc chắn muốn xóa track này? Tất cả các vòng thi liên quan cũng sẽ bị xóa."
             onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
+            okText="Xóa"
+            cancelText="Hủy"
           >
             <Button type="text" danger icon={<Trash2 size={16} />} />
           </Popconfirm>
@@ -93,7 +93,7 @@ const TrackManagementPage = ({ hackathonId }) => {
           icon={<Plus size={16} />} 
           onClick={handleAdd}
         >
-          Add Track
+          Thêm Track
         </Button>
       </div>
 

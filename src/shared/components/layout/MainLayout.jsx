@@ -36,32 +36,32 @@ const MainLayout = ({ children }) => {
     {
       key: ROUTES.DASHBOARD,
       icon: <LayoutDashboard size={18} />,
-      label: 'Dashboard',
+      label: 'Tổng quan',
     },
     {
       key: ROUTES.HACKATHONS,
       icon: <Trophy size={18} />,
-      label: 'Event Config',
+      label: 'Cấu hình Sự kiện',
     },
     {
       key: 'teams',
       icon: <Users size={18} />,
-      label: 'Team Management',
+      label: 'Quản lý Đội thi',
     },
     {
       key: 'monitor',
       icon: <Activity size={18} />,
-      label: 'Real-time Monitor',
+      label: 'Giám sát Real-time',
     },
     {
       key: 'analytics',
       icon: <BarChart3 size={18} />,
-      label: 'Analytics',
+      label: 'Phân tích dữ liệu',
     },
     {
       key: 'settings',
       icon: <Settings size={18} />,
-      label: 'System Settings',
+      label: 'Cài đặt Hệ thống',
     },
   ];
 
@@ -69,12 +69,12 @@ const MainLayout = ({ children }) => {
     {
       key: 'help',
       icon: <HelpCircle size={18} />,
-      label: 'Help Center',
+      label: 'Trung tâm Hỗ trợ',
     },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: 'Log Out',
+      label: 'Đăng xuất',
       danger: true
     },
   ];
@@ -126,7 +126,7 @@ const MainLayout = ({ children }) => {
           {!collapsed && (
             <div>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#141414', lineHeight: '1.2' }}>HackOS</div>
-              <div style={{ fontSize: 12, color: '#8c8c8c' }}>Enterprise Admin</div>
+              <div style={{ fontSize: 12, color: '#8c8c8c' }}>Quản trị viên Doanh nghiệp</div>
             </div>
           )}
         </div>
@@ -141,7 +141,7 @@ const MainLayout = ({ children }) => {
               style={{ height: 48, borderRadius: 8, fontWeight: 600 }}
               onClick={() => navigate(ROUTES.HACKATHON_CREATE)}
             >
-              Create New Event
+              Tạo Sự kiện Mới
             </Button>
           </div>
         )}
