@@ -42,8 +42,8 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
     <Modal
       open={visible}
       title={title}
-      okText="Save"
-      cancelText="Cancel"
+      okText="Lưu"
+      cancelText="Hủy"
       onCancel={onCancel}
       onOk={handleSubmit}
       width={800}
@@ -62,17 +62,17 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           <Col span={16}>
             <Form.Item
               name="name"
-              label="Round Name"
-              rules={[{ required: true, message: 'Please enter round name' }]}
+              label="Tên vòng thi"
+              rules={[{ required: true, message: 'Vui lòng nhập tên vòng thi' }]}
             >
-              <Input placeholder="e.g. Sơ loại" />
+              <Input placeholder="Ví dụ: Vòng Sơ loại" />
             </Form.Item>
           </Col>
           <Col span={8}>
             <Form.Item
               name="sequence_order"
-              label="Sequence Order"
-              rules={[{ required: true, message: 'Required' }]}
+              label="Thứ tự"
+              rules={[{ required: true, message: 'Bắt buộc' }]}
             >
               <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
@@ -81,10 +81,10 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
 
         <Form.Item
           name="track_id"
-          label="Track"
-          rules={[{ required: true, message: 'Please select a track' }]}
+          label="Track (Bảng đấu)"
+          rules={[{ required: true, message: 'Vui lòng chọn track' }]}
         >
-          <Select placeholder="Select track">
+          <Select placeholder="Chọn track">
             {tracks.map(t => (
               <Option key={t.id} value={t.id}>{t.name}</Option>
             ))}
@@ -95,7 +95,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           <Col span={12}>
             <Form.Item
               name="submission_open"
-              label="Submission Open"
+              label="Mở nộp bài"
               dependencies={['submission_deadline']}
             >
               <DatePicker 
@@ -108,18 +108,18 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           <Col span={12}>
             <Form.Item
               name="submission_deadline"
-              label="Submission Deadline"
+              label="Hạn chót nộp bài"
               dependencies={['submission_open']}
               validateTrigger={['onChange', 'onBlur']}
               rules={[
-                { required: true, message: 'Required' },
+                { required: true, message: 'Bắt buộc' },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     const open = getFieldValue('submission_open');
                     if (!value || !open || dayjs(value).isAfter(dayjs(open))) {
                       return Promise.resolve();
                     }
-                    return Promise.reject(new Error('Deadline must be after opening time'));
+                    return Promise.reject(new Error('Hạn chót phải sau thời gian mở nộp bài'));
                   },
                 }),
               ]}
@@ -137,7 +137,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           <Col span={12}>
             <Form.Item
               name="coding_duration_hours"
-              label="Coding Duration (Hours)"
+              label="Thời gian thi (Giờ)"
               validateTrigger={['onChange', 'onBlur']}
               rules={[
                 ({ getFieldValue }) => ({
@@ -145,7 +145,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
                     if (value === undefined || value === null || value > 0) {
                       return Promise.resolve();
                     }
-                    return Promise.reject(new Error('Duration must be > 0'));
+                    return Promise.reject(new Error('Thời lượng phải > 0'));
                   },
                 }),
               ]}
@@ -156,7 +156,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           <Col span={12}>
             <Form.Item
               name="problem_statement_url"
-              label="Problem Statement URL"
+              label="Link Đề bài"
             >
               <Input placeholder="https://example.com/problem" />
             </Form.Item>
@@ -167,7 +167,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           <Col span={8}>
             <Form.Item
               name="top_n_advance"
-              label="Top N Advance"
+              label="Số đội đi tiếp (Top N)"
             >
               <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
@@ -175,7 +175,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           <Col span={8}>
             <Form.Item
               name="min_teams_final"
-              label="Min Teams Final"
+              label="Số đội tối thiểu vào Chung kết"
             >
               <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
@@ -183,12 +183,12 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           <Col span={8}>
             <Form.Item
               name="tiebreak_rule"
-              label="Tiebreak Rule"
+              label="Luật Tiebreak"
             >
               <Select>
-                <Option value="PENALTY_SCORE">Penalty Score</Option>
-                <Option value="LATEST_SUBMISSION">Latest Submission</Option>
-                <Option value="EARLIEST_SUBMISSION">Earliest Submission</Option>
+                <Option value="PENALTY_SCORE">Điểm phạt (Penalty)</Option>
+                <Option value="LATEST_SUBMISSION">Bài nộp muộn nhất</Option>
+                <Option value="EARLIEST_SUBMISSION">Bài nộp sớm nhất</Option>
               </Select>
             </Form.Item>
           </Col>
@@ -198,7 +198,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           <Col span={12}>
             <Form.Item
               name="wildcard_enabled"
-              label="Wildcard Enabled"
+              label="Cho phép Wildcard"
               valuePropName="checked"
             >
               <Switch />
@@ -207,7 +207,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           <Col span={12}>
             <Form.Item
               name="is_active"
-              label="Is Active"
+              label="Đang hoạt động"
               valuePropName="checked"
             >
               <Switch />

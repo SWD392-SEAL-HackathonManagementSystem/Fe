@@ -26,19 +26,19 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         <Col span={16}>
           <Form.Item
             name="name"
-            label="Hackathon Name"
-            rules={[{ required: true, message: 'Please enter hackathon name' }]}
+            label="Tên Hackathon"
+            rules={[{ required: true, message: 'Vui lòng nhập tên hackathon' }]}
           >
-            <Input placeholder="e.g. SEAL Hackathon Spring 2026" />
+            <Input placeholder="Ví dụ: SEAL Hackathon Xuân 2026" />
           </Form.Item>
         </Col>
         <Col span={8}>
           <Form.Item
             name="slug"
-            label="Slug"
-            rules={[{ required: true, message: 'Please enter slug' }]}
+            label="Đường dẫn (Slug)"
+            rules={[{ required: true, message: 'Vui lòng nhập slug' }]}
           >
-            <Input placeholder="e.g. seal-spring-2026" />
+            <Input placeholder="Ví dụ: seal-xuan-2026" />
           </Form.Item>
         </Col>
       </Row>
@@ -47,37 +47,37 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         <Col span={12}>
           <Form.Item
             name="season"
-            label="Season"
-            rules={[{ required: true, message: 'Please select season' }]}
+            label="Mùa"
+            rules={[{ required: true, message: 'Vui lòng chọn mùa' }]}
           >
-            <Select placeholder="Select season">
-              <Option value="Spring">Spring</Option>
-              <Option value="Summer">Summer</Option>
-              <Option value="Fall">Fall</Option>
-              <Option value="Winter">Winter</Option>
+            <Select placeholder="Chọn mùa">
+              <Option value="Spring">Xuân</Option>
+              <Option value="Summer">Hạ</Option>
+              <Option value="Fall">Thu</Option>
+              <Option value="Winter">Đông</Option>
             </Select>
           </Form.Item>
         </Col>
         <Col span={12}>
           <Form.Item
             name="year"
-            label="Year"
-            rules={[{ required: true, message: 'Please enter year' }]}
+            label="Năm"
+            rules={[{ required: true, message: 'Vui lòng nhập năm' }]}
           >
-            <Input type="number" placeholder="e.g. 2026" />
+            <Input type="number" placeholder="Ví dụ: 2026" />
           </Form.Item>
         </Col>
       </Row>
 
-      <Form.Item name="description" label="Description">
-        <TextArea rows={4} placeholder="Briefly describe the hackathon" />
+      <Form.Item name="description" label="Mô tả">
+        <TextArea rows={4} placeholder="Mô tả ngắn gọn về hackathon" />
       </Form.Item>
 
-      <Form.Item name="rules" label="Rules">
-        <TextArea rows={4} placeholder="Specify rules and regulations" />
+      <Form.Item name="rules" label="Thể lệ">
+        <TextArea rows={4} placeholder="Quy định và thể lệ cuộc thi" />
       </Form.Item>
 
-      <Form.Item name="banner_url" label="Banner URL">
+      <Form.Item name="banner_url" label="Link ảnh Banner">
         <Input placeholder="https://example.com/banner.jpg" />
       </Form.Item>
 
@@ -85,7 +85,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         <Col span={12}>
           <Form.Item
             name="registration_start"
-            label="Registration Start"
+            label="Bắt đầu Đăng ký"
           >
             <DatePicker 
               showTime 
@@ -97,7 +97,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         <Col span={12}>
           <Form.Item
             name="registration_end"
-            label="Registration End"
+            label="Kết thúc Đăng ký"
             dependencies={['registration_start']}
             rules={[
               ({ getFieldValue }) => ({
@@ -106,7 +106,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
                   if (!value || !start || dayjs(value).isAfter(dayjs(start)) || dayjs(value).isSame(dayjs(start))) {
                     return Promise.resolve();
                   }
-                  return Promise.reject(new Error('Registration end must be after or equal to start'));
+                  return Promise.reject(new Error('Ngày kết thúc đăng ký phải sau hoặc bằng ngày bắt đầu'));
                 },
               }),
             ]}
@@ -124,7 +124,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         <Col span={12}>
           <Form.Item
             name="event_start"
-            label="Event Start"
+            label="Bắt đầu Sự kiện"
             dependencies={['registration_end']}
             rules={[
               ({ getFieldValue }) => ({
@@ -133,7 +133,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
                   if (!value || !regEnd || dayjs(value).isAfter(dayjs(regEnd)) || dayjs(value).isSame(dayjs(regEnd))) {
                     return Promise.resolve();
                   }
-                  return Promise.reject(new Error('Event start must be after or equal to registration end'));
+                  return Promise.reject(new Error('Sự kiện phải bắt đầu sau khi kết thúc đăng ký'));
                 },
               }),
             ]}
@@ -148,7 +148,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         <Col span={12}>
           <Form.Item
             name="event_end"
-            label="Event End"
+            label="Kết thúc Sự kiện"
             dependencies={['event_start']}
             rules={[
               ({ getFieldValue }) => ({
@@ -157,7 +157,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
                   if (!value || !start || dayjs(value).isAfter(dayjs(start)) || dayjs(value).isSame(dayjs(start))) {
                     return Promise.resolve();
                   }
-                  return Promise.reject(new Error('Event end must be after or equal to start'));
+                  return Promise.reject(new Error('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu'));
                 },
               }),
             ]}
@@ -175,7 +175,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         <Col span={12}>
           <Form.Item
             name="wildcard_enabled"
-            label="Wildcard Enabled"
+            label="Cho phép Wildcard"
             valuePropName="checked"
           >
             <Switch />
@@ -184,7 +184,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         <Col span={12}>
           <Form.Item
             name="individual_ranking_enabled"
-            label="Individual Ranking Enabled"
+            label="Bật Bảng xếp hạng cá nhân"
             valuePropName="checked"
           >
             <Switch />

@@ -31,8 +31,8 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
     <Modal
       open={visible}
       title={title}
-      okText="Save"
-      cancelText="Cancel"
+      okText="Lưu"
+      cancelText="Hủy"
       onCancel={onCancel}
       onOk={handleSubmit}
       width={700}
@@ -48,30 +48,30 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
       >
         <Form.Item
           name="name"
-          label="Track Name"
-          rules={[{ required: true, message: 'Please enter track name' }]}
+          label="Tên Track"
+          rules={[{ required: true, message: 'Vui lòng nhập tên track' }]}
         >
-          <Input placeholder="e.g. Web Development" />
+          <Input placeholder="Ví dụ: Phát triển Web" />
         </Form.Item>
 
-        <Form.Item name="description" label="Description">
-          <TextArea rows={3} placeholder="Briefly describe the track" />
+        <Form.Item name="description" label="Mô tả">
+          <TextArea rows={3} placeholder="Mô tả ngắn gọn về track" />
         </Form.Item>
 
         <Row gutter={24}>
           <Col span={12}>
             <Form.Item
               name="max_teams"
-              label="Max Teams"
+              label="Số đội tối đa"
               dependencies={['max_teams_per_group']}
             >
-              <InputNumber min={1} style={{ width: '100%' }} />
+              <InputNumber min={1} style={{ width: '100%' }} placeholder="Không giới hạn nếu để trống" />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item
               name="max_teams_per_group"
-              label="Max Teams Per Group"
+              label="Số đội mỗi bảng"
               dependencies={['max_teams']}
               validateTrigger={['onChange', 'onBlur']}
               rules={[
@@ -81,7 +81,7 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
                     if (!value || !maxTeams || value <= maxTeams) {
                       return Promise.resolve();
                     }
-                    return Promise.reject(new Error('Max teams per group must be ≤ total max teams'));
+                    return Promise.reject(new Error('Số đội mỗi bảng phải ≤ tổng số đội'));
                   },
                 }),
               ]}
@@ -95,8 +95,8 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
           <Col span={12}>
             <Form.Item
               name="min_team_size"
-              label="Min Team Size"
-              rules={[{ required: true, message: 'Required' }]}
+              label="Sĩ số tối thiểu"
+              rules={[{ required: true, message: 'Bắt buộc' }]}
               dependencies={['max_team_size']}
             >
               <InputNumber min={1} style={{ width: '100%' }} />
@@ -105,18 +105,18 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
           <Col span={12}>
             <Form.Item
               name="max_team_size"
-              label="Max Team Size"
+              label="Sĩ số tối đa"
               dependencies={['min_team_size']}
               validateTrigger={['onChange', 'onBlur']}
               rules={[
-                { required: true, message: 'Required' },
+                { required: true, message: 'Bắt buộc' },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     const minSize = getFieldValue('min_team_size');
                     if (!value || !minSize || value >= minSize) {
                       return Promise.resolve();
                     }
-                    return Promise.reject(new Error('Max size must be ≥ min size'));
+                    return Promise.reject(new Error('Sĩ số tối đa phải ≥ sĩ số tối thiểu'));
                   },
                 }),
               ]}
@@ -126,10 +126,10 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
           </Col>
         </Row>
 
-        <Form.Item name="status" label="Status">
+        <Form.Item name="status" label="Trạng thái">
           <Select>
-            <Select.Option value="OPEN">Open</Select.Option>
-            <Select.Option value="CLOSED">Closed</Select.Option>
+            <Select.Option value="OPEN">Mở</Select.Option>
+            <Select.Option value="CLOSED">Đóng</Select.Option>
           </Select>
         </Form.Item>
       </Form>
