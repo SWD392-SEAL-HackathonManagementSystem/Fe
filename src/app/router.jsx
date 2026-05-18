@@ -10,7 +10,9 @@ import CreateHackathonPage from '../features/hackathons/pages/CreateHackathonPag
 import HackathonSetupPage from '../features/hackathons/pages/HackathonSetupPage';
 import TrackManagementPage from '../features/tracks/pages/TrackManagementPage';
 import RoundManagementPage from '../features/rounds/pages/RoundManagementPage';
-import { useParams } from 'react-router-dom';
+import CriteriaManagementPage from '../features/criteria/pages/CriteriaManagementPage';
+import ReviewValidatePage from '../features/criteria/pages/ReviewValidatePage';
+import { useParams, useNavigate } from 'react-router-dom';
 
 const TrackWrapper = () => {
   const { hackathonId } = useParams();
@@ -30,6 +32,28 @@ const RoundWrapper = () => {
   );
 };
 
+const CriteriaWrapper = () => {
+  const { hackathonId, roundId } = useParams();
+  const navigate = useNavigate();
+  return (
+    <div style={{ padding: 24 }}>
+      <CriteriaManagementPage
+        roundId={parseInt(roundId)}
+        roundName={`Round #${roundId} Criteria`}
+        onBack={() => navigate(`/hackathons/${hackathonId}/setup`)}
+      />
+    </div>
+  );
+};
+
+const ReviewWrapper = () => {
+  return (
+    <div style={{ padding: 24 }}>
+      <ReviewValidatePage />
+    </div>
+  );
+};
+
 const AppRouter = () => {
   return (
     <MainLayout>
@@ -42,6 +66,8 @@ const AppRouter = () => {
         {/* Explicit routes for tracks and rounds */}
         <Route path={ROUTES.TRACKS} element={<TrackWrapper />} />
         <Route path={ROUTES.ROUNDS} element={<RoundWrapper />} />
+        <Route path={ROUTES.CRITERIA} element={<CriteriaWrapper />} />
+        <Route path={ROUTES.REVIEW_VALIDATE} element={<ReviewWrapper />} />
         
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

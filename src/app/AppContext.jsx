@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { MOCK_HACKATHONS } from '../features/hackathons/data/hackathon.mock';
 import { MOCK_TRACKS } from '../features/tracks/data/track.mock';
 import { MOCK_ROUNDS } from '../features/rounds/data/round.mock';
+import { MOCK_CRITERIA } from '../features/criteria/data/criteria.mock';
 
 const AppContext = createContext();
 
@@ -22,6 +23,11 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : MOCK_ROUNDS;
   });
 
+  const [criteria, setCriteria] = useState(() => {
+    const saved = localStorage.getItem('criteria');
+    return saved ? JSON.parse(saved) : MOCK_CRITERIA;
+  });
+
   useEffect(() => {
     localStorage.setItem('hackathons', JSON.stringify(hackathons));
   }, [hackathons]);
@@ -33,6 +39,10 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('rounds', JSON.stringify(rounds));
   }, [rounds]);
+
+  useEffect(() => {
+    localStorage.setItem('criteria', JSON.stringify(criteria));
+  }, [criteria]);
 
   // Auto-update status based on real time
   useEffect(() => {
@@ -101,7 +111,9 @@ export const AppProvider = ({ children }) => {
     setTracks(tracks.filter(t => t.hackathon_id !== id));
     // Rounds are linked to tracks, so we need to filter them too
     const trackIds = tracks.filter(t => t.hackathon_id === id).map(t => t.id);
+    const roundIds = rounds.filter(r => trackIds.includes(r.track_id)).map(r => r.id);
     setRounds(rounds.filter(r => !trackIds.includes(r.track_id)));
+    setCriteria(criteria.filter(c => !roundIds.includes(c.round_id)));
   };
 
   // Track actions
@@ -121,7 +133,9 @@ export const AppProvider = ({ children }) => {
 
   const deleteTrack = (id) => {
     setTracks(tracks.filter(t => t.id !== id));
+    const roundIds = rounds.filter(r => r.track_id === id).map(r => r.id);
     setRounds(rounds.filter(r => r.track_id !== id));
+    setCriteria(criteria.filter(c => !roundIds.includes(c.round_id)));
   };
 
   // Round actions
@@ -142,13 +156,33 @@ export const AppProvider = ({ children }) => {
 
   const deleteRound = (id) => {
     setRounds(rounds.filter(r => r.id !== id));
+    setCriteria(criteria.filter(c => c.round_id !== id));
+  };
+
+  // Criteria actions
+  const addCriteria = (criterion) => {
+    const newCriterion = {
+      ...criterion,
+      id: criteria.length > 0 ? Math.max(...criteria.map(c => c.id)) + 1 : 1,
+    };
+    setCriteria([...criteria, newCriterion]);
+    return newCriterion;
+  };
+
+  const updateCriteria = (id, updates) => {
+    setCriteria(criteria.map(c => c.id === id ? { ...c, ...updates } : c));
+  };
+
+  const deleteCriteria = (id) => {
+    setCriteria(criteria.filter(c => c.id !== id));
   };
 
   return (
     <AppContext.Provider value={{
       hackathons, addHackathon, updateHackathon, deleteHackathon,
       tracks, addTrack, updateTrack, deleteTrack,
-      rounds, addRound, updateRound, deleteRound
+      rounds, addRound, updateRound, deleteRound,
+      criteria, addCriteria, updateCriteria, deleteCriteria
     }}>
       {children}
     </AppContext.Provider>
