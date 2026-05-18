@@ -8,6 +8,8 @@ import CriteriaManagementPage from '../../criteria/pages/CriteriaManagementPage'
 import ReviewValidatePage from '../../criteria/pages/ReviewValidatePage';
 import { useAppContext } from '../../../app/AppContext';
 import { ROUTES } from '../../../shared/constants/routes';
+import PeopleManagementPage from '../../people/pages/PeopleManagementPage';
+import EventManagementPage from '../../events/pages/EventManagementPage';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -94,6 +96,16 @@ const HackathonSetupPage = () => {
       key: 'review',
       label: 'Review & Validate',
       children: <ReviewValidatePage />,
+    },
+    {
+      key: 'people',
+      label: 'Nhân sự (People)',
+      children: <PeopleManagementPage hackathonId={hackathon.id} />,
+    },
+    {
+      key: 'events',
+      label: 'Lịch trình (Events)',
+      children: <EventManagementPage hackathonId={hackathon.id} />,
     },
   ];
 

@@ -4,6 +4,10 @@ import { MOCK_HACKATHONS } from '../features/hackathons/data/hackathon.mock';
 import { MOCK_TRACKS } from '../features/tracks/data/track.mock';
 import { MOCK_ROUNDS } from '../features/rounds/data/round.mock';
 import { MOCK_CRITERIA } from '../features/criteria/data/criteria.mock';
+import { MOCK_PEOPLE } from '../features/people/data/people.mock';
+import { MOCK_ASSIGNMENTS } from '../features/people/data/assignments.mock';
+import { MOCK_EVENTS } from '../features/events/data/event.mock';
+import { MOCK_NOTIFICATIONS } from '../features/notifications/data/notification.mock';
 
 const AppContext = createContext();
 
@@ -28,6 +32,26 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : MOCK_CRITERIA;
   });
 
+  const [people, setPeople] = useState(() => {
+    const saved = localStorage.getItem('people');
+    return saved ? JSON.parse(saved) : MOCK_PEOPLE;
+  });
+
+  const [assignments, setAssignments] = useState(() => {
+    const saved = localStorage.getItem('assignments');
+    return saved ? JSON.parse(saved) : MOCK_ASSIGNMENTS;
+  });
+
+  const [events, setEvents] = useState(() => {
+    const saved = localStorage.getItem('events');
+    return saved ? JSON.parse(saved) : MOCK_EVENTS;
+  });
+
+  const [notifications, setNotifications] = useState(() => {
+    const saved = localStorage.getItem('notifications');
+    return saved ? JSON.parse(saved) : MOCK_NOTIFICATIONS;
+  });
+
   useEffect(() => {
     localStorage.setItem('hackathons', JSON.stringify(hackathons));
   }, [hackathons]);
@@ -43,6 +67,10 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem('criteria', JSON.stringify(criteria));
   }, [criteria]);
+  useEffect(() => { localStorage.setItem('people', JSON.stringify(people)); }, [people]);
+  useEffect(() => { localStorage.setItem('assignments', JSON.stringify(assignments)); }, [assignments]);
+  useEffect(() => { localStorage.setItem('events', JSON.stringify(events)); }, [events]);
+  useEffect(() => { localStorage.setItem('notifications', JSON.stringify(notifications)); }, [notifications]);
 
   // Auto-update status based on real time
   useEffect(() => {
@@ -177,12 +205,58 @@ export const AppProvider = ({ children }) => {
     setCriteria(criteria.filter(c => c.id !== id));
   };
 
+  // People actions
+  const addPerson = (person) => {
+    const newPerson = { ...person, id: Date.now(), status: 'PENDING' };
+    setPeople([...people, newPerson]);
+    return newPerson;
+  };
+
+  const assignRole = (assignment) => {
+    const newAssignment = { ...assignment, id: Date.now() };
+    setAssignments([...assignments, newAssignment]);
+  };
+
+  const removeAssignment = (id) => {
+    setAssignments(assignments.filter(a => a.id !== id));
+  };
+
+  // --- Event actions ---
+  const addEvent = (event) => {
+    const newEvent = { ...event, id: Date.now() };
+    setEvents([...events, newEvent]);
+    return newEvent;
+  };
+
+  // Notification actions
+  const addNotification = (notif) => {
+    const newNotif = { 
+      ...notif, 
+      id: Date.now(), 
+      time: 'Vừa xong', 
+      is_read: false 
+    };
+    setNotifications(prev => [newNotif, ...prev]); // Push lên đầu mảng
+  };
+
+  const markAsRead = (id) => {
+    if (id === 'ALL') {
+      setNotifications(notifications.map(n => ({ ...n, is_read: true })));
+    } else {
+      setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
+    }
+  };
+
   return (
     <AppContext.Provider value={{
       hackathons, addHackathon, updateHackathon, deleteHackathon,
       tracks, addTrack, updateTrack, deleteTrack,
       rounds, addRound, updateRound, deleteRound,
-      criteria, addCriteria, updateCriteria, deleteCriteria
+      criteria, addCriteria, updateCriteria, deleteCriteria,
+      people, addPerson,
+      assignments, assignRole, removeAssignment,
+      events, addEvent,
+      notifications, addNotification, markAsRead
     }}>
       {children}
     </AppContext.Provider>
