@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Card, Tabs, Button, Table, Form, Input, Modal, Select, Tag, Alert, message, notification } from 'antd';
+import { Card, Tabs, Button, Table, Form, Input, Modal, Select, Tag, Alert, message, notification, Space } from 'antd';
 import { UserPlus, ShieldAlert, Trash2 } from 'lucide-react';
 import { useAppContext } from '../../../app/AppContext';
 
 const { Option } = Select;
 
 const PeopleManagementPage = ({ hackathonId }) => {
-  // Đã lấy thêm hàm addNotification từ AppContext
   const { people, addPerson, assignments, assignRole, removeAssignment, tracks, rounds, addNotification } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
@@ -35,17 +34,15 @@ const PeopleManagementPage = ({ hackathonId }) => {
     setIsModalOpen(false);
     form.resetFields();
 
-    // 1. Gửi data vào hệ thống Notification chung (Sẽ làm sáng Chuông trên Header)
     addNotification({
       type: 'INVITATION',
-      title: 'Invitation Sent',
+      title: 'Đã gửi lời mời',
       description: `Đã tự động gửi email chứa link đăng nhập một lần tới ${values.name} (${values.email}).`
     });
 
-    // 2. Bắn thêm một Popup Toast ở góc màn hình cho UX thêm sinh động
     setTimeout(() => {
       notification.info({
-        message: <strong>Invitation Sent</strong>,
+        message: <strong>Đã gửi lời mời</strong>,
         description: `Hệ thống đã gửi email mời tới ${values.name}.`,
         placement: 'bottomRight',
         duration: 5,
@@ -66,13 +63,33 @@ const PeopleManagementPage = ({ hackathonId }) => {
     }
 
     assignRole({ ...values, hackathon_id: hackathonId, type });
-    message.success(`Đã phân công ${type} thành công!`);
+    message.success(`Đã phân công ${type === 'MENTOR' ? 'Mentor' : 'Giám khảo'} thành công!`);
   };
 
-  // --- HÀM TIỆN ÍCH HIỂN THỊ DỮ LIỆU BẢNG ---
-  const getPersonName = (id) => people.find(p => p.id === id)?.name || 'Unknown';
-  const getTrackName = (id) => tracks.find(t => t.id === id)?.name || 'Unknown';
-  const getRoundName = (id) => rounds.find(r => r.id === id)?.name || 'Unknown';
+  // --- HÀM TIỆN ÍCH HIỂN THỊ DỮ LIỆU BẢNG BẰNG TIẾNG VIỆT ---
+  const getPersonName = (id) => people.find(p => p.id === id)?.name || 'Không xác định';
+  const getTrackName = (id) => tracks.find(t => t.id === id)?.name || 'Không xác định';
+  const getRoundName = (id) => rounds.find(r => r.id === id)?.name || 'Không xác định';
+
+  // Dịch trạng thái lời mời sang tiếng Việt
+  const renderInvitationStatus = (status) => {
+    switch (status) {
+      case 'ACCEPTED': return <Tag color="green">Đã chấp nhận</Tag>;
+      case 'PENDING': return <Tag color="orange">Chờ phản hồi</Tag>;
+      case 'SENT': return <Tag color="blue">Đã gửi</Tag>;
+      default: return <Tag>{status}</Tag>;
+    }
+  };
+
+  // Dịch và tô màu cho Vai trò Giám khảo
+  const renderJudgeRole = (role) => {
+    switch (role) {
+      case 'HEAD': return <Tag color="red">Trưởng ban</Tag>;
+      case 'CALIBRATION': return <Tag color="gold">Chấm chéo</Tag>; // gold là màu vàng cam đẹp nhất của Ant Design
+      case 'NORMAL': return <Tag color="blue">Bình thường</Tag>;
+      default: return <Tag color="blue">Bình thường</Tag>;
+    }
+  };
 
   const mentorColumns = [
     { title: 'Tên Mentor', key: 'name', render: (_, r) => <strong>{getPersonName(r.person_id)}</strong> },
@@ -83,7 +100,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
   const judgeColumnsAssign = [
     { title: 'Tên Giám khảo', key: 'name', render: (_, r) => <strong>{getPersonName(r.person_id)}</strong> },
     { title: 'Phụ trách Vòng thi', key: 'round', render: (_, r) => <Tag color="geekblue">{getRoundName(r.round_id)}</Tag> },
-    { title: 'Vai trò', dataIndex: 'assignment_type', key: 'type', render: t => <Tag color={t === 'HEAD' ? 'red' : 'default'}>{t}</Tag> },
+    { title: 'Vai trò', dataIndex: 'assignment_type', key: 'type', render: t => renderJudgeRole(t) },
     { title: 'Thao tác', key: 'action', render: (_, r) => <Button type="text" danger icon={<Trash2 size={16}/>} onClick={() => removeAssignment(r.id)} /> }
   ];
 
@@ -109,11 +126,12 @@ const PeopleManagementPage = ({ hackathonId }) => {
             <Table 
               dataSource={people.filter(p => p.role === 'JUDGE')} 
               rowKey="id" pagination={false}
+              locale={{ emptyText: 'Chưa có giám khảo nào.' }}
               columns={[
                 { title: 'Tên', dataIndex: 'name', key: 'name', render: t => <strong>{t}</strong> },
                 { title: 'Email', dataIndex: 'email', key: 'email' },
                 { title: 'Tổ chức', dataIndex: 'institution', key: 'institution' },
-                { title: 'Trạng thái Mời', dataIndex: 'status', key: 'status', render: s => <Tag color={s === 'ACCEPTED' ? 'green' : 'orange'}>{s}</Tag> }
+                { title: 'Trạng thái Mời', dataIndex: 'status', key: 'status', render: s => renderInvitationStatus(s) }
               ]} 
             />
           </Tabs.TabPane>
@@ -122,17 +140,19 @@ const PeopleManagementPage = ({ hackathonId }) => {
           <Tabs.TabPane tab="Phân công Mentor" key="2">
             <Card type="inner" style={{ marginBottom: 24, background: '#fafafa' }}>
               <Form layout="inline" onFinish={(vals) => handleAssign(vals, 'MENTOR')}>
-                <Form.Item name="person_id" rules={[{ required: true }]}>
-                  <Select placeholder="Chọn Mentor..." style={{ width: 250 }}>
-                    {people.filter(p => p.role === 'MENTOR').map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
-                  </Select>
-                </Form.Item>
-                <Form.Item name="track_id" rules={[{ required: true }]}>
-                  <Select placeholder="Chọn Bảng đấu (Track)..." style={{ width: 250 }}>
-                    {hackathonTracks.map(t => <Option key={t.id} value={t.id}>{t.name}</Option>)}
-                  </Select>
-                </Form.Item>
-                <Button type="primary" htmlType="submit">Phân công</Button>
+                <Space size="middle" wrap>
+                  <Form.Item name="person_id" rules={[{ required: true, message: 'Vui lòng chọn' }]}>
+                    <Select placeholder="Chọn Mentor..." style={{ width: 220 }}>
+                      {people.filter(p => p.role === 'MENTOR').map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
+                    </Select>
+                  </Form.Item>
+                  <Form.Item name="track_id" rules={[{ required: true, message: 'Vui lòng chọn' }]}>
+                    <Select placeholder="Chọn Bảng đấu (Track)..." style={{ width: 250 }}>
+                      {hackathonTracks.map(t => <Option key={t.id} value={t.id}>{t.name}</Option>)}
+                    </Select>
+                  </Form.Item>
+                  <Button type="primary" htmlType="submit">Phân công</Button>
+                </Space>
               </Form>
             </Card>
             <Table dataSource={hackathonAssignments.filter(a => a.type === 'MENTOR')} columns={mentorColumns} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có Mentor nào được phân công' }} />
@@ -142,24 +162,28 @@ const PeopleManagementPage = ({ hackathonId }) => {
           <Tabs.TabPane tab="Phân công Judge" key="3">
             <Card type="inner" style={{ marginBottom: 24, background: '#fafafa' }}>
               <Form layout="inline" onFinish={(vals) => handleAssign(vals, 'JUDGE')} initialValues={{ assignment_type: 'NORMAL' }}>
-                <Form.Item name="person_id" rules={[{ required: true }]}>
-                  <Select placeholder="Chọn Giám khảo..." style={{ width: 200 }}>
-                    {people/*.filter(p => p.role === 'JUDGE')*/.map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
-                  </Select>
-                </Form.Item>
-                <Form.Item name="round_id" rules={[{ required: true }]}>
-                  <Select placeholder="Chọn Vòng SƠ LOẠI..." style={{ width: 200 }}>
-                    {preliminaryRounds.map(r => <Option key={r.id} value={r.id}>{r.name} ({getTrackName(r.track_id)})</Option>)}
-                  </Select>
-                </Form.Item>
-                <Form.Item name="assignment_type" rules={[{ required: true }]}>
-                  <Select style={{ width: 150 }}>
-                    <Option value="NORMAL">Bình thường</Option>
-                    <Option value="HEAD">Trưởng ban</Option>
-                    <Option value="CALIBRATION">Chấm chéo</Option>
-                  </Select>
-                </Form.Item>
-                <Button type="primary" htmlType="submit">Phân công</Button>
+                <Space size="middle" wrap>
+                  <Form.Item name="person_id" rules={[{ required: true, message: 'Vui lòng chọn' }]}>
+                    <Select placeholder="Chọn Giám khảo..." style={{ width: 220 }}>
+                      {/* Lưu ý: Bạn có thể bỏ comment filter JUDGE bên dưới khi đã test xong conflict */}
+                      {people/*.filter(p => p.role === 'JUDGE')*/.map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
+                    </Select>
+                  </Form.Item>
+                  <Form.Item name="round_id" rules={[{ required: true, message: 'Vui lòng chọn' }]}>
+                    <Select placeholder="Chọn Vòng SƠ LOẠI..." style={{ width: 250 }}>
+                      {preliminaryRounds.map(r => <Option key={r.id} value={r.id}>{r.name} ({getTrackName(r.track_id)})</Option>)}
+                    </Select>
+                  </Form.Item>
+                  {/* GIỮ VALUE LÀ TIẾNG ANH CHO CHUẨN DB, NHƯNG HIỂN THỊ TIẾNG VIỆT */}
+                  <Form.Item name="assignment_type" rules={[{ required: true, message: 'Vui lòng chọn' }]}>
+                    <Select style={{ width: 140 }}>
+                      <Option value="NORMAL">Bình thường</Option>
+                      <Option value="HEAD">Trưởng ban</Option>
+                      <Option value="CALIBRATION">Chấm chéo</Option>
+                    </Select>
+                  </Form.Item>
+                  <Button type="primary" htmlType="submit">Phân công</Button>
+                </Space>
               </Form>
             </Card>
             <Table dataSource={hackathonAssignments.filter(a => a.type === 'JUDGE')} columns={judgeColumnsAssign} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có Judge nào được phân công' }}/>
@@ -168,10 +192,10 @@ const PeopleManagementPage = ({ hackathonId }) => {
       </Card>
 
       {/* MODAL MỜI GUEST JUDGE */}
-      <Modal title="Mời Giám khảo khách mời" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} okText="Gửi lời mời">
+      <Modal title="Mời Giám khảo khách mời" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} okText="Gửi lời mời" cancelText="Hủy">
         <Form form={form} layout="vertical" onFinish={handleAddGuestJudge}>
-          <Form.Item name="name" label="Họ và Tên" rules={[{ required: true }]}><Input placeholder="VD: Nguyễn Văn A" /></Form.Item>
-          <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email' }]}><Input placeholder="VD: email@example.com" /></Form.Item>
+          <Form.Item name="name" label="Họ và Tên" rules={[{ required: true, message: 'Bắt buộc nhập' }]}><Input placeholder="VD: Nguyễn Văn A" /></Form.Item>
+          <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email', message: 'Email không hợp lệ' }]}><Input placeholder="VD: email@example.com" /></Form.Item>
           <Form.Item name="institution" label="Đơn vị/Tổ chức"><Input placeholder="Tên công ty hoặc trường đại học" /></Form.Item>
         </Form>
       </Modal>
