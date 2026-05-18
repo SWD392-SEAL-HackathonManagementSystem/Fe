@@ -30,13 +30,17 @@ const EventManagementPage = ({ hackathonId }) => {
     const eEnd = values.ends_at ? dayjs(values.ends_at) : null;
     const hStart = currentHackathon?.event_start ? dayjs(currentHackathon.event_start) : null;
     const hEnd = currentHackathon?.event_end ? dayjs(currentHackathon.event_end).add(1, 'day') : null;
+    const rStart = currentHackathon?.registration_start ? dayjs(currentHackathon.registration_start) : hStart;
 
+    // --- LỚP 1: Chặn cứng (Nằm ngoài khung giải đấu) ---
     if (hStart && hEnd) {
-      if (eStart.isBefore(hStart) || (eEnd && eEnd.isAfter(hEnd))) {
-        return message.error('Lỗi Lớp 1: Sự kiện nằm ngoài thời gian giải đấu.');
+      const minStartTime = values.type === 'WORKSHOP' ? rStart : hStart;
+      if (eStart.isBefore(minStartTime) || (eEnd && eEnd.isAfter(hEnd))) {
+        return message.error(`Lỗi Lớp 1: Thời gian không hợp lệ. ${values.type === 'WORKSHOP' ? 'Workshop phải nằm trong hoặc sau thời gian đăng ký' : 'Sự kiện phải nằm trong thời gian giải đấu'}.`);
       }
     }
 
+    // --- LỚP 2: Chặn cứng (Chồng lấn KICKOFF hoặc AWARDS) ---
     const isOverlap = hackathonEvents.some(e => {
       if ((values.type === 'KICKOFF' && e.type === 'KICKOFF') || (values.type === 'AWARDS' && e.type === 'AWARDS')) {
         const existStart = dayjs(e.starts_at);
@@ -50,10 +54,24 @@ const EventManagementPage = ({ hackathonId }) => {
       return message.error(`Lỗi Lớp 2: Đã có sự kiện ${values.type} trong khoảng thời gian này!`);
     }
 
+    // --- LỚP 3: Logic tùy chỉnh theo yêu cầu mới ---
+    const kickoffEvent = hackathonEvents.find(e => e.type === 'KICKOFF');
+    const kickoffStart = kickoffEvent ? dayjs(kickoffEvent.starts_at) : hStart;
+    const regEnd = currentHackathon?.registration_end ? dayjs(currentHackathon.registration_end) : null;
+
+    // 🔴 CHẶN CỨNG ĐỐI VỚI WORKSHOP 
+    if (values.type === 'WORKSHOP') {
+      if (regEnd && eStart.isBefore(regEnd)) {
+        return message.error('WORKSHOP training nên diễn ra sau ngày đóng đăng ký.');
+      }
+      if (kickoffStart && eStart.isAfter(kickoffStart)) {
+        return message.error('WORKSHOP training nên diễn ra trước ngày Khai mạc (Kick-off).');
+      }
+    }
+
+    // 🟡 CẢNH BÁO MỀM (Chỉ còn áp dụng cho KICKOFF nếu diễn ra quá muộn)
     let warningMsg = '';
-    if (values.type === 'WORKSHOP' && currentHackathon.registration_end && eStart.isAfter(dayjs(currentHackathon.registration_end))) {
-      warningMsg = 'WORKSHOP thường diễn ra trước khi đóng đăng ký.';
-    } else if (values.type === 'KICKOFF' && hStart && eStart.isAfter(hStart.add(1, 'day'))) {
+    if (values.type === 'KICKOFF' && hStart && eStart.isAfter(hStart.add(1, 'day'))) {
       warningMsg = 'KICKOFF nên nằm trong ngày đầu tiên của sự kiện.';
     }
 
@@ -82,7 +100,7 @@ const EventManagementPage = ({ hackathonId }) => {
 
     if (warningMsg) {
       Modal.confirm({
-        title: 'Cảnh báo Lớp 3 (Thứ tự Logic)',
+        title: 'Cảnh báo (Thứ tự Logic)',
         content: `${warningMsg} Bạn có chắc chắn muốn bỏ qua cảnh báo và lưu không?`,
         onOk: saveEvent
       });
@@ -157,7 +175,6 @@ const EventManagementPage = ({ hackathonId }) => {
               <Select placeholder="Chọn loại sự kiện">
                 <Select.Option value="KICKOFF">KICKOFF (Khai mạc)</Select.Option>
                 <Select.Option value="WORKSHOP">WORKSHOP</Select.Option>
-                <Select.Option value="TEAM_MEETING">TEAM MEETING (Họp đội)</Select.Option>
                 <Select.Option value="PRESENTATION">PRESENTATION (Thuyết trình)</Select.Option>
                 <Select.Option value="AWARDS">AWARDS (Trao giải)</Select.Option>
                 <Select.Option value="OTHER">OTHER (Khác)</Select.Option>
