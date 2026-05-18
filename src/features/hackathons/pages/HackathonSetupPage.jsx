@@ -6,6 +6,8 @@ import TrackManagementPage from '../../tracks/pages/TrackManagementPage';
 import RoundManagementPage from '../../rounds/pages/RoundManagementPage';
 import { useAppContext } from '../../../app/AppContext';
 import { ROUTES } from '../../../shared/constants/routes';
+import PeopleManagementPage from '../../people/pages/PeopleManagementPage';
+import EventManagementPage from '../../events/pages/EventManagementPage';
 
 const { Title } = Typography;
 
@@ -37,6 +39,16 @@ const HackathonSetupPage = () => {
       key: 'rounds',
       label: 'Vòng thi (Rounds)',
       children: <RoundManagementPage hackathonId={hackathon.id} />,
+    },
+    {
+      key: 'people',
+      label: 'Nhân sự (People)',
+      children: <PeopleManagementPage hackathonId={hackathon.id} />,
+    },
+    {
+      key: 'events',
+      label: 'Lịch trình (Events)',
+      children: <EventManagementPage hackathonId={hackathon.id} />,
     },
   ];
 
