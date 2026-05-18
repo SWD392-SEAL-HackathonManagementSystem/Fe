@@ -109,14 +109,16 @@ const HackathonListPage = () => {
                   </div>
                 }
                 actions={[
-                  <Button 
-                    type="text" 
-                    icon={<Settings size={16} />} 
-                    key="setup"
-                    onClick={() => navigate(`/hackathons/${hackathon.id}/setup`)}
-                  >
-                    Thiết lập
-                  </Button>,
+                  hackathon.status !== 'COMPLETED' && (
+                    <Button 
+                      type="text" 
+                      icon={<Settings size={16} />} 
+                      key="setup"
+                      onClick={() => navigate(`/hackathons/${hackathon.id}/setup`)}
+                    >
+                      Thiết lập
+                    </Button>
+                  ),
                   <Popconfirm
                     title="Xóa Sự kiện"
                     description="Bạn có chắc chắn muốn xóa sự kiện này? Hành động này không thể hoàn tác."
@@ -129,7 +131,7 @@ const HackathonListPage = () => {
                       Xóa
                     </Button>
                   </Popconfirm>
-                ]}
+                ].filter(Boolean)}
               >
                 <Card.Meta
                   title={<Title level={4}>{hackathon.name}</Title>}
