@@ -24,19 +24,26 @@ const HackathonSetupPage = () => {
   const hackathonRounds = rounds.filter(r => trackIds.includes(r.track_id));
 
   if (!hackathon) {
-    return <div>Hackathon not found</div>;
+    return (
+      <Card style={{ textAlign: 'center', padding: '40px 0' }}>
+        <Typography.Title level={4}>Không tìm thấy sự kiện</Typography.Title>
+        <Button type="primary" onClick={() => navigate(ROUTES.HACKATHONS)}>
+          Quay lại danh sách
+        </Button>
+      </Card>
+    );
   }
 
   const items = [
     {
       key: 'tracks',
-      label: 'Tracks',
-      children: <TrackManagementPage hackathonId={parseInt(hackathonId)} />,
+      label: 'Bảng đấu (Tracks)',
+      children: <TrackManagementPage hackathonId={hackathon.id} />,
     },
     {
       key: 'rounds',
-      label: 'Rounds',
-      children: <RoundManagementPage hackathonId={parseInt(hackathonId)} />,
+      label: 'Vòng thi (Rounds)',
+      children: <RoundManagementPage hackathonId={hackathon.id} />,
     },
     {
       key: 'criteria',
@@ -94,11 +101,13 @@ const HackathonSetupPage = () => {
     <div>
       <PageHeader 
         title={hackathon.name}
-        subtitle={`Configure tracks and rounds for ${hackathon.season} ${hackathon.year}`}
-        backAction={() => navigate(ROUTES.HACKATHONS)}
+        subtitle={`Thiết lập bảng đấu và vòng thi cho mùa ${hackathon.season} ${hackathon.year}`}
+        onBack={() => navigate(ROUTES.HACKATHONS)}
       />
 
-      <Tabs defaultActiveKey="tracks" items={items} type="card" />
+      <Card style={{ borderRadius: 12 }}>
+        <Tabs defaultActiveKey="tracks" items={items} />
+      </Card>
     </div>
   );
 };

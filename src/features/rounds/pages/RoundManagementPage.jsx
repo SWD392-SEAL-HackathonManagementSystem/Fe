@@ -40,29 +40,29 @@ const RoundManagementPage = ({ hackathonId }) => {
 
   const handleDelete = (id) => {
     deleteRound(id);
-    message.success('Round deleted successfully');
+    message.success('Đã xóa vòng thi thành công');
   };
 
   const handleModalFinish = (values) => {
     if (editingRound) {
       updateRound(editingRound.id, values);
-      message.success('Round updated successfully');
+      message.success('Đã cập nhật vòng thi thành công');
     } else {
       addRound(values);
-      message.success('Round created successfully');
+      message.success('Đã tạo vòng thi mới thành công');
     }
     setIsModalVisible(false);
   };
 
   const columns = [
     {
-      title: 'Order',
+      title: 'Thứ tự',
       dataIndex: 'sequence_order',
       key: 'sequence_order',
       width: 80,
     },
     {
-      title: 'Name',
+      title: 'Tên vòng thi',
       dataIndex: 'name',
       key: 'name',
       render: (text, record) => (
@@ -77,33 +77,33 @@ const RoundManagementPage = ({ hackathonId }) => {
       ),
     },
     {
-      title: 'Submission Period',
+      title: 'Thời gian nộp bài',
       key: 'period',
       render: (_, record) => (
         <div style={{ fontSize: 13 }}>
-          <div>Open: {formatDate(record.submission_open)}</div>
-          <div>Deadline: {formatDate(record.submission_deadline)}</div>
+          <div>Mở: {formatDate(record.submission_open)}</div>
+          <div>Hạn chót: {formatDate(record.submission_deadline)}</div>
         </div>
       ),
     },
     {
-      title: 'Duration',
+      title: 'Thời lượng',
       dataIndex: 'coding_duration_hours',
       key: 'duration',
       render: (val) => val ? `${val}h` : '-',
     },
     {
-      title: 'Status',
+      title: 'Trạng thái',
       dataIndex: 'is_active',
       key: 'status',
       render: (active) => (
         <Tag color={active ? 'green' : 'default'}>
-          {active ? 'Active' : 'Inactive'}
+          {active ? 'Đang hoạt động' : 'Ngưng hoạt động'}
         </Tag>
       ),
     },
     {
-      title: 'Actions',
+      title: 'Thao tác',
       key: 'actions',
       render: (_, record) => (
         <Space size="middle">
@@ -113,11 +113,11 @@ const RoundManagementPage = ({ hackathonId }) => {
             onClick={() => handleEdit(record)}
           />
           <Popconfirm
-            title="Delete Round"
-            description="Are you sure you want to delete this round?"
+            title="Xóa vòng thi"
+            description="Bạn có chắc chắn muốn xóa vòng thi này?"
             onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
+            okText="Xóa"
+            cancelText="Hủy"
           >
             <Button type="text" danger icon={<Trash2 size={16} />} />
           </Popconfirm>
@@ -131,7 +131,7 @@ const RoundManagementPage = ({ hackathonId }) => {
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space>
           <Select 
-            placeholder="Filter by Track" 
+            placeholder="Lọc theo Track" 
             style={{ width: 200 }} 
             allowClear
             onChange={setSelectedTrackId}
@@ -146,14 +146,14 @@ const RoundManagementPage = ({ hackathonId }) => {
               type={viewMode === 'table' ? 'primary' : 'default'}
               onClick={() => setViewMode('table')}
             >
-              Table
+              Bảng
             </Button>
             <Button 
               icon={<Calendar size={16} />} 
               type={viewMode === 'timeline' ? 'primary' : 'default'}
               onClick={() => setViewMode('timeline')}
             >
-              Timeline
+              Dòng thời gian
             </Button>
           </Button.Group>
         </Space>
@@ -164,12 +164,12 @@ const RoundManagementPage = ({ hackathonId }) => {
           onClick={handleAdd}
           disabled={hackathonTracks.length === 0}
         >
-          Add Round
+          Thêm vòng thi
         </Button>
       </div>
 
       {hackathonTracks.length === 0 ? (
-        <Card>Please create at least one track before managing rounds.</Card>
+        <Card>Vui lòng tạo ít nhất một track trước khi quản lý các vòng thi.</Card>
       ) : viewMode === 'table' ? (
         <Table 
           columns={columns} 
@@ -188,27 +188,27 @@ const RoundManagementPage = ({ hackathonId }) => {
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <Title level={5} style={{ margin: 0 }}>{round.name}</Title>
                     <Tag color={round.is_active ? 'green' : 'default'}>
-                      {round.is_active ? 'Active' : 'Inactive'}
+                      {round.is_active ? 'Đang hoạt động' : 'Ngưng hoạt động'}
                     </Tag>
                   </div>
                   <div style={{ color: '#8c8c8c', marginBottom: 8 }}>
                     Track: {hackathonTracks.find(t => t.id === round.track_id)?.name} | 
-                    Deadline: {formatDate(round.submission_deadline)}
+                    Hạn chót: {formatDate(round.submission_deadline)}
                   </div>
                   <div>
-                    <Button size="small" icon={<Edit size={14} />} onClick={() => handleEdit(round)}>Edit</Button>
+                    <Button size="small" icon={<Edit size={14} />} onClick={() => handleEdit(round)}>Sửa</Button>
                   </div>
                 </div>
               ),
             }))}
           />
-          {filteredRounds.length === 0 && <div>No rounds found.</div>}
+          {filteredRounds.length === 0 && <div>Không tìm thấy vòng thi nào.</div>}
         </Card>
       )}
 
       <RoundFormModal
         visible={isModalVisible}
-        title={editingRound ? 'Edit Round' : 'Add Round'}
+        title={editingRound ? 'Sửa vòng thi' : 'Thêm vòng thi'}
         initialValues={editingRound}
         tracks={hackathonTracks}
         onCancel={() => setIsModalVisible(false)}

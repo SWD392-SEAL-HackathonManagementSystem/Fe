@@ -111,7 +111,7 @@ const Dashboard = () => {
           <Card 
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Tình Trạng Sự Kiện (Real-time)</span>
+                <span>Tình Trạng Sự Kiện (Thời gian thực)</span>
                 <Button type="text" icon={<MoreOutlined />} />
               </div>
             }

@@ -23,26 +23,26 @@ const CreateHackathonPage = () => {
     };
 
     const newHackathon = addHackathon(formattedValues);
-    message.success('Hackathon created successfully');
+    message.success('Đã tạo sự kiện thành công');
     navigate(ROUTES.HACKATHONS);
   };
 
   return (
     <div>
       <PageHeader 
-        title="Create Hackathon" 
-        subtitle="Setup your new hackathon event"
-        backAction={() => navigate(ROUTES.HACKATHONS)}
+        title="Tạo Sự kiện Mới" 
+        subtitle="Thiết lập các thông tin cơ bản cho sự kiện hackathon của bạn"
+        onBack={() => navigate(ROUTES.HACKATHONS)}
       />
       
-      <Card>
+      <Card style={{ borderRadius: 12 }}>
         <HackathonForm form={form} onFinish={handleFinish} />
         
         <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
           <Space>
-            <Button onClick={() => navigate(ROUTES.HACKATHONS)}>Cancel</Button>
-            <Button type="primary" onClick={() => form.submit()}>
-              Create Hackathon
+            <Button onClick={() => navigate(ROUTES.HACKATHONS)}>Hủy</Button>
+            <Button type="primary" onClick={() => form.submit()} size="large">
+              Tạo Sự kiện
             </Button>
           </Space>
         </div>

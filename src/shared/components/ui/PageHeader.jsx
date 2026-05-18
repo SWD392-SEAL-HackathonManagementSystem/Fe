@@ -5,7 +5,8 @@ import { useNavigate } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 
-const PageHeader = ({ title, subtitle, extra, backAction }) => {
+const PageHeader = ({ title, subtitle, extra, backAction, onBack }) => {
+  const handleBack = onBack || backAction;
   const navigate = useNavigate();
 
   return (
@@ -16,10 +17,10 @@ const PageHeader = ({ title, subtitle, extra, backAction }) => {
       marginBottom: 24
     }}>
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-        {backAction && (
+        {handleBack && (
           <Button 
             icon={<ArrowLeft size={18} />} 
-            onClick={() => typeof backAction === 'function' ? backAction() : navigate(-1)}
+            onClick={() => typeof handleBack === 'function' ? handleBack() : navigate(-1)}
             style={{ marginTop: 4 }}
           />
         )}
