@@ -171,7 +171,7 @@ const RoundManagementPage = ({ hackathonId }) => {
       {hackathonTracks.length === 0 ? (
         <Card>Vui lòng tạo ít nhất một track trước khi quản lý các vòng thi.</Card>
       ) : viewMode === 'table' ? (
-        <Table 
+        <Table scroll={{ x: 'max-content' }}
           columns={columns} 
           dataSource={filteredRounds} 
           rowKey="id"

@@ -158,9 +158,9 @@ const EventManagementPage = ({ hackathonId }) => {
         </Button>
       </div>
 
-      <Card bodyStyle={{ padding: viewMode === 'calendar' ? 0 : 24 }}>
+      <Card styles={{ body: { padding: viewMode === 'calendar' ? 0 : 24 } }}>
         {viewMode === 'list' ? (
-          <Table dataSource={hackathonEvents} columns={columns} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có sự kiện nào được tạo.' }} />
+          <Table scroll={{ x: 'max-content' }} dataSource={hackathonEvents} columns={columns} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có sự kiện nào được tạo.' }} />
         ) : (
           <Calendar cellRender={cellRender} />
         )}

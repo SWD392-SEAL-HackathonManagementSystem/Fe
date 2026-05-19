@@ -60,3 +60,19 @@ code {
   font-weight: 700 !important;
   font-size: 24px !important;
 }
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+  
+  .ant-card {
+    margin-bottom: 16px;
+  }
+  
+  .ant-layout-content {
+    padding: 16px !important;
+    margin: 0 !important;
+  }
+}
