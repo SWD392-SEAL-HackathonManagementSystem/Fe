@@ -1,13 +1,12 @@
-import React, { useMemo } from 'react';
-import { Card, Button, Typography, Tag, Space, Alert, Divider } from 'antd';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Lock, ExternalLink } from 'lucide-react';
-import { useAppContext } from '../../../app/AppContext';
+import React from 'react';
+import { Card, Button, Typography, Tag, Alert } from 'antd';
+import { CheckCircle, XCircle, AlertTriangle, Lock } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatDate } from '../../../shared/utils/date';
+import { useHackathonValidation } from '../hooks/useHackathonValidation';
 
 const { Title, Text, Paragraph } = Typography;
 
-// Validation check item component
 const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
   const getIcon = () => {
     switch (status) {
@@ -25,13 +24,13 @@ const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
   const getStatusTag = () => {
     switch (status) {
       case 'success':
-        return <Tag color="success">Success</Tag>;
+        return <Tag color="success">Hợp lệ</Tag>;
       case 'error':
-        return <Tag color="error">Error</Tag>;
+        return <Tag color="error">Lỗi</Tag>;
       case 'warning':
-        return <Tag color="warning">Warning</Tag>;
+        return <Tag color="warning">Cảnh báo</Tag>;
       default:
-        return <Tag>Unknown</Tag>;
+        return <Tag>Không xác định</Tag>;
     }
   };
 
@@ -64,7 +63,7 @@ const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
               display: 'inline-block',
             }}
           >
-            Error: {detail}
+            Lỗi: {detail}
           </div>
         )}
         {status === 'warning' && detail && (
@@ -82,11 +81,11 @@ const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
               display: 'inline-block',
             }}
           >
-            Warning: {detail}
+            Cảnh báo: {detail}
           </div>
         )}
         {status === 'success' && detail && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary" style={{ fontSize: 13 }}>
             {detail}
           </Text>
         )}
@@ -106,84 +105,32 @@ const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
 const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
   const navigate = useNavigate();
   const params = useParams();
-  const { hackathons, tracks, rounds, criteria } = useAppContext();
-
   const hId = propHackathonId || parseInt(params.hackathonId);
-  const hackathon = hackathons.find((h) => h.id === hId);
 
-  // Gather data for this hackathon
-  const hackathonTracks = useMemo(() => tracks.filter((t) => t.hackathon_id === hId), [tracks, hId]);
-  const trackIds = useMemo(() => hackathonTracks.map((t) => t.id), [hackathonTracks]);
-  const hackathonRounds = useMemo(() => rounds.filter((r) => trackIds.includes(r.track_id)), [rounds, trackIds]);
-  const roundIds = useMemo(() => hackathonRounds.map((r) => r.id), [hackathonRounds]);
-  const hackathonCriteria = useMemo(() => criteria.filter((c) => roundIds.includes(c.round_id)), [criteria, roundIds]);
-
-  // ===== VALIDATION CHECKS =====
-
-  // 1. Tracks & Rounds
-  const hasAtLeastOneTrack = hackathonTracks.length >= 1;
-  const tracksWithEnoughRounds = hackathonTracks.every(
-    (t) => hackathonRounds.filter((r) => r.track_id === t.id).length >= 2
-  );
-  const tracksWithoutEnoughRounds = hackathonTracks.filter(
-    (t) => hackathonRounds.filter((r) => r.track_id === t.id).length < 2
-  );
-
-  // 2. Criteria & Scoring
-  const roundsWithCriteria = hackathonRounds.every(
-    (r) => hackathonCriteria.filter((c) => c.round_id === r.id).length >= 1
-  );
-  const roundsWithoutCriteria = hackathonRounds.filter(
-    (r) => hackathonCriteria.filter((c) => c.round_id === r.id).length < 1
-  );
-
-  // Weight validation per round
-  const weightErrors = [];
-  hackathonRounds.forEach((r) => {
-    const roundCri = hackathonCriteria.filter((c) => c.round_id === r.id);
-    if (roundCri.length > 0) {
-      const totalWeight = roundCri.reduce((sum, c) => sum + c.weight, 0);
-      if (Math.abs(totalWeight - 1.0) > 0.001) {
-        const track = hackathonTracks.find((t) => t.id === r.track_id);
-        weightErrors.push({
-          roundId: r.id,
-          roundName: r.name,
-          trackName: track?.name || 'Unknown',
-          totalWeight: totalWeight.toFixed(2),
-        });
-      }
-    }
-  });
-
-  // 3. Schedule
-  const hasSchedule = hackathon?.event_start && hackathon?.event_end;
-
-  // Count errors and warnings
-  const errors = [];
-  const warnings = [];
-
-  if (!hasAtLeastOneTrack) errors.push('No tracks configured');
-  if (!tracksWithEnoughRounds && hasAtLeastOneTrack)
-    errors.push('Some tracks have less than 2 rounds');
-  if (!roundsWithCriteria && hackathonRounds.length > 0)
-    warnings.push('Some rounds have no criteria');
-  if (weightErrors.length > 0)
-    errors.push(`Weight mismatch in ${weightErrors.length} round(s)`);
-
-  const totalErrors = errors.length + weightErrors.length;
-  const hasBlockingErrors = totalErrors > 0 || !hasAtLeastOneTrack;
+  // Gọi Custom Hook để lấy logic validation
+  const {
+    hackathon,
+    hasCorrectRounds,
+    prelimRoundsHaveTracks,
+    weightErrors,
+    missingCriteriaErrors,
+    personnelErrors,
+    hasKickoffEvent,
+    hasSchedule,
+    totalErrors,
+    hasBlockingErrors
+  } = useHackathonValidation(hId);
 
   if (!hackathon) {
     return (
       <div style={{ padding: 24 }}>
-        <Alert type="error" message="Hackathon not found" />
+        <Alert type="error" message="Không tìm thấy giải đấu" />
       </div>
     );
   }
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
-      {/* Header */}
       <div
         style={{
           display: 'flex',
@@ -194,7 +141,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <Title level={3} style={{ margin: 0 }}>
-            Review & Validate Configuration
+            Đánh giá & Kiểm tra cấu hình
           </Title>
           <Tag
             style={{
@@ -214,67 +161,40 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
         </Button>
       </div>
 
-      {/* Description */}
       <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 24 }}>
-        Before activating the hackathon, please review the critical configuration requirements.
-        All errors must be resolved to proceed. Warnings are highly recommended to address
-        but will not block activation.
+        Trước khi kích hoạt giải đấu, vui lòng kiểm tra lại các yêu cầu cấu hình bắt buộc dưới đây. 
+        Tất cả các lỗi phải được khắc phục để có thể mở cổng đăng ký tham gia.
       </Paragraph>
 
-      {/* Section 1: Tracks & Rounds */}
       <Card
-        title={<Title level={4} style={{ margin: 0 }}>Tracks & Rounds</Title>}
+        title={<Title level={4} style={{ margin: 0 }}>Cấu trúc Vòng thi & Bảng đấu</Title>}
         style={{ marginBottom: 24, borderRadius: 12, overflow: 'hidden' }}
         styles={{ body: { padding: 0 } }}
       >
         <ValidationItem
-          status={hasAtLeastOneTrack ? 'success' : 'error'}
-          title="At least 1 Track configured"
+          status={hasCorrectRounds && prelimRoundsHaveTracks ? 'success' : 'error'}
+          title="Thiết lập Vòng Sơ loại & Chung kết"
           detail={
-            hasAtLeastOneTrack
-              ? `${hackathonTracks.length} Track(s) currently configured (${hackathonTracks.map((t) => t.name).join(', ')}).`
-              : 'No tracks have been configured yet.'
+            hasCorrectRounds && prelimRoundsHaveTracks
+              ? 'Giải đấu đã có ít nhất 1 Vòng Sơ loại (kèm bảng đấu) và đúng 1 Vòng Chung kết.'
+              : 'Yêu cầu bắt buộc: Phải có ít nhất 1 Vòng Sơ loại (có chứa bảng đấu) và duy nhất 1 Vòng Chung kết (FINAL).'
           }
-          linkText={!hasAtLeastOneTrack ? 'Go to Track Settings' : null}
+          linkText={(!hasCorrectRounds || !prelimRoundsHaveTracks) ? 'Đi tới thiết lập Vòng thi' : null}
           linkAction={
-            !hasAtLeastOneTrack
-              ? () => navigate(`/hackathons/${hId}/setup`)
-              : null
-          }
-        />
-        <ValidationItem
-          status={
-            !hasAtLeastOneTrack
-              ? 'warning'
-              : tracksWithEnoughRounds
-              ? 'success'
-              : 'error'
-          }
-          title="Each Track has ≥2 Rounds"
-          detail={
-            tracksWithEnoughRounds
-              ? 'All tracks have at least 2 rounds configured.'
-              : tracksWithoutEnoughRounds.length > 0
-              ? `Track(s) '${tracksWithoutEnoughRounds.map((t) => t.name).join("', '")}' have fewer than 2 rounds.`
-              : 'Configure tracks first.'
-          }
-          linkText={!tracksWithEnoughRounds ? 'Go to Round Settings' : null}
-          linkAction={
-            !tracksWithEnoughRounds
+            (!hasCorrectRounds || !prelimRoundsHaveTracks)
               ? () => navigate(`/hackathons/${hId}/setup`)
               : null
           }
         />
       </Card>
 
-      {/* Section 2: Criteria & Scoring */}
       <Card
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={4} style={{ margin: 0 }}>Criteria & Scoring</Title>
-            {(weightErrors.length > 0 || !roundsWithCriteria) && (
+            <Title level={4} style={{ margin: 0 }}>Tiêu chí & Chấm điểm</Title>
+            {(weightErrors.length > 0 || missingCriteriaErrors.length > 0) && (
               <Tag color="error" icon={<XCircle size={12} />}>
-                Action Required
+                Cần xử lý
               </Tag>
             )}
           </div>
@@ -283,72 +203,106 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
           marginBottom: 24,
           borderRadius: 12,
           overflow: 'hidden',
-          borderColor: weightErrors.length > 0 ? '#ff4d4f' : undefined,
+          borderColor: (weightErrors.length > 0 || missingCriteriaErrors.length > 0) ? '#ff4d4f' : undefined,
         }}
         styles={{ body: { padding: 0 } }}
       >
         <ValidationItem
-          status={roundsWithCriteria ? 'success' : 'warning'}
-          title="Each Round has ≥1 Criteria"
+          status={missingCriteriaErrors.length === 0 ? 'success' : 'error'}
+          title="Thiết lập tiêu chí đánh giá"
           detail={
-            roundsWithCriteria
-              ? 'All configured rounds have associated scoring rubrics.'
-              : `${roundsWithoutCriteria.length} round(s) have no criteria defined.`
+            missingCriteriaErrors.length === 0
+              ? 'Tất cả các bảng đấu và vòng chung kết đều đã có tiêu chí.'
+              : missingCriteriaErrors.join(' | ')
           }
-          linkText={!roundsWithCriteria ? 'Go to Criteria Settings' : null}
+          linkText={missingCriteriaErrors.length > 0 ? 'Đi tới thiết lập Tiêu chí' : null}
           linkAction={
-            !roundsWithCriteria
+            missingCriteriaErrors.length > 0
               ? () => navigate(`/hackathons/${hId}/setup`)
               : null
           }
         />
         <ValidationItem
           status={weightErrors.length === 0 ? 'success' : 'error'}
-          title="Total weight per Round = 1.0"
+          title="Tổng trọng số bằng 1.0"
           detail={
             weightErrors.length === 0
-              ? 'All rounds have criteria weights that sum to 1.0.'
-              : weightErrors
-                  .map(
-                    (e) =>
-                      `Track '${e.trackName}' → Round '${e.roundName}' weights sum to ${e.totalWeight}.`
-                  )
-                  .join(' | ')
+              ? 'Tất cả bộ tiêu chí đều có tổng trọng số chính xác bằng 1.0 (không tính loại PENALTY).'
+              : weightErrors.join(' | ') + ' (Bắt buộc phải bằng 1.0)'
           }
-          linkText={weightErrors.length > 0 ? 'Go to Rubric Settings' : null}
+          linkText={weightErrors.length > 0 ? 'Cân bằng lại trọng số' : null}
           linkAction={
             weightErrors.length > 0
-              ? () => navigate(`/hackathons/${hId}/criteria/${weightErrors[0].roundId}`)
+              ? () => navigate(`/hackathons/${hId}/setup`)
               : null
           }
         />
       </Card>
 
-      {/* Section 3: Schedule & Personnel */}
       <Card
-        title={<Title level={4} style={{ margin: 0 }}>Schedule & Personnel</Title>}
-        style={{ marginBottom: 24, borderRadius: 12, overflow: 'hidden' }}
+        title={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={4} style={{ margin: 0 }}>Phân công Nhân sự</Title>
+            {personnelErrors.length > 0 && (
+              <Tag color="error" icon={<XCircle size={12} />}>
+                Cần xử lý
+              </Tag>
+            )}
+          </div>
+        }
+        style={{
+          marginBottom: 24,
+          borderRadius: 12,
+          overflow: 'hidden',
+          borderColor: personnelErrors.length > 0 ? '#ff4d4f' : undefined,
+        }}
         styles={{ body: { padding: 0 } }}
       >
         <ValidationItem
-          status={hasSchedule ? 'success' : 'warning'}
-          title="Kickoff schedule set"
+          status={personnelErrors.length === 0 ? 'success' : 'error'}
+          title="Phân công Giám khảo / Mentor"
           detail={
-            hasSchedule
-              ? `Start: ${formatDate(hackathon.event_start, 'MMM DD, YYYY')}. End: ${formatDate(hackathon.event_end, 'MMM DD, YYYY')}.`
-              : 'Event schedule has not been configured.'
+            personnelErrors.length === 0
+              ? 'Tất cả các Bảng đấu (Sơ loại) và Vòng chung kết đều đã được phân công đủ Mentor và Giám khảo.'
+              : (
+                <div>
+                  <Paragraph style={{ margin: 0, color: '#ff4d4f' }}>Yêu cầu bổ sung nhân sự:</Paragraph>
+                  <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
+                    {personnelErrors.map((err, i) => <li key={`personnel-${i}`}>{err}</li>)}
+                  </ul>
+                </div>
+              )
+          }
+          linkText={personnelErrors.length > 0 ? 'Đi tới Quản lý Nhân sự' : null}
+          linkAction={
+            personnelErrors.length > 0
+              ? () => navigate(`/hackathons/${hId}/setup?tab=people`)
+              : null
           }
         />
+      </Card>
+      <Card
+        title={<Title level={4} style={{ margin: 0 }}>Lịch trình sự kiện</Title>}
+        style={{ marginBottom: 24, borderRadius: 12, overflow: 'hidden', borderColor: !hasKickoffEvent ? '#ff4d4f' : undefined }}
+        styles={{ body: { padding: 0 } }}
+      >
         <ValidationItem
-          status="warning"
-          title="Judges assigned to all Rounds"
-          detail="Judge assignment feature is not yet implemented. Please assign judges manually."
-          linkText="Manage Judges"
-          linkAction={() => {}}
+          status={hasKickoffEvent ? 'success' : 'error'}
+          title="Thiết lập sự kiện Khai mạc (KICKOFF)"
+          detail={
+            hasKickoffEvent
+              ? 'Đã cấu hình sự kiện Khai mạc (KICKOFF) để tiến hành bốc thăm chia bảng.'
+              : 'Yêu cầu bắt buộc: Phải có ít nhất 1 sự kiện thuộc loại "KICKOFF" trong Lịch trình sự kiện (Event Management).'
+          }
+          linkText={!hasKickoffEvent ? 'Đi tới Lịch trình' : null}
+          linkAction={
+            !hasKickoffEvent
+              ? () => navigate(`/hackathons/${hId}/setup`) // Điều hướng về tab setup chung (có Events)
+              : null
+          }
         />
       </Card>
 
-      {/* Activation Area */}
       <Card
         style={{
           marginTop: 32,
@@ -367,20 +321,20 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
         >
           <div style={{ flex: 1, minWidth: 300 }}>
             <Title level={3} style={{ margin: 0, marginBottom: 8 }}>
-              Ready to Open Hackathon
+              Trạng thái sẵn sàng
             </Title>
             <Paragraph type="secondary" style={{ fontSize: 16, margin: 0, maxWidth: 600 }}>
               {hasBlockingErrors ? (
                 <>
-                  Your event configuration has{' '}
+                  Hệ thống phát hiện có{' '}
                   <strong style={{ color: '#ff4d4f' }}>
-                    {totalErrors} critical error{totalErrors !== 1 ? 's' : ''}
+                    {totalErrors} lỗi cấu hình
                   </strong>{' '}
-                  that must be resolved before you can activate the hackathon and open registrations.
+                  cần được khắc phục trước khi kích hoạt giải đấu (ONGOING) và mở cổng đăng ký.
                 </>
               ) : (
                 <>
-                  All critical checks have passed. You can now activate the hackathon and open registrations.
+                  Tất cả các kiểm tra hệ thống bắt buộc đều đã hợp lệ. Giải đấu đã sẵn sàng để kích hoạt và mở cổng đăng ký cho sinh viên.
                 </>
               )}
             </Paragraph>
@@ -398,7 +352,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
               fontWeight: 600,
             }}
           >
-            {hasBlockingErrors ? 'Activate Hackathon' : '🚀 Activate Hackathon'}
+            {hasBlockingErrors ? 'Chưa thể Kích hoạt' : 'Kích hoạt Giải đấu'}
           </Button>
         </div>
       </Card>

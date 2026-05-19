@@ -1,35 +1,39 @@
-import React, { useState, useMemo } from 'react';
-import { Table, Button, Space, Popconfirm, message, Tag, Card, Alert, Typography, Tooltip, Switch, Modal, Select, Form } from 'antd';
-import { Plus, Edit, Trash2, ArrowLeft, Copy, Scale, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import { Table, Button, Space, Popconfirm, message, Tag, Card, Alert, Typography, Switch, Select } from 'antd';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import CriteriaFormModal from '../components/CriteriaFormModal';
-import { useAppContext } from '../../../app/AppContext';
+import { useCriteriaManagement } from '../hooks/useCriteriaManagement';
+import { CRITERIA_TYPES, CRITERIA_COLORS } from '../constants/criteria.constants';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-const CriteriaManagementPage = ({ roundId, roundName, onBack }) => {
-  const { criteria, addCriteria, updateCriteria, deleteCriteria, rounds, updateRound } = useAppContext();
+const CriteriaManagementPage = ({ hackathonId }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCloneModalVisible, setIsCloneModalVisible] = useState(false);
-  const [cloneSourceRound, setCloneSourceRound] = useState(null);
+  const [cloneSourceId, setCloneSourceId] = useState(null);
+  const [cloneSourceType, setCloneSourceType] = useState('TRACK'); // 'TRACK' | 'ROUND'
   const [editingCriteria, setEditingCriteria] = useState(null);
 
-  const currentRound = rounds.find(r => r.id === roundId);
-  const otherRounds = rounds.filter(r => r.id !== roundId);
-
-  // Filter criteria by the current round
-  const roundCriteria = useMemo(
-    () => criteria.filter((c) => c.round_id === roundId),
-    [criteria, roundId]
-  );
-
-  // Calculate total weight
-  const totalWeight = useMemo(
-    () => roundCriteria.reduce((sum, c) => sum + c.weight, 0),
-    [roundCriteria]
-  );
-
-  const isWeightValid = Math.abs(totalWeight - 1.0) < 0.001;
+  // Gọi Custom Hook để tách toàn bộ logic tính toán ra khỏi UI
+  const {
+    hackathonRounds,
+    hackathonTracks,
+    currentRound,
+    roundTracks,
+    currentCriteria,
+    totalWeight,
+    isWeightValid,
+    selectedRoundId,
+    setSelectedRoundId,
+    selectedTrackId,
+    setSelectedTrackId,
+    handleAutoBalance,
+    handleCloneCriteria,
+    handleSaveCriteria,
+    deleteCriteria,
+    updateRound,
+  } = useCriteriaManagement(hackathonId);
 
   const handleAdd = () => {
     setEditingCriteria(null);
@@ -43,176 +47,88 @@ const CriteriaManagementPage = ({ roundId, roundName, onBack }) => {
 
   const handleDelete = (id) => {
     deleteCriteria(id);
-    message.success('Criteria deleted successfully');
+    message.success('Đã xoá tiêu chí');
   };
 
   const handleModalFinish = (values) => {
-    if (editingCriteria) {
-      updateCriteria(editingCriteria.id, values);
-      message.success('Criteria updated successfully');
-    } else {
-      addCriteria({ ...values, round_id: roundId });
-      message.success('Criteria created successfully');
-    }
+    handleSaveCriteria(values, editingCriteria?.id);
     setIsModalVisible(false);
     setEditingCriteria(null);
   };
 
-  const handleAutoBalance = () => {
-    if (roundCriteria.length === 0) return;
-    const evenWeight = parseFloat((1.0 / roundCriteria.length).toFixed(2));
-    let remaining = 1.0;
-
-    roundCriteria.forEach((c, index) => {
-      if (index === roundCriteria.length - 1) {
-        // Last item gets the remainder to ensure exactly 1.0
-        updateCriteria(c.id, { weight: parseFloat(remaining.toFixed(2)) });
-      } else {
-        updateCriteria(c.id, { weight: evenWeight });
-        remaining -= evenWeight;
-      }
-    });
-    message.success('Weights auto-balanced to sum 1.0');
-  };
-
-  const handleCloneCriteria = () => {
-    setIsCloneModalVisible(true);
-  };
-
-  const handleCloneConfirm = () => {
-    if (!cloneSourceRound) {
-      message.error('Please select a source round');
-      return;
+  const executeClone = () => {
+    if (!cloneSourceId) return;
+    const clonedCount = handleCloneCriteria(
+      cloneSourceType === 'ROUND' ? cloneSourceId : null,
+      cloneSourceType === 'TRACK' ? cloneSourceId : null
+    );
+    
+    if (clonedCount > 0) {
+      message.success(`Đã sao chép thành công ${clonedCount} tiêu chí.`);
+    } else {
+      message.warning('Không tìm thấy tiêu chí nào từ nguồn đã chọn để sao chép.');
     }
-    const sourceCriteria = criteria.filter((c) => c.round_id === cloneSourceRound);
-    if (sourceCriteria.length === 0) {
-      message.warning('Selected round has no criteria to clone');
-      return;
-    }
-    sourceCriteria.forEach((c) => {
-      addCriteria({
-        round_id: roundId,
-        name: `${c.name} (Copy)`,
-        type: c.type,
-        weight: c.weight,
-        max_score: c.max_score,
-        description: c.description,
-        display_order: c.display_order,
-        rubric_url: c.rubric_url,
-      });
-    });
-    message.success(`Cloned ${sourceCriteria.length} criteria`);
     setIsCloneModalVisible(false);
-    setCloneSourceRound(null);
-  };
-
-  const handleToggleActive = (checked) => {
-    updateRound(roundId, { is_active: checked });
-    message.success(`Round ${checked ? 'activated' : 'deactivated'}`);
+    setCloneSourceId(null);
   };
 
   const getTypeColor = (type) => {
-    switch (type) {
-      case 'Technical':
-        return 'blue';
-      case 'Innovation':
-        return 'orange';
-      case 'General':
-      default:
-        return 'default';
-    }
+    return CRITERIA_COLORS[type] || CRITERIA_COLORS.DEFAULT;
   };
 
   const columns = [
     {
-      title: 'Order',
+      title: 'Thứ tự',
       dataIndex: 'display_order',
       key: 'display_order',
       width: 80,
       align: 'center',
-      render: (text) => <Text type="secondary">{text}</Text>,
     },
     {
-      title: 'Criteria Name',
+      title: 'Tên tiêu chí',
       dataIndex: 'name',
       key: 'name',
       render: (text) => <strong>{text}</strong>,
     },
     {
-      title: 'Type',
+      title: 'Phân loại',
       dataIndex: 'type',
       key: 'type',
       width: 120,
       render: (type) => <Tag color={getTypeColor(type)}>{type}</Tag>,
     },
     {
-      title: 'Weight',
+      title: 'Trọng số',
       dataIndex: 'weight',
       key: 'weight',
       width: 100,
       align: 'right',
-      render: (weight) => (
-        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
-          {weight.toFixed(2)}
+      render: (weight, record) => (
+        <span style={{ fontWeight: 600, color: record.type === CRITERIA_TYPES.PENALTY ? '#ff4d4f' : 'inherit' }}>
+          {record.type === CRITERIA_TYPES.PENALTY ? '-' : weight?.toFixed(2)}
         </span>
       ),
     },
     {
-      title: 'Max Score',
+      title: 'Điểm tối đa',
       dataIndex: 'max_score',
       key: 'max_score',
       width: 100,
       align: 'right',
-      render: (score) => (
-        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
-          {score}
-        </span>
-      ),
     },
     {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
-      ellipsis: true,
-      render: (text) => (
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {text}
-        </Text>
-      ),
-    },
-    {
-      title: 'Rubric',
-      dataIndex: 'rubric_url',
-      key: 'rubric_url',
-      width: 80,
-      align: 'center',
-      render: (url) => 
-        url ? (
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink size={16} />
-          </a>
-        ) : (
-          <Text type="secondary">-</Text>
-        ),
-    },
-    {
-      title: 'Actions',
+      title: 'Hành động',
       key: 'actions',
       width: 100,
       align: 'right',
       render: (_, record) => (
         <Space size="small">
-          <Button
-            type="text"
-            icon={<Edit size={16} />}
-            onClick={() => handleEdit(record)}
-          />
-          <Popconfirm
-            title="Delete Criteria"
-            description="Are you sure you want to delete this criteria?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
+          <Button type="text" icon={<Edit size={16} />} onClick={() => handleEdit(record)} />
+          <Popconfirm 
+            title="Bạn có chắc muốn xoá?" 
+            onConfirm={() => handleDelete(record.id)} 
+            okText="Xoá" 
+            cancelText="Hủy"
           >
             <Button type="text" danger icon={<Trash2 size={16} />} />
           </Popconfirm>
@@ -223,212 +139,161 @@ const CriteriaManagementPage = ({ roundId, roundName, onBack }) => {
 
   return (
     <div>
-      {/* Header */}
-      <div
-        style={{
-          marginBottom: 24,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-        }}
-      >
-        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-          {onBack && (
-            <Button
-              icon={<ArrowLeft size={18} />}
-              onClick={onBack}
-              style={{ marginTop: 4 }}
-            />
-          )}
-          <div>
-            <Text
-              type="secondary"
-              style={{
-                fontSize: 12,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
+      <Card style={{ marginBottom: 24, borderRadius: 12 }}>
+        <Space size="large" style={{ display: 'flex', width: '100%', alignItems: 'flex-start' }}>
+          <div style={{ minWidth: 300 }}>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>Vòng thi (Round):</Text>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="Chọn vòng thi"
+              value={selectedRoundId}
+              onChange={(val) => {
+                setSelectedRoundId(val);
               }}
             >
-              Judging Setup
-            </Text>
-            <Title level={3} style={{ margin: 0 }}>
-              {roundName || 'Criteria Management'}
-            </Title>
+              {hackathonRounds.map(r => (
+                <Option key={r.id} value={r.id}>{r.name} {r.is_final ? '(Chung Kết)' : '(Sơ Loại)'}</Option>
+              ))}
+            </Select>
           </div>
-        </div>
-        <Space>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginRight: 16 }}>
-            <Text>Round Active:</Text>
-            <Switch 
-              checked={currentRound?.is_active} 
-              onChange={handleToggleActive} 
-            />
-          </div>
-          <Button
-            icon={<Copy size={16} />}
-            onClick={handleCloneCriteria}
-          >
-            Clone Criteria
-          </Button>
-        </Space>
-      </div>
-
-      {/* Weight Warning */}
-      {roundCriteria.length > 0 && !isWeightValid && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: 16, borderRadius: 8 }}
-          message={
-            <strong>Total Weight Mismatch</strong>
-          }
-          description={
-            <span>
-              The current criteria weights sum to{' '}
-              <code
-                style={{
-                  background: 'rgba(0,0,0,0.06)',
-                  padding: '2px 6px',
-                  borderRadius: 4,
-                  fontFamily: 'JetBrains Mono, monospace',
-                }}
+          
+          {/* Ẩn dropdown Track nếu Vòng thi đang chọn là Chung kết (is_final) */}
+          {currentRound && !currentRound.is_final && (
+            <div style={{ minWidth: 300 }}>
+              <Text strong style={{ display: 'block', marginBottom: 8 }}>Bảng đấu (Track):</Text>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Chọn bảng đấu"
+                value={selectedTrackId}
+                onChange={setSelectedTrackId}
               >
-                {totalWeight.toFixed(2)}
-              </code>
-              . The total weight should equal exactly{' '}
-              <code
-                style={{
-                  background: 'rgba(0,0,0,0.06)',
-                  padding: '2px 6px',
-                  borderRadius: 4,
-                  fontFamily: 'JetBrains Mono, monospace',
-                }}
-              >
-                1.0
-              </code>{' '}
-              to proceed with judging. (Soft warning: You can still save)
-            </span>
-          }
-          action={
-            <Button
-              size="small"
-              type="primary"
-              danger
-              icon={<Scale size={14} />}
-              onClick={handleAutoBalance}
-            >
-              Auto-Balance
-            </Button>
-          }
-        />
-      )}
-
-      {/* Weight Success */}
-      {roundCriteria.length > 0 && isWeightValid && (
-        <Alert
-          type="success"
-          showIcon
-          style={{ marginBottom: 16, borderRadius: 8 }}
-          message={
-            <span>
-              Total weight is valid:{' '}
-              <code
-                style={{
-                  fontFamily: 'JetBrains Mono, monospace',
-                  background: 'rgba(0,0,0,0.06)',
-                  padding: '2px 6px',
-                  borderRadius: 4,
-                }}
-              >
-                {totalWeight.toFixed(2)}
-              </code>
-            </span>
-          }
-        />
-      )}
-
-      {/* Criteria Table */}
-      <Card style={{ borderRadius: 12 }}>
-        <Table
-          columns={columns}
-          dataSource={roundCriteria}
-          rowKey="id"
-          pagination={false}
-          locale={{ emptyText: 'No criteria defined yet. Add your first criteria below.' }}
-          footer={() => (
-            <div style={{ textAlign: 'center' }}>
-              <Button
-                type="link"
-                icon={<Plus size={16} />}
-                onClick={handleAdd}
-              >
-                Add New Criteria
-              </Button>
+                {roundTracks.map(t => (
+                  <Option key={t.id} value={t.id}>{t.name}</Option>
+                ))}
+              </Select>
             </div>
           )}
-        />
+        </Space>
       </Card>
 
-      {/* Bottom Action Bar */}
-      <div
-        style={{
-          marginTop: 24,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: 12,
-        }}
-      >
-        <Button onClick={onBack}>Discard Changes</Button>
-        <Button
-          type="primary"
-          disabled={roundCriteria.length === 0}
-        >
-          Save Criteria Map
-        </Button>
-      </div>
+      {(!currentRound || (!currentRound.is_final && !selectedTrackId)) ? (
+        <Card style={{ textAlign: 'center', padding: '40px 0', borderRadius: 12 }}>
+          <Text type="secondary">Vui lòng chọn Vòng thi {currentRound && !currentRound.is_final ? 'và Bảng đấu ' : ''}để thiết lập tiêu chí.</Text>
+        </Card>
+      ) : (
+        <>
+          <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={4} style={{ margin: 0 }}>
+              {currentRound.is_final 
+                ? currentRound.name 
+                : `${currentRound.name} - Bảng: ${roundTracks.find(t => t.id === selectedTrackId)?.name}`}
+            </Title>
+            <Space>
+              <Text>Kích hoạt vòng thi:</Text>
+              <Switch 
+                checked={currentRound?.is_active} 
+                onChange={(checked) => updateRound(currentRound.id, { is_active: checked })} 
+              />
+            </Space>
+          </div>
 
-      {/* Form Modal */}
-      <CriteriaFormModal
-        visible={isModalVisible}
-        title={editingCriteria ? 'Edit Criteria' : 'Add Criteria'}
-        initialValues={editingCriteria}
-        onCancel={() => {
-          setIsModalVisible(false);
-          setEditingCriteria(null);
-        }}
-        onFinish={handleModalFinish}
-      />
+          {currentCriteria.length > 0 && !isWeightValid && (
+            <Alert 
+              type="error" 
+              showIcon 
+              style={{ marginBottom: 16, borderRadius: 8 }}
+              message={<strong>Cảnh báo trọng số</strong>}
+              description={<span>Tổng trọng số hiện tại là {totalWeight.toFixed(2)}. Tổng trọng số bắt buộc phải bằng 1.0 (không tính loại PENALTY).</span>}
+              action={<Button size="small" type="primary" danger onClick={handleAutoBalance}>Cân bằng tự động</Button>}
+            />
+          )}
 
-      {/* Clone Criteria Modal */}
-      <Modal
-        title="Clone Criteria from another Round"
-        open={isCloneModalVisible}
-        onOk={handleCloneConfirm}
-        onCancel={() => {
-          setIsCloneModalVisible(false);
-          setCloneSourceRound(null);
-        }}
-        okText="Clone"
-        okButtonProps={{ disabled: !cloneSourceRound }}
-      >
-        <div style={{ padding: '20px 0' }}>
-          <Text style={{ display: 'block', marginBottom: 8 }}>
-            Select a source round to copy its criteria to the current round:
-          </Text>
-          <Select
-            style={{ width: '100%' }}
-            placeholder="Select a round"
-            value={cloneSourceRound}
-            onChange={setCloneSourceRound}
-          >
-            {otherRounds.map((r) => (
-              <Option key={r.id} value={r.id}>
-                {r.name}
-              </Option>
-            ))}
-          </Select>
-        </div>
-      </Modal>
+          {currentCriteria.length > 0 && isWeightValid && (
+            <Alert 
+              type="success" 
+              showIcon 
+              style={{ marginBottom: 16, borderRadius: 8 }} 
+              message={<strong>Trọng số hợp lệ: {totalWeight.toFixed(2)}</strong>} 
+            />
+          )}
+
+          <Card style={{ borderRadius: 12 }}>
+            <Table 
+              columns={columns} 
+              dataSource={currentCriteria} 
+              rowKey="id" 
+              pagination={false}
+              locale={{ emptyText: 'Chưa có tiêu chí nào được thiết lập.' }}
+              footer={() => (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
+                  <Button 
+                    type="default" 
+                    icon={<Edit size={16} />} 
+                    onClick={() => setIsCloneModalVisible(true)}
+                  >
+                    Sao chép tiêu chí
+                  </Button>
+                  <Button type="dashed" icon={<Plus size={16} />} onClick={handleAdd}>
+                    Thêm tiêu chí mới
+                  </Button>
+                </div>
+              )}
+            />
+          </Card>
+
+          <CriteriaFormModal
+            visible={isModalVisible}
+            title={editingCriteria ? 'Cập nhật tiêu chí' : 'Thêm tiêu chí'}
+            initialValues={editingCriteria}
+            onCancel={() => { setIsModalVisible(false); setEditingCriteria(null); }}
+            onFinish={handleModalFinish}
+          />
+
+          {/* Modal Sao chép tiêu chí */}
+          {isCloneModalVisible && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Card style={{ width: 500, borderRadius: 8 }} title="Sao chép tiêu chí từ vòng/bảng khác">
+                <div style={{ marginBottom: 16 }}>
+                  <Text strong>Chọn nguồn để sao chép:</Text>
+                  <Select
+                    style={{ width: '100%', marginTop: 8 }}
+                    placeholder="Chọn bảng đấu hoặc vòng thi"
+                    value={cloneSourceId ? `${cloneSourceType}_${cloneSourceId}` : undefined}
+                    onChange={(val) => {
+                      const [type, id] = val.split('_');
+                      setCloneSourceType(type);
+                      setCloneSourceId(parseInt(id));
+                    }}
+                  >
+                    {hackathonRounds.map(r => {
+                      if (r.is_final) {
+                        return (
+                          <Option key={`ROUND_${r.id}`} value={`ROUND_${r.id}`} disabled={currentRound?.is_final && r.id === selectedRoundId}>
+                            Vòng Chung kết: {r.name}
+                          </Option>
+                        );
+                      } else {
+                        // Tìm tracks của round này
+                        const rTracks = hackathonTracks.filter(t => t.round_id === r.id);
+                        return rTracks.map(t => (
+                          <Option key={`TRACK_${t.id}`} value={`TRACK_${t.id}`} disabled={!currentRound?.is_final && t.id === selectedTrackId}>
+                            Vòng {r.name} - Bảng: {t.name}
+                          </Option>
+                        ));
+                      }
+                    })}
+                  </Select>
+                </div>
+                <Alert type="info" showIcon message="Hệ thống sẽ sao chép toàn bộ tiêu chí (bao gồm Trọng số và Điểm tối đa) từ nguồn đã chọn vào vòng/bảng đấu hiện tại." style={{ marginBottom: 24 }} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                  <Button onClick={() => setIsCloneModalVisible(false)}>Hủy</Button>
+                  <Button type="primary" disabled={!cloneSourceId} onClick={executeClone}>Tiến hành Sao chép</Button>
+                </div>
+              </Card>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

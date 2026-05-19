@@ -49,53 +49,13 @@ const HackathonSetupPage = () => {
     },
     {
       key: 'criteria',
-      label: 'Criteria',
-      children: (
-        <div>
-          {hackathonRounds.length === 0 ? (
-            <Card>Please create at least one round before managing criteria.</Card>
-          ) : (
-            <>
-              <div style={{ marginBottom: 16 }}>
-                <Space>
-                  <span style={{ fontWeight: 500 }}>Select Round:</span>
-                  <Select
-                    placeholder="Choose a round to manage criteria"
-                    style={{ width: 300 }}
-                    onChange={setSelectedRoundId}
-                    value={selectedRoundId}
-                  >
-                    {hackathonRounds.map(r => {
-                      const track = hackathonTracks.find(t => t.id === r.track_id);
-                      return (
-                        <Option key={r.id} value={r.id}>
-                          {track?.name} → {r.name}
-                        </Option>
-                      );
-                    })}
-                  </Select>
-                </Space>
-              </div>
-              {selectedRoundId ? (
-                <CriteriaManagementPage
-                  roundId={selectedRoundId}
-                  roundName={hackathonRounds.find(r => r.id === selectedRoundId)?.name}
-                  onBack={() => setSelectedRoundId(null)}
-                />
-              ) : (
-                <Card style={{ textAlign: 'center', padding: '40px 0' }}>
-                  Please select a round above to manage its scoring criteria.
-                </Card>
-              )}
-            </>
-          )}
-        </div>
-      ),
+      label: 'Tiêu chí đánh giá (Criteria)',
+      children: <CriteriaManagementPage hackathonId={hackathon.id} />, 
     },
     {
       key: 'review',
-      label: 'Review & Validate',
-      children: <ReviewValidatePage />,
+      label: 'Đánh giá & Kiểm tra (Review & Validate)',
+      children: <ReviewValidatePage hackathonId={hackathon.id} />, 
     },
     {
       key: 'people',
