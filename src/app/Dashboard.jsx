@@ -27,7 +27,7 @@ const data = [
 ];
 
 const StatCard = ({ title, value, trend, icon, color }) => (
-  <Card bodyStyle={{ padding: 20 }} borderRadius={12}>
+  <Card styles={{ body: { padding: 20 } }} style={{ borderRadius: 12 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
       <div>
         <div style={{ background: color + '15', width: 40, height: 40, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
@@ -67,7 +67,7 @@ const Dashboard = () => {
         </Space>
       </div>
 
-      <Row gutter={[24, 24]} marginBottom={32}>
+      <Row gutter={[24, 24]} style={{ marginBottom: 32 }}>
         <Col xs={24} sm={12} lg={6}>
           <StatCard 
             title="Tổng Lượt Đăng Ký" 
@@ -118,7 +118,7 @@ const Dashboard = () => {
             style={{ borderRadius: 12, height: '100%' }}
           >
             <div style={{ height: 400, width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="99%" height={400} minWidth={1} minHeight={1}>
                 <AreaChart data={data}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
@@ -147,31 +147,36 @@ const Dashboard = () => {
         </Col>
         <Col xs={24} lg={6}>
           <Card title="Thao Tác Nhanh" style={{ borderRadius: 12, height: '100%' }}>
-            <List
-              itemLayout="horizontal"
-              dataSource={[
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
                 { title: 'Thêm Giám Khảo', icon: <UserAddOutlined />, color: '#1677ff' },
                 { title: 'Gửi Thông Báo', icon: <SendOutlined />, color: '#52c41a' },
                 { title: 'Quản Lý Vai Trò', icon: <TeamOutlined />, color: '#faad14' },
-              ]}
-              renderItem={(item) => (
-                <List.Item 
-                  style={{ cursor: 'pointer', padding: '16px 12px', borderRadius: 8, marginBottom: 8, transition: 'all 0.3s' }}
+              ].map((item, index) => (
+                <div 
+                  key={index}
                   className="quick-action-item"
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    cursor: 'pointer', 
+                    padding: '16px 12px', 
+                    borderRadius: 8, 
+                    transition: 'all 0.3s' 
+                  }}
                 >
-                  <List.Item.Meta
-                    avatar={
-                      <Avatar 
-                        icon={item.icon} 
-                        style={{ backgroundColor: item.color + '15', color: item.color, borderRadius: 8 }} 
-                      />
-                    }
-                    title={<span style={{ fontWeight: 600 }}>{item.title}</span>}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <Avatar 
+                      icon={item.icon} 
+                      style={{ backgroundColor: item.color + '15', color: item.color, borderRadius: 8 }} 
+                    />
+                    <span style={{ fontWeight: 600 }}>{item.title}</span>
+                  </div>
                   <RightOutlined style={{ color: '#bfbfbf' }} />
-                </List.Item>
-              )}
-            />
+                </div>
+              ))}
+            </div>
           </Card>
         </Col>
       </Row>

@@ -123,7 +123,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
                 Mời Giám khảo (Tạo TK Tạm)
               </Button>
             </div>
-            <Table 
+            <Table scroll={{ x: 'max-content' }}
               dataSource={people.filter(p => p.role === 'JUDGE')} 
               rowKey="id" pagination={false}
               locale={{ emptyText: 'Chưa có giám khảo nào.' }}
@@ -155,7 +155,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
                 </Space>
               </Form>
             </Card>
-            <Table dataSource={hackathonAssignments.filter(a => a.type === 'MENTOR')} columns={mentorColumns} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có Mentor nào được phân công' }} />
+            <Table scroll={{ x: 'max-content' }}dataSource={hackathonAssignments.filter(a => a.type === 'MENTOR')} columns={mentorColumns} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có Mentor nào được phân công' }} />
           </Tabs.TabPane>
 
           {/* TAB 3: JUDGE ASSIGNMENT */}
@@ -186,7 +186,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
                 </Space>
               </Form>
             </Card>
-            <Table dataSource={hackathonAssignments.filter(a => a.type === 'JUDGE')} columns={judgeColumnsAssign} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có Judge nào được phân công' }}/>
+            <Table scroll={{ x: 'max-content' }}dataSource={hackathonAssignments.filter(a => a.type === 'JUDGE')} columns={judgeColumnsAssign} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có Judge nào được phân công' }}/>
           </Tabs.TabPane>
         </Tabs>
       </Card>

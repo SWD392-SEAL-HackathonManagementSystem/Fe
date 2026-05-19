@@ -349,7 +349,7 @@ const CriteriaManagementPage = ({ roundId, roundName, onBack }) => {
 
       {/* Criteria Table */}
       <Card style={{ borderRadius: 12 }}>
-        <Table
+        <Table scroll={{ x: 'max-content' }}
           columns={columns}
           dataSource={roundCriteria}
           rowKey="id"

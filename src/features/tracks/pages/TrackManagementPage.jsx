@@ -97,7 +97,7 @@ const TrackManagementPage = ({ hackathonId }) => {
         </Button>
       </div>
 
-      <Table 
+      <Table scroll={{ x: 'max-content' }}
         columns={columns} 
         dataSource={hackathonTracks} 
         rowKey="id"

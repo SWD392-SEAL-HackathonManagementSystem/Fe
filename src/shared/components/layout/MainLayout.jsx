@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout, Menu, Button, theme, Input, Badge, Avatar, Space, Popover, List, Typography } from 'antd';
+import { Layout, Menu, Button, theme, Input, Badge, Avatar, Space, Popover, List, Typography, Drawer, Grid } from 'antd';
 import { 
   MenuFoldOutlined, 
   MenuUnfoldOutlined, 
@@ -20,12 +20,16 @@ import { useAppContext } from '../../../app/AppContext';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const MainLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { token: { colorBgContainer, borderRadiusLG } } = theme.useToken();
+  const screens = useBreakpoint();
+  const isMobile = !screens.md;
   
   // Lấy dữ liệu global từ AppContext
   const { notifications, markAsRead } = useAppContext();
@@ -45,6 +49,7 @@ const MainLayout = ({ children }) => {
   ];
 
   const handleMenuClick = ({ key }) => {
+    if (isMobile) setDrawerVisible(false);
     if (key === ROUTES.DASHBOARD || key === ROUTES.HACKATHONS) navigate(key);
   };
 
@@ -68,82 +73,115 @@ const MainLayout = ({ children }) => {
           Đã đọc tất cả
         </Button>
       </div>
-      <List
-        itemLayout="horizontal"
-        dataSource={notifications.slice(0, 5)} // Chỉ show 5 thông báo mới nhất
-        locale={{ emptyText: 'Không có thông báo mới' }}
-        renderItem={item => {
-          const config = getNotifConfig(item.type);
-          return (
-            <List.Item 
-              style={{ padding: '12px 8px', cursor: 'pointer', opacity: item.is_read ? 0.6 : 1, transition: 'background 0.3s', borderRadius: 6 }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-              onClick={() => markAsRead(item.id)}
-            >
-              <List.Item.Meta
-                avatar={<Avatar style={{ backgroundColor: config.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }} icon={config.icon} />}
-                title={<span style={{ fontSize: 14, fontWeight: item.is_read ? 400 : 600 }}>{item.title}</span>}
-                description={
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {notifications.length === 0 ? (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: '#bfbfbf' }}>
+            Không có thông báo mới
+          </div>
+        ) : (
+          notifications.slice(0, 5).map(item => {
+            const config = getNotifConfig(item.type);
+            return (
+              <div 
+                key={item.id}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start',
+                  padding: '12px 8px', 
+                  cursor: 'pointer', 
+                  opacity: item.is_read ? 0.6 : 1, 
+                  transition: 'background 0.3s', 
+                  borderRadius: 6 
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                onClick={() => markAsRead(item.id)}
+              >
+                <Avatar 
+                  style={{ backgroundColor: config.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 12 }} 
+                  icon={config.icon} 
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: item.is_read ? 400 : 600, color: '#141414', marginBottom: 4 }}>
+                    {item.title}
+                  </div>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <Text type="secondary" style={{ fontSize: 12 }}>{item.description}</Text>
                     <Text type="secondary" style={{ fontSize: 11, marginTop: 4 }}>{item.time}</Text>
                   </div>
-                }
-              />
-              {!item.is_read && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1677ff', marginLeft: 8 }} />}
-            </List.Item>
-          );
-        }}
-      />
+                </div>
+                {!item.is_read && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1677ff', marginLeft: 8, marginTop: 6, flexShrink: 0 }} />}
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
+  );
+
+  const siderContent = (
+    <>
+      <div style={{ height: 80, display: 'flex', alignItems: 'center', padding: '0 24px', marginBottom: 8 }}>
+        <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg, #1677ff 0%, #003eb3 100%)', borderRadius: 8, marginRight: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: 20, flexShrink: 0 }}>H</div>
+        {(!collapsed || isMobile) && (
+          <div style={{ overflow: 'hidden' }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#141414', lineHeight: '1.2', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>HackOS</div>
+            <div style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>Quản trị viên Doanh nghiệp</div>
+          </div>
+        )}
+      </div>
+      {(!collapsed || isMobile) && (
+        <div style={{ padding: '0 16px 24px' }}>
+          <Button type="primary" icon={<PlusOutlined />} block size="large" style={{ height: 48, borderRadius: 8, fontWeight: 600 }} onClick={() => { if(isMobile) setDrawerVisible(false); navigate(ROUTES.HACKATHON_CREATE); }}>Tạo Sự kiện Mới</Button>
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 180px)', justifyContent: 'space-between' }}>
+        <Menu mode="inline" selectedKeys={[location.pathname]} items={menuItems} onClick={handleMenuClick} style={{ borderRight: 0 }} />
+        <Menu mode="inline" items={bottomMenuItems} style={{ borderRight: 0, marginBottom: 24 }} onClick={() => { if(isMobile) setDrawerVisible(false); }} />
+      </div>
+    </>
   );
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f8f9fa' }}>
-      <Sider trigger={null} collapsible collapsed={collapsed} theme="light" width={260} style={{ boxShadow: '2px 0 8px 0 rgba(29,35,41,.03)', zIndex: 10, position: 'fixed', height: '100vh', left: 0, top: 0, bottom: 0 }}>
-        {/* ... (Các phần Sidebar giữ nguyên như cũ, chỉ rút gọn để hiển thị) ... */}
-        <div style={{ height: 80, display: 'flex', alignItems: 'center', padding: '0 24px', marginBottom: 8 }}>
-          <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg, #1677ff 0%, #003eb3 100%)', borderRadius: 8, marginRight: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: 20 }}>H</div>
-          {!collapsed && (
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#141414', lineHeight: '1.2' }}>HackOS</div>
-              <div style={{ fontSize: 12, color: '#8c8c8c' }}>Quản trị viên Doanh nghiệp</div>
-            </div>
-          )}
-        </div>
-        {!collapsed && (
-          <div style={{ padding: '0 16px 24px' }}>
-            <Button type="primary" icon={<PlusOutlined />} block size="large" style={{ height: 48, borderRadius: 8, fontWeight: 600 }} onClick={() => navigate(ROUTES.HACKATHON_CREATE)}>Tạo Sự kiện Mới</Button>
-          </div>
-        )}
-        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 180px)', justifyContent: 'space-between' }}>
-          <Menu mode="inline" selectedKeys={[location.pathname]} items={menuItems} onClick={handleMenuClick} style={{ borderRight: 0 }} />
-          <Menu mode="inline" items={bottomMenuItems} style={{ borderRight: 0, marginBottom: 24 }} />
-        </div>
-      </Sider>
+      {isMobile ? (
+        <Drawer
+          placement="left"
+          closable={false}
+          onClose={() => setDrawerVisible(false)}
+          open={drawerVisible}
+          styles={{ body: { padding: 0 } }}
+        >
+          {siderContent}
+        </Drawer>
+      ) : (
+        <Sider trigger={null} collapsible collapsed={collapsed} theme="light" width={260} style={{ boxShadow: '2px 0 8px 0 rgba(29,35,41,.03)', zIndex: 10, position: 'fixed', height: '100vh', left: 0, top: 0, bottom: 0 }}>
+          {siderContent}
+        </Sider>
+      )}
       
-      <Layout style={{ marginLeft: collapsed ? 80 : 260, transition: 'all 0.2s' }}>
-        <Header style={{ padding: '0 24px', background: colorBgContainer, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 4px rgba(0,21,41,.05)', position: 'sticky', top: 0, zIndex: 9, height: 72 }}>
-          <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-            <Button type="text" icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => setCollapsed(!collapsed)} style={{ fontSize: '16px', width: 40, height: 40, marginRight: 16 }} />
-            <Input prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} placeholder="Tìm kiếm nhóm, giám khảo, cài đặt..." style={{ maxWidth: 400, borderRadius: 8, background: '#f5f5f5', border: 'none', height: 40 }} />
+      <Layout style={{ marginLeft: isMobile ? 0 : (collapsed ? 80 : 260), transition: 'all 0.2s' }}>
+        <Header style={{ padding: isMobile ? '0 16px' : '0 24px', background: colorBgContainer, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 4px rgba(0,21,41,.05)', position: 'sticky', top: 0, zIndex: 9, height: 72 }}>
+          <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+            <Button type="text" icon={isMobile ? <MenuUnfoldOutlined /> : (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />)} onClick={() => isMobile ? setDrawerVisible(true) : setCollapsed(!collapsed)} style={{ fontSize: '16px', width: 40, height: 40, marginRight: 16 }} />
+            {!isMobile && <Input prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} placeholder="Tìm kiếm nhóm, giám khảo, cài đặt..." style={{ maxWidth: 400, borderRadius: 8, background: '#f5f5f5', border: 'none', height: 40 }} />}
           </div>
           
-          <Space size={20}>
+          <Space size={isMobile ? 8 : 20}>
+            {isMobile && <Button type="text" icon={<SearchOutlined style={{ fontSize: 20 }} />} />}
             {/* THỰC TẾ HÓA CHUÔNG THÔNG BÁO TỪ CONTEXT */}
             <Popover content={notificationContent} trigger="click" placement="bottomRight" arrow={false}>
               <Badge count={unreadCount} offset={[-4, 4]}>
                 <Button type="text" icon={<BellOutlined style={{ fontSize: 20 }} />} />
               </Badge>
             </Popover>
-            <Button type="text" icon={<SettingOutlined style={{ fontSize: 20 }} />} />
-            <Button type="text" icon={<QuestionCircleOutlined style={{ fontSize: 20 }} />} />
+            {!isMobile && <Button type="text" icon={<SettingOutlined style={{ fontSize: 20 }} />} />}
+            {!isMobile && <Button type="text" icon={<QuestionCircleOutlined style={{ fontSize: 20 }} />} />}
             <Avatar src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" style={{ cursor: 'pointer', border: '2px solid #f0f0f0' }} />
           </Space>
         </Header>
         
-        <Content style={{ margin: '24px', minHeight: 280, borderRadius: borderRadiusLG }}>
+        <Content style={{ margin: isMobile ? '16px' : '24px', minHeight: 280, borderRadius: borderRadiusLG }}>
           {children}
         </Content>
       </Layout>
