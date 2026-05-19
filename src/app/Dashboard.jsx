@@ -58,8 +58,7 @@ const Dashboard = () => {
     <div style={{ maxWidth: 1400, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
         <div>
-          <Title level={2} style={{ margin: 0, fontWeight: 700 }}>Tổng quan SEAL 2024</Title>
-          <Text type="secondary">Cập nhật lúc 10:42 AM, ngày 24 tháng 10.</Text>
+          <Title level={2} style={{ margin: 0, fontWeight: 700 }}>Tổng quan SEAL </Title>
         </div>
         <Space>
           <Button icon={<CalendarOutlined />} style={{ borderRadius: 8 }}>Hôm nay</Button>
