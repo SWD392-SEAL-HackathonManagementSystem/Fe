@@ -8,7 +8,9 @@ import {
   SettingOutlined, 
   QuestionCircleOutlined,
   LogoutOutlined,
-  PlusOutlined
+  PlusOutlined,
+  SunOutlined,
+  MoonOutlined
 } from '@ant-design/icons';
 import {
   LayoutDashboard, Trophy, Users, Activity, BarChart3, Settings, HelpCircle,
@@ -27,12 +29,12 @@ const MainLayout = ({ children }) => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { token: { colorBgContainer, borderRadiusLG } } = theme.useToken();
+  const { token } = theme.useToken();
   const screens = useBreakpoint();
   const isMobile = !screens.md;
   
   // Lấy dữ liệu global từ AppContext
-  const { notifications, markAsRead } = useAppContext();
+  const { notifications, markAsRead, darkMode, toggleDarkMode } = useAppContext();
 
   const menuItems = [
     { key: ROUTES.DASHBOARD, icon: <LayoutDashboard size={18} />, label: 'Tổng quan' },
@@ -58,16 +60,16 @@ const MainLayout = ({ children }) => {
 
   const getNotifConfig = (type) => {
     switch(type) {
-      case 'INVITATION': return { icon: <Mail size={16} color="#1677ff" />, bg: '#e6f4ff' };
-      case 'REMINDER': return { icon: <CalendarClock size={16} color="#52c41a" />, bg: '#f6ffed' };
-      case 'WARNING': return { icon: <AlertTriangle size={16} color="#faad14" />, bg: '#fffbe6' };
-      default: return { icon: <BellOutlined style={{color: '#1677ff'}}/>, bg: '#e6f4ff' };
+      case 'INVITATION': return { icon: <Mail size={16} color={token.colorPrimary} />, bg: darkMode ? '#111a2c' : '#e6f4ff' };
+      case 'REMINDER': return { icon: <CalendarClock size={16} color={token.colorSuccess} />, bg: darkMode ? '#11211b' : '#f6ffed' };
+      case 'WARNING': return { icon: <AlertTriangle size={16} color={token.colorWarning} />, bg: darkMode ? '#272015' : '#fffbe6' };
+      default: return { icon: <BellOutlined style={{color: token.colorPrimary}}/>, bg: darkMode ? '#111a2c' : '#e6f4ff' };
     }
   };
 
   const notificationContent = (
     <div style={{ width: 340 }}>
-      <div style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '8px 0', borderBottom: `1px solid ${token.colorBorderSecondary}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text strong>Thông báo hệ thống</Text>
         <Button type="link" size="small" onClick={() => markAsRead('ALL')} disabled={unreadCount === 0} icon={<CheckCheck size={14} />}>
           Đã đọc tất cả
@@ -75,7 +77,7 @@ const MainLayout = ({ children }) => {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {notifications.length === 0 ? (
-          <div style={{ padding: '24px 0', textAlign: 'center', color: '#bfbfbf' }}>
+          <div style={{ padding: '24px 0', textAlign: 'center', color: token.colorTextDisabled }}>
             Không có thông báo mới
           </div>
         ) : (
@@ -93,7 +95,7 @@ const MainLayout = ({ children }) => {
                   transition: 'background 0.3s', 
                   borderRadius: 6 
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                onMouseEnter={(e) => e.currentTarget.style.background = token.colorBgTextHover}
                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 onClick={() => markAsRead(item.id)}
               >
@@ -102,7 +104,7 @@ const MainLayout = ({ children }) => {
                   icon={config.icon} 
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: item.is_read ? 400 : 600, color: '#141414', marginBottom: 4 }}>
+                  <div style={{ fontSize: 14, fontWeight: item.is_read ? 400 : 600, color: token.colorText, marginBottom: 4 }}>
                     {item.title}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -110,7 +112,7 @@ const MainLayout = ({ children }) => {
                     <Text type="secondary" style={{ fontSize: 11, marginTop: 4 }}>{item.time}</Text>
                   </div>
                 </div>
-                {!item.is_read && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#1677ff', marginLeft: 8, marginTop: 6, flexShrink: 0 }} />}
+                {!item.is_read && <div style={{ width: 8, height: 8, borderRadius: '50%', background: token.colorPrimary, marginLeft: 8, marginTop: 6, flexShrink: 0 }} />}
               </div>
             );
           })
@@ -125,8 +127,8 @@ const MainLayout = ({ children }) => {
         <img src="/logo.jpg" alt="SEAL Hackathon Logo" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 8, marginRight: 12, flexShrink: 0 }} />
         {(!collapsed || isMobile) && (
           <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#141414', lineHeight: '1.2', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>HackOS</div>
-            <div style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>Quản trị viên Doanh nghiệp</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: token.colorText, lineHeight: '1.2', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>HackOS</div>
+            <div style={{ fontSize: 12, color: token.colorTextSecondary || '#8c8c8c', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>Quản trị viên Doanh nghiệp</div>
           </div>
         )}
       </div>
@@ -143,7 +145,7 @@ const MainLayout = ({ children }) => {
   );
 
   return (
-    <Layout style={{ minHeight: '100vh', background: '#f8f9fa' }}>
+    <Layout style={{ minHeight: '100vh', background: token.colorBgLayout }}>
       {isMobile ? (
         <Drawer
           placement="left"
@@ -155,33 +157,38 @@ const MainLayout = ({ children }) => {
           {siderContent}
         </Drawer>
       ) : (
-        <Sider trigger={null} collapsible collapsed={collapsed} theme="light" width={260} style={{ boxShadow: '2px 0 8px 0 rgba(29,35,41,.03)', zIndex: 10, position: 'fixed', height: '100vh', left: 0, top: 0, bottom: 0 }}>
+        <Sider trigger={null} collapsible collapsed={collapsed} theme={darkMode ? 'dark' : 'light'} width={260} style={{ boxShadow: darkMode ? '2px 0 8px 0 rgba(0,0,0,.15)' : '2px 0 8px 0 rgba(29,35,41,.03)', zIndex: 10, position: 'fixed', height: '100vh', left: 0, top: 0, bottom: 0 }}>
           {siderContent}
         </Sider>
       )}
       
       <Layout style={{ marginLeft: isMobile ? 0 : (collapsed ? 80 : 260), transition: 'all 0.2s' }}>
-        <Header style={{ padding: isMobile ? '0 16px' : '0 24px', background: colorBgContainer, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 4px rgba(0,21,41,.05)', position: 'sticky', top: 0, zIndex: 9, height: 72 }}>
+        <Header style={{ padding: isMobile ? '0 16px' : '0 24px', background: token.colorBgContainer, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: darkMode ? '0 1px 4px rgba(0,0,0,.2)' : '0 1px 4px rgba(0,21,41,.05)', position: 'sticky', top: 0, zIndex: 9, height: 72 }}>
           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
             <Button type="text" icon={isMobile ? <MenuUnfoldOutlined /> : (collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />)} onClick={() => isMobile ? setDrawerVisible(true) : setCollapsed(!collapsed)} style={{ fontSize: '16px', width: 40, height: 40, marginRight: 16 }} />
-            {!isMobile && <Input prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} placeholder="Tìm kiếm nhóm, giám khảo, cài đặt..." style={{ maxWidth: 400, borderRadius: 8, background: '#f5f5f5', border: 'none', height: 40 }} />}
+            {!isMobile && <Input prefix={<SearchOutlined style={{ color: token.colorTextPlaceholder }} />} placeholder="Tìm kiếm nhóm, giám khảo, cài đặt..." style={{ maxWidth: 400, borderRadius: 8, background: token.colorFillTertiary, border: 'none', height: 40, color: token.colorText }} />}
           </div>
           
           <Space size={isMobile ? 8 : 20}>
             {isMobile && <Button type="text" icon={<SearchOutlined style={{ fontSize: 20 }} />} />}
-            {/* THỰC TẾ HÓA CHUÔNG THÔNG BÁO TỪ CONTEXT */}
             <Popover content={notificationContent} trigger="click" placement="bottomRight" arrow={false}>
               <Badge count={unreadCount} offset={[-4, 4]}>
                 <Button type="text" icon={<BellOutlined style={{ fontSize: 20 }} />} />
               </Badge>
             </Popover>
+            <Button 
+              type="text" 
+              icon={darkMode ? <SunOutlined style={{ fontSize: 20 }} /> : <MoonOutlined style={{ fontSize: 20 }} />} 
+              onClick={toggleDarkMode}
+              title={darkMode ? "Chuyển sang chế độ sáng" : "Chuyển sang chế độ tối"}
+            />
             {!isMobile && <Button type="text" icon={<SettingOutlined style={{ fontSize: 20 }} />} />}
             {!isMobile && <Button type="text" icon={<QuestionCircleOutlined style={{ fontSize: 20 }} />} />}
-            <Avatar src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" style={{ cursor: 'pointer', border: '2px solid #f0f0f0' }} />
+            <Avatar src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" style={{ cursor: 'pointer', border: `2px solid ${token.colorBorder}` }} />
           </Space>
         </Header>
         
-        <Content style={{ margin: isMobile ? '16px' : '24px', minHeight: 280, borderRadius: borderRadiusLG }}>
+        <Content style={{ margin: isMobile ? '16px' : '24px', minHeight: 280, borderRadius: token.borderRadiusLG }}>
           {children}
         </Content>
       </Layout>
