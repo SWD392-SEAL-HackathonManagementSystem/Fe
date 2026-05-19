@@ -12,6 +12,19 @@ import { MOCK_NOTIFICATIONS } from '../features/notifications/data/notification.
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    return saved === 'true';
+  });
+
+  const toggleDarkMode = () => {
+    setDarkMode(prev => !prev);
+  };
+
+  useEffect(() => {
+    localStorage.setItem('darkMode', darkMode);
+  }, [darkMode]);
+
   const [hackathons, setHackathons] = useState(() => {
     const saved = localStorage.getItem('hackathons');
     return saved ? JSON.parse(saved) : MOCK_HACKATHONS;
@@ -249,6 +262,7 @@ export const AppProvider = ({ children }) => {
 
   return (
     <AppContext.Provider value={{
+      darkMode, toggleDarkMode,
       hackathons, addHackathon, updateHackathon, deleteHackathon,
       tracks, addTrack, updateTrack, deleteTrack,
       rounds, addRound, updateRound, deleteRound,
