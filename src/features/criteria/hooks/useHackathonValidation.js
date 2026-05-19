@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useAppContext } from '../../../app/AppContext';
 import { CRITERIA_TYPES, MAX_WEIGHT_TOTAL } from '../constants/criteria.constants';
+import { criteriaApi } from '../api/criteria.api';
 
 export const useHackathonValidation = (hackathonId) => {
-  const { hackathons, tracks, rounds, criteria, events = [], assignments = [] } = useAppContext();
+  const { hackathons, tracks, rounds, events = [], assignments = [] } = useAppContext();
 
   const hackathon = useMemo(() => hackathons.find((h) => h.id === hackathonId), [hackathons, hackathonId]);
 
@@ -24,42 +25,82 @@ export const useHackathonValidation = (hackathonId) => {
     return prelimRounds.every(r => tracks.some(t => t.round_id === r.id));
   }, [prelimRounds, tracks]);
 
-  // 3. Validate Trọng số và sự tồn tại của Tiêu chí
-  const { weightErrors, missingCriteriaErrors } = useMemo(() => {
-    const wErrors = [];
-    const mErrors = [];
+  // 3. Validate Trọng số và sự tồn tại của Tiêu chí qua API
+  const [weightErrors, setWeightErrors] = useState([]);
+  const [missingCriteriaErrors, setMissingCriteriaErrors] = useState([]);
+  const [isValidatingCriteria, setIsValidatingCriteria] = useState(false);
 
-    hackathonRounds.forEach((r) => {
-      if (r.is_final) {
-        // Xét Vòng chung kết
-        const finalCriteria = criteria.filter((c) => c.round_id === r.id && c.type !== CRITERIA_TYPES.PENALTY);
-        if (finalCriteria.length === 0) {
-          mErrors.push(`Vòng Chung kết chưa có tiêu chí đánh giá.`);
-        } else {
-          const totalWeight = finalCriteria.reduce((sum, c) => sum + (c.weight || 0), 0);
-          if (Math.abs(totalWeight - MAX_WEIGHT_TOTAL) > 0.001) {
-            wErrors.push(`Vòng Chung kết: Tổng trọng số đang là ${totalWeight.toFixed(2)}`);
-          }
+  useEffect(() => {
+    let isMounted = true;
+
+    const validateCriteria = async () => {
+      if (hackathonRounds.length === 0) {
+        if (isMounted) {
+          setWeightErrors([]);
+          setMissingCriteriaErrors([]);
         }
-      } else {
-        // Xét Vòng sơ loại
-        const rTracks = tracks.filter((t) => t.round_id === r.id);
-        rTracks.forEach((t) => {
-          const trackCriteria = criteria.filter((c) => c.track_id === t.id && c.type !== CRITERIA_TYPES.PENALTY);
-          if (trackCriteria.length === 0) {
-            mErrors.push(`Bảng đấu '${t.name}' (Vòng ${r.name}) chưa có tiêu chí đánh giá.`);
+        return;
+      }
+
+      setIsValidatingCriteria(true);
+      const wErrors = [];
+      const mErrors = [];
+
+      try {
+        const promises = [];
+        
+        hackathonRounds.forEach((r) => {
+          if (r.is_final) {
+            promises.push(
+              criteriaApi.getWeightSummary(r.id, null).then(res => {
+                const summary = res.data;
+                if (!summary || summary.items.length === 0) {
+                  mErrors.push(`Vòng Chung kết chưa có tiêu chí đánh giá.`);
+                } else if (summary.status === 'WARN') {
+                  wErrors.push(`Vòng Chung kết: Tổng trọng số đang là ${summary.total.toFixed(2)}`);
+                }
+              }).catch(() => {
+                mErrors.push(`Không thể kiểm tra tiêu chí Vòng Chung kết (Lỗi API).`);
+              })
+            );
           } else {
-            const totalWeight = trackCriteria.reduce((sum, c) => sum + (c.weight || 0), 0);
-            if (Math.abs(totalWeight - MAX_WEIGHT_TOTAL) > 0.001) {
-              wErrors.push(`Bảng đấu '${t.name}' (Vòng ${r.name}): Tổng trọng số đang là ${totalWeight.toFixed(2)}`);
-            }
+            const rTracks = tracks.filter((t) => t.round_id === r.id);
+            rTracks.forEach((t) => {
+              promises.push(
+                criteriaApi.getWeightSummary(null, t.id).then(res => {
+                  const summary = res.data;
+                  if (!summary || summary.items.length === 0) {
+                    mErrors.push(`Bảng đấu '${t.name}' (Vòng ${r.name}) chưa có tiêu chí đánh giá.`);
+                  } else if (summary.status === 'WARN') {
+                    wErrors.push(`Bảng đấu '${t.name}' (Vòng ${r.name}): Tổng trọng số đang là ${summary.total.toFixed(2)}`);
+                  }
+                }).catch(() => {
+                  mErrors.push(`Không thể kiểm tra tiêu chí Bảng đấu '${t.name}' (Lỗi API).`);
+                })
+              );
+            });
           }
         });
-      }
-    });
 
-    return { weightErrors: wErrors, missingCriteriaErrors: mErrors };
-  }, [hackathonRounds, criteria, tracks]);
+        await Promise.all(promises);
+
+        if (isMounted) {
+          setWeightErrors(wErrors);
+          setMissingCriteriaErrors(mErrors);
+        }
+      } catch (error) {
+        console.error('Error validating criteria via API:', error);
+      } finally {
+        if (isMounted) setIsValidatingCriteria(false);
+      }
+    };
+
+    validateCriteria();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [hackathonRounds, tracks]);
 
   // 4. Validate sự kiện KICKOFF
   const hasKickoffEvent = useMemo(() => {
@@ -118,5 +159,6 @@ export const useHackathonValidation = (hackathonId) => {
     hasKickoffEvent,
     totalErrors,
     hasBlockingErrors,
+    isValidatingCriteria
   };
 };
