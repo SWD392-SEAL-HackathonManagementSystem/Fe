@@ -122,7 +122,7 @@ const MainLayout = ({ children }) => {
   const siderContent = (
     <>
       <div style={{ height: 80, display: 'flex', alignItems: 'center', padding: '0 24px', marginBottom: 8 }}>
-        <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg, #1677ff 0%, #003eb3 100%)', borderRadius: 8, marginRight: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: 20, flexShrink: 0 }}>H</div>
+        <img src="/logo.jpg" alt="SEAL Hackathon Logo" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 8, marginRight: 12, flexShrink: 0 }} />
         {(!collapsed || isMobile) && (
           <div style={{ overflow: 'hidden' }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#141414', lineHeight: '1.2', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>HackOS</div>
