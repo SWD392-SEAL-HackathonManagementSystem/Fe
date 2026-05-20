@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Card, Tabs, Button, Table, Form, Input, Modal, Select, Tag, Alert, message, notification, Space } from 'antd';
-import { UserPlus, ShieldAlert, Trash2 } from 'lucide-react';
+import { Card, Tabs, Button, Table, Form, Input, Modal, Select, Tag, message, notification, Space } from 'antd';
+import { UserPlus, Trash2 } from 'lucide-react';
 import { useAppContext } from '../../../app/AppContext';
 
 const { Option } = Select;
@@ -10,24 +10,12 @@ const PeopleManagementPage = ({ hackathonId }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
 
-  // Dữ liệu cho Hackathon hiện tại
   const hackathonTracks = tracks.filter(t => t.hackathon_id === hackathonId);
   const hackathonRounds = rounds.filter(r => hackathonTracks.map(t => t.id).includes(r.track_id));
   const hackathonAssignments = assignments.filter(a => a.hackathon_id === hackathonId);
 
-  // Lọc lấy các Vòng Sơ Loại (Giả sử sequence_order = 1 là Sơ loại)
   const preliminaryRounds = hackathonRounds.filter(r => r.sequence_order === 1);
 
-  // Logic kiểm tra Conflict 2 chiều (Mentor ↔ Judge)
-  const getConflictWarnings = () => {
-    const mentorIds = hackathonAssignments.filter(a => a.type === 'MENTOR').map(a => a.person_id);
-    const judgeIds = hackathonAssignments.filter(a => a.type === 'JUDGE').map(a => a.person_id);
-    const conflictIds = mentorIds.filter(id => judgeIds.includes(id));
-    return conflictIds.map(id => people.find(p => p.id === id)?.name).filter(Boolean);
-  };
-  const conflicts = getConflictWarnings();
-
-  // --- XỬ LÝ LƯU GUEST JUDGE VÀ BẮN THÔNG BÁO ---
   const handleAddGuestJudge = (values) => {
     addPerson({ ...values, role: 'JUDGE' });
     message.success('Đã tạo tài khoản và gửi lời mời Giám khảo thành công');
@@ -50,28 +38,76 @@ const PeopleManagementPage = ({ hackathonId }) => {
     }, 500);
   };
 
-  // --- XỬ LÝ PHÂN CÔNG (ASSIGNMENT) ---
+  const checkIsFinalRound = (round) => {
+    if (!round) return false;
+    return round.sequence_order > 1 || round.name.toLowerCase().includes('chung kết') || round.name.toLowerCase().includes('final');
+  };
+
   const handleAssign = (values, type) => {
     const isExist = hackathonAssignments.some(a => 
       a.person_id === values.person_id && 
       a.type === type && 
       (a.track_id === values.track_id || a.round_id === values.round_id)
     );
-    
-    if (isExist) {
-      return message.error('Nhân sự này đã được phân công vào hạng mục này rồi!');
+    if (isExist) return message.error('Nhân sự này đã được phân công vào hạng mục này rồi!');
+
+    if (type === 'JUDGE') {
+      const targetRound = hackathonRounds.find(r => r.id === values.round_id);
+      const targetTrackId = targetRound?.track_id;
+      
+      const isFinalRound = checkIsFinalRound(targetRound); 
+      
+      const isMentorSameTrack = hackathonAssignments.some(a => a.type === 'MENTOR' && a.person_id === values.person_id && a.track_id === targetTrackId);
+      const isMentorAnywhere = hackathonAssignments.some(a => a.type === 'MENTOR' && a.person_id === values.person_id);
+
+      if (isMentorSameTrack) {
+        return message.error('Lỗi: Mentor không được làm Giám khảo cho chính Bảng đấu (Track) mà mình hướng dẫn!');
+      }
+
+      if (values.assignment_type === 'HEAD' && isMentorAnywhere) {
+        return message.error('Lỗi: Người đã từng làm Mentor tuyệt đối không được giữ vai trò Trưởng ban!');
+      }
+
+      if (isFinalRound && isMentorAnywhere) {
+        return message.error('Lỗi: Người đã tham gia làm Mentor không được phép chấm thi tại Vòng Chung kết!');
+      }
+    }
+
+    if (type === 'MENTOR') {
+      const isJudgeSameTrack = hackathonAssignments.some(a => {
+        if (a.type !== 'JUDGE') return false;
+        const roundOfJudge = hackathonRounds.find(r => r.id === a.round_id);
+        return roundOfJudge?.track_id === values.track_id && a.person_id === values.person_id;
+      });
+
+      if (isJudgeSameTrack) {
+        return message.error('Lỗi: Người này đang làm Giám khảo cho Bảng đấu này, không thể phân công làm Mentor!');
+      }
+
+      const isHeadJudge = hackathonAssignments.some(a => a.type === 'JUDGE' && a.assignment_type === 'HEAD' && a.person_id === values.person_id);
+      if (isHeadJudge) {
+        return message.error('Lỗi: Người này đang giữ vai trò Trưởng ban, không thể phân công đi làm Mentor!');
+      }
+
+      const isJudgeFinalRound = hackathonAssignments.some(a => {
+        if (a.type !== 'JUDGE') return false;
+        const roundOfJudge = hackathonRounds.find(r => r.id === a.round_id);
+        return checkIsFinalRound(roundOfJudge) && a.person_id === values.person_id;
+      });
+
+      if (isJudgeFinalRound) {
+        return message.error('Lỗi: Người này đang là Giám khảo Vòng Chung kết, không thể phân công đi làm Mentor!');
+      }
     }
 
     assignRole({ ...values, hackathon_id: hackathonId, type });
     message.success(`Đã phân công ${type === 'MENTOR' ? 'Mentor' : 'Giám khảo'} thành công!`);
   };
 
-  // --- HÀM TIỆN ÍCH HIỂN THỊ DỮ LIỆU BẢNG BẰNG TIẾNG VIỆT ---
   const getPersonName = (id) => people.find(p => p.id === id)?.name || 'Không xác định';
   const getTrackName = (id) => tracks.find(t => t.id === id)?.name || 'Không xác định';
   const getRoundName = (id) => rounds.find(r => r.id === id)?.name || 'Không xác định';
 
-  // Dịch trạng thái lời mời sang tiếng Việt
   const renderInvitationStatus = (status) => {
     switch (status) {
       case 'ACCEPTED': return <Tag color="green">Đã chấp nhận</Tag>;
@@ -81,11 +117,10 @@ const PeopleManagementPage = ({ hackathonId }) => {
     }
   };
 
-  // Dịch và tô màu cho Vai trò Giám khảo
   const renderJudgeRole = (role) => {
     switch (role) {
       case 'HEAD': return <Tag color="red">Trưởng ban</Tag>;
-      case 'CALIBRATION': return <Tag color="gold">Chấm chéo</Tag>; // gold là màu vàng cam đẹp nhất của Ant Design
+      case 'CALIBRATION': return <Tag color="gold">Chấm chéo</Tag>;
       case 'NORMAL': return <Tag color="blue">Bình thường</Tag>;
       default: return <Tag color="blue">Bình thường</Tag>;
     }
@@ -106,24 +141,16 @@ const PeopleManagementPage = ({ hackathonId }) => {
 
   return (
     <div>
-      {conflicts.length > 0 && (
-        <Alert
-          message="Cảnh báo Xung đột Vai trò (Conflict Mentor ↔ Judge)"
-          description={`Phát hiện cá nhân được phân công vừa làm Mentor vừa làm Judge: ${conflicts.join(', ')}. Hệ thống chỉ cảnh báo, không khóa thao tác.`}
-          type="warning" showIcon icon={<ShieldAlert size={20} />} style={{ marginBottom: 24, borderRadius: 8 }}
-        />
-      )}
-
       <Card>
         <Tabs defaultActiveKey="1">
-          {/* TAB 1: GUEST JUDGE */}
           <Tabs.TabPane tab="Giám khảo khách mời" key="1">
             <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
               <Button type="primary" icon={<UserPlus size={16} />} onClick={() => setIsModalOpen(true)}>
-                Mời Giám khảo (Tạo TK Tạm)
+                Mời Giám khảo (Tạo tài khoản tạm thời)
               </Button>
             </div>
-            <Table scroll={{ x: 'max-content' }}
+            <Table 
+              scroll={{ x: 'max-content' }}
               dataSource={people.filter(p => p.role === 'JUDGE')} 
               rowKey="id" pagination={false}
               locale={{ emptyText: 'Chưa có giám khảo nào.' }}
@@ -136,18 +163,17 @@ const PeopleManagementPage = ({ hackathonId }) => {
             />
           </Tabs.TabPane>
 
-          {/* TAB 2: MENTOR ASSIGNMENT */}
-          <Tabs.TabPane tab="Phân công Mentor" key="2">
+          <Tabs.TabPane tab="Phân công người hướng dẫn" key="2">
             <Card type="inner" style={{ marginBottom: 24, background: '#fafafa' }}>
               <Form layout="inline" onFinish={(vals) => handleAssign(vals, 'MENTOR')}>
                 <Space size="middle" wrap>
                   <Form.Item name="person_id" rules={[{ required: true, message: 'Vui lòng chọn' }]}>
-                    <Select placeholder="Chọn Mentor..." style={{ width: 220 }}>
+                    <Select placeholder="Chọn người hướng dẫn" style={{ width: 220 }}>
                       {people.filter(p => p.role === 'MENTOR').map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
                     </Select>
                   </Form.Item>
                   <Form.Item name="track_id" rules={[{ required: true, message: 'Vui lòng chọn' }]}>
-                    <Select placeholder="Chọn Bảng đấu (Track)..." style={{ width: 250 }}>
+                    <Select placeholder="Chọn bảng đấu" style={{ width: 250 }}>
                       {hackathonTracks.map(t => <Option key={t.id} value={t.id}>{t.name}</Option>)}
                     </Select>
                   </Form.Item>
@@ -155,26 +181,30 @@ const PeopleManagementPage = ({ hackathonId }) => {
                 </Space>
               </Form>
             </Card>
-            <Table scroll={{ x: 'max-content' }}dataSource={hackathonAssignments.filter(a => a.type === 'MENTOR')} columns={mentorColumns} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có Mentor nào được phân công' }} />
+            <Table 
+              scroll={{ x: 'max-content' }}
+              dataSource={hackathonAssignments.filter(a => a.type === 'MENTOR')} 
+              columns={mentorColumns} 
+              rowKey="id" 
+              pagination={false} 
+              locale={{ emptyText: 'Chưa có người hướng dẫn nào được phân công' }} 
+            />
           </Tabs.TabPane>
 
-          {/* TAB 3: JUDGE ASSIGNMENT */}
-          <Tabs.TabPane tab="Phân công Judge" key="3">
+          <Tabs.TabPane tab="Phân công giám khảo" key="3">
             <Card type="inner" style={{ marginBottom: 24, background: '#fafafa' }}>
               <Form layout="inline" onFinish={(vals) => handleAssign(vals, 'JUDGE')} initialValues={{ assignment_type: 'NORMAL' }}>
                 <Space size="middle" wrap>
                   <Form.Item name="person_id" rules={[{ required: true, message: 'Vui lòng chọn' }]}>
-                    <Select placeholder="Chọn Giám khảo..." style={{ width: 220 }}>
-                      {/* Lưu ý: Bạn có thể bỏ comment filter JUDGE bên dưới khi đã test xong conflict */}
-                      {people/*.filter(p => p.role === 'JUDGE')*/.map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
+                    <Select placeholder="Chọn giám khảo" style={{ width: 220 }}>
+                      {people.map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
                     </Select>
                   </Form.Item>
                   <Form.Item name="round_id" rules={[{ required: true, message: 'Vui lòng chọn' }]}>
-                    <Select placeholder="Chọn Vòng SƠ LOẠI..." style={{ width: 250 }}>
-                      {preliminaryRounds.map(r => <Option key={r.id} value={r.id}>{r.name} ({getTrackName(r.track_id)})</Option>)}
+                    <Select placeholder="Chọn vòng thi" style={{ width: 250 }}>
+                      {hackathonRounds.map(r => <Option key={r.id} value={r.id}>{r.name} ({getTrackName(r.track_id)})</Option>)}
                     </Select>
                   </Form.Item>
-                  {/* GIỮ VALUE LÀ TIẾNG ANH CHO CHUẨN DB, NHƯNG HIỂN THỊ TIẾNG VIỆT */}
                   <Form.Item name="assignment_type" rules={[{ required: true, message: 'Vui lòng chọn' }]}>
                     <Select style={{ width: 140 }}>
                       <Option value="NORMAL">Bình thường</Option>
@@ -186,12 +216,18 @@ const PeopleManagementPage = ({ hackathonId }) => {
                 </Space>
               </Form>
             </Card>
-            <Table scroll={{ x: 'max-content' }}dataSource={hackathonAssignments.filter(a => a.type === 'JUDGE')} columns={judgeColumnsAssign} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có Judge nào được phân công' }}/>
+            <Table 
+              scroll={{ x: 'max-content' }}
+              dataSource={hackathonAssignments.filter(a => a.type === 'JUDGE')} 
+              columns={judgeColumnsAssign} 
+              rowKey="id" 
+              pagination={false} 
+              locale={{ emptyText: 'Chưa có Giám khảo nào được phân công' }}
+            />
           </Tabs.TabPane>
         </Tabs>
       </Card>
 
-      {/* MODAL MỜI GUEST JUDGE */}
       <Modal title="Mời Giám khảo khách mời" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} okText="Gửi lời mời" cancelText="Hủy">
         <Form form={form} layout="vertical" onFinish={handleAddGuestJudge}>
           <Form.Item name="name" label="Họ và Tên" rules={[{ required: true, message: 'Bắt buộc nhập' }]}><Input placeholder="VD: Nguyễn Văn A" /></Form.Item>
