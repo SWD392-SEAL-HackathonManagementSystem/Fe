@@ -3,7 +3,7 @@ import { Modal, Form, Input, InputNumber, Row, Col, Select, message } from 'antd
 
 const { TextArea } = Input;
 
-const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) => {
+const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title, rounds, isEditing }) => {
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -53,6 +53,20 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title }) =
         >
           <Input placeholder="Ví dụ: Phát triển Web" />
         </Form.Item>
+
+        {!isEditing && (
+          <Form.Item
+            name="round_id"
+            label="Vòng sơ loại"
+            rules={[{ required: true, message: 'Vui lòng chọn vòng sơ loại' }]}
+          >
+            <Select placeholder="Chọn vòng sơ loại">
+              {rounds?.map(r => (
+                <Select.Option key={r.id} value={r.id}>{r.name}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+        )}
 
         <Form.Item name="description" label="Mô tả">
           <TextArea rows={3} placeholder="Mô tả ngắn gọn về track" />

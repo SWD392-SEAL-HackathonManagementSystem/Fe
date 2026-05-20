@@ -1,14 +1,14 @@
-import React, { useMemo } from 'react';
-import { Card, Button, Typography, Tag, Space, Alert, Divider } from 'antd';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Lock, ExternalLink } from 'lucide-react';
-import { useAppContext } from '../../../app/AppContext';
+import React, { useState, useEffect } from 'react';
+import { Card, Button, Typography, Tag, Space, Alert, Spin, message } from 'antd';
+import { CheckCircle, XCircle, AlertTriangle, Lock } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { formatDate } from '../../../shared/utils/date';
+import { hackathonService } from '../../hackathons/services/hackathonService';
+import { mapHackathonToFE } from '../../hackathons/mappers/hackathonMapper';
 
 const { Title, Text, Paragraph } = Typography;
 
 // Validation check item component
-const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
+const ValidationItem = ({ status, title, detail }) => {
   const getIcon = () => {
     switch (status) {
       case 'success':
@@ -25,13 +25,13 @@ const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
   const getStatusTag = () => {
     switch (status) {
       case 'success':
-        return <Tag color="success">Success</Tag>;
+        return <Tag color="success">Hợp lệ</Tag>;
       case 'error':
-        return <Tag color="error">Error</Tag>;
+        return <Tag color="error">Lỗi chặn</Tag>;
       case 'warning':
-        return <Tag color="warning">Warning</Tag>;
+        return <Tag color="warning">Cảnh báo</Tag>;
       default:
-        return <Tag>Unknown</Tag>;
+        return <Tag>Không rõ</Tag>;
     }
   };
 
@@ -49,52 +49,15 @@ const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
       <div style={{ marginTop: 2 }}>{getIcon()}</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 500, fontSize: 16, marginBottom: 4 }}>{title}</div>
-        {status === 'error' && detail && (
+        {detail && (
           <div
             style={{
-              background: '#fff1f0',
-              border: '1px solid #ffccc7',
-              padding: '6px 12px',
-              borderRadius: 6,
-              marginTop: 4,
-              marginBottom: 8,
+              padding: '2px 0',
               fontSize: 13,
-              color: '#cf1322',
-              fontWeight: 500,
-              display: 'inline-block',
+              color: status === 'error' ? '#cf1322' : status === 'warning' ? '#ad6800' : '#595959',
             }}
           >
-            Error: {detail}
-          </div>
-        )}
-        {status === 'warning' && detail && (
-          <div
-            style={{
-              background: '#fffbe6',
-              border: '1px solid #ffe58f',
-              padding: '6px 12px',
-              borderRadius: 6,
-              marginTop: 4,
-              marginBottom: 8,
-              fontSize: 13,
-              color: '#ad6800',
-              fontWeight: 500,
-              display: 'inline-block',
-            }}
-          >
-            Warning: {detail}
-          </div>
-        )}
-        {status === 'success' && detail && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
             {detail}
-          </Text>
-        )}
-        {linkText && linkAction && (
-          <div style={{ marginTop: 8 }}>
-            <Button type="link" size="small" onClick={linkAction} style={{ paddingLeft: 0 }}>
-              {linkText} →
-            </Button>
           </div>
         )}
       </div>
@@ -106,80 +69,63 @@ const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
 const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
   const navigate = useNavigate();
   const params = useParams();
-  const { hackathons, tracks, rounds, criteria } = useAppContext();
+  const [loading, setLoading] = useState(true);
+  const [hackathon, setHackathon] = useState(null);
+  const [readiness, setReadiness] = useState(null);
+  const [activating, setActivating] = useState(false);
 
   const hId = propHackathonId || parseInt(params.hackathonId);
-  const hackathon = hackathons.find((h) => h.id === hId);
 
-  // Gather data for this hackathon
-  const hackathonTracks = useMemo(() => tracks.filter((t) => t.hackathon_id === hId), [tracks, hId]);
-  const trackIds = useMemo(() => hackathonTracks.map((t) => t.id), [hackathonTracks]);
-  const hackathonRounds = useMemo(() => rounds.filter((r) => trackIds.includes(r.track_id)), [rounds, trackIds]);
-  const roundIds = useMemo(() => hackathonRounds.map((r) => r.id), [hackathonRounds]);
-  const hackathonCriteria = useMemo(() => criteria.filter((c) => roundIds.includes(c.round_id)), [criteria, roundIds]);
-
-  // ===== VALIDATION CHECKS =====
-
-  // 1. Tracks & Rounds
-  const hasAtLeastOneTrack = hackathonTracks.length >= 1;
-  const tracksWithEnoughRounds = hackathonTracks.every(
-    (t) => hackathonRounds.filter((r) => r.track_id === t.id).length >= 2
-  );
-  const tracksWithoutEnoughRounds = hackathonTracks.filter(
-    (t) => hackathonRounds.filter((r) => r.track_id === t.id).length < 2
-  );
-
-  // 2. Criteria & Scoring
-  const roundsWithCriteria = hackathonRounds.every(
-    (r) => hackathonCriteria.filter((c) => c.round_id === r.id).length >= 1
-  );
-  const roundsWithoutCriteria = hackathonRounds.filter(
-    (r) => hackathonCriteria.filter((c) => c.round_id === r.id).length < 1
-  );
-
-  // Weight validation per round
-  const weightErrors = [];
-  hackathonRounds.forEach((r) => {
-    const roundCri = hackathonCriteria.filter((c) => c.round_id === r.id);
-    if (roundCri.length > 0) {
-      const totalWeight = roundCri.reduce((sum, c) => sum + c.weight, 0);
-      if (Math.abs(totalWeight - 1.0) > 0.001) {
-        const track = hackathonTracks.find((t) => t.id === r.track_id);
-        weightErrors.push({
-          roundId: r.id,
-          roundName: r.name,
-          trackName: track?.name || 'Unknown',
-          totalWeight: totalWeight.toFixed(2),
-        });
-      }
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [hackData, readinessData] = await Promise.all([
+        hackathonService.getById(hId),
+        hackathonService.getReadiness(hId)
+      ]);
+      setHackathon(mapHackathonToFE(hackData));
+      setReadiness(readinessData);
+    } catch (error) {
+      message.error(error.message || 'Lỗi khi tải dữ liệu cấu hình');
+    } finally {
+      setLoading(false);
     }
-  });
+  };
 
-  // 3. Schedule
-  const hasSchedule = hackathon?.event_start && hackathon?.event_end;
+  useEffect(() => {
+    loadData();
+  }, [hId]);
 
-  // Count errors and warnings
-  const errors = [];
-  const warnings = [];
+  const handleActivate = async () => {
+    try {
+      setActivating(true);
+      await hackathonService.updateStatus(hId, 'ONGOING');
+      message.success('Kích hoạt sự kiện Hackathon thành công! Trạng thái hiện tại: ONGOING.');
+      await loadData();
+    } catch (error) {
+      message.error(error.message || 'Lỗi khi kích hoạt Hackathon');
+    } finally {
+      setActivating(false);
+    }
+  };
 
-  if (!hasAtLeastOneTrack) errors.push('No tracks configured');
-  if (!tracksWithEnoughRounds && hasAtLeastOneTrack)
-    errors.push('Some tracks have less than 2 rounds');
-  if (!roundsWithCriteria && hackathonRounds.length > 0)
-    warnings.push('Some rounds have no criteria');
-  if (weightErrors.length > 0)
-    errors.push(`Weight mismatch in ${weightErrors.length} round(s)`);
-
-  const totalErrors = errors.length + weightErrors.length;
-  const hasBlockingErrors = totalErrors > 0 || !hasAtLeastOneTrack;
+  if (loading) {
+    return (
+      <Card style={{ textAlign: 'center', padding: '40px 0', borderRadius: 12 }}>
+        <Spin size="large" />
+      </Card>
+    );
+  }
 
   if (!hackathon) {
     return (
       <div style={{ padding: 24 }}>
-        <Alert type="error" message="Hackathon not found" />
+        <Alert type="error" message="Không tìm thấy sự kiện Hackathon" />
       </div>
     );
   }
+
+  const { ready, blockers = [], warnings = [], summary = {} } = readiness || {};
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
@@ -194,7 +140,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <Title level={3} style={{ margin: 0 }}>
-            Review & Validate Configuration
+            Kiểm tra & Cấu hình Sự kiện
           </Title>
           <Tag
             style={{
@@ -202,79 +148,50 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
               fontSize: 12,
             }}
           >
-            ID: HCK-{hackathon.id}
+            Trạng thái hiện tại: {hackathon.status}
           </Tag>
         </div>
-        <Button
-          type="text"
-          onClick={() => navigate(-1)}
-          style={{ fontSize: 16 }}
-        >
-          ✕
-        </Button>
       </div>
 
       {/* Description */}
       <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 24 }}>
-        Before activating the hackathon, please review the critical configuration requirements.
-        All errors must be resolved to proceed. Warnings are highly recommended to address
-        but will not block activation.
+        Trước khi kích hoạt sự kiện Hackathon (chuyển sang ONGOING), hệ thống sẽ chạy dry-run kiểm tra các điều kiện sẵn sàng.
+        Tất cả các lỗi chặn (Blockers) phải được giải quyết. Các cảnh báo (Warnings) được khuyến nghị xử lý nhưng không chặn việc kích hoạt.
       </Paragraph>
 
-      {/* Section 1: Tracks & Rounds */}
+      {/* Section 1: Summary Statistics */}
       <Card
-        title={<Title level={4} style={{ margin: 0 }}>Tracks & Rounds</Title>}
-        style={{ marginBottom: 24, borderRadius: 12, overflow: 'hidden' }}
-        styles={{ body: { padding: 0 } }}
+        title={<Title level={4} style={{ margin: 0 }}>Thống kê cấu hình</Title>}
+        style={{ marginBottom: 24, borderRadius: 12 }}
       >
-        <ValidationItem
-          status={hasAtLeastOneTrack ? 'success' : 'error'}
-          title="At least 1 Track configured"
-          detail={
-            hasAtLeastOneTrack
-              ? `${hackathonTracks.length} Track(s) currently configured (${hackathonTracks.map((t) => t.name).join(', ')}).`
-              : 'No tracks have been configured yet.'
-          }
-          linkText={!hasAtLeastOneTrack ? 'Go to Track Settings' : null}
-          linkAction={
-            !hasAtLeastOneTrack
-              ? () => navigate(`/hackathons/${hId}/setup`)
-              : null
-          }
-        />
-        <ValidationItem
-          status={
-            !hasAtLeastOneTrack
-              ? 'warning'
-              : tracksWithEnoughRounds
-              ? 'success'
-              : 'error'
-          }
-          title="Each Track has ≥2 Rounds"
-          detail={
-            tracksWithEnoughRounds
-              ? 'All tracks have at least 2 rounds configured.'
-              : tracksWithoutEnoughRounds.length > 0
-              ? `Track(s) '${tracksWithoutEnoughRounds.map((t) => t.name).join("', '")}' have fewer than 2 rounds.`
-              : 'Configure tracks first.'
-          }
-          linkText={!tracksWithEnoughRounds ? 'Go to Round Settings' : null}
-          linkAction={
-            !tracksWithEnoughRounds
-              ? () => navigate(`/hackathons/${hId}/setup`)
-              : null
-          }
-        />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+          <div>
+            <Text type="secondary">Bảng đấu (Tracks)</Text>
+            <Title level={3} style={{ margin: '4px 0 0 0' }}>{summary.tracksCount || 0}</Title>
+          </div>
+          <div>
+            <Text type="secondary">Vòng thi (Rounds)</Text>
+            <Title level={3} style={{ margin: '4px 0 0 0' }}>{summary.roundsCount || 0}</Title>
+          </div>
+          <div>
+            <Text type="secondary">Tiêu chí (Criteria)</Text>
+            <Title level={3} style={{ margin: '4px 0 0 0' }}>{summary.criteriaCount || 0}</Title>
+          </div>
+          <div>
+            <Text type="secondary">Lịch trình (Events)</Text>
+            <Title level={3} style={{ margin: '4px 0 0 0' }}>{summary.eventsCount || 0}</Title>
+          </div>
+        </div>
       </Card>
 
-      {/* Section 2: Criteria & Scoring */}
+      {/* Section 2: Validation Results */}
       <Card
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Title level={4} style={{ margin: 0 }}>Criteria & Scoring</Title>
-            {(weightErrors.length > 0 || !roundsWithCriteria) && (
-              <Tag color="error" icon={<XCircle size={12} />}>
-                Action Required
+            <Title level={4} style={{ margin: 0 }}>Kết quả kiểm tra sẵn sàng</Title>
+            {blockers.length > 0 && (
+              <Tag color="error" icon={<XCircle size={12} style={{ marginRight: 4 }} />}>
+                Yêu cầu xử lý
               </Tag>
             )}
           </div>
@@ -283,69 +200,34 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
           marginBottom: 24,
           borderRadius: 12,
           overflow: 'hidden',
-          borderColor: weightErrors.length > 0 ? '#ff4d4f' : undefined,
+          borderColor: blockers.length > 0 ? '#ff4d4f' : undefined,
         }}
         styles={{ body: { padding: 0 } }}
       >
-        <ValidationItem
-          status={roundsWithCriteria ? 'success' : 'warning'}
-          title="Each Round has ≥1 Criteria"
-          detail={
-            roundsWithCriteria
-              ? 'All configured rounds have associated scoring rubrics.'
-              : `${roundsWithoutCriteria.length} round(s) have no criteria defined.`
-          }
-          linkText={!roundsWithCriteria ? 'Go to Criteria Settings' : null}
-          linkAction={
-            !roundsWithCriteria
-              ? () => navigate(`/hackathons/${hId}/setup`)
-              : null
-          }
-        />
-        <ValidationItem
-          status={weightErrors.length === 0 ? 'success' : 'error'}
-          title="Total weight per Round = 1.0"
-          detail={
-            weightErrors.length === 0
-              ? 'All rounds have criteria weights that sum to 1.0.'
-              : weightErrors
-                  .map(
-                    (e) =>
-                      `Track '${e.trackName}' → Round '${e.roundName}' weights sum to ${e.totalWeight}.`
-                  )
-                  .join(' | ')
-          }
-          linkText={weightErrors.length > 0 ? 'Go to Rubric Settings' : null}
-          linkAction={
-            weightErrors.length > 0
-              ? () => navigate(`/hackathons/${hId}/criteria/${weightErrors[0].roundId}`)
-              : null
-          }
-        />
-      </Card>
+        {blockers.length === 0 && warnings.length === 0 && (
+          <div style={{ padding: '24px 32px', textAlign: 'center' }}>
+            <CheckCircle size={40} color="#52c41a" style={{ marginBottom: 12 }} />
+            <div style={{ fontSize: 16, fontWeight: 500, color: '#52c41a' }}>Tất cả các điều kiện sẵn sàng đều hợp lệ!</div>
+          </div>
+        )}
 
-      {/* Section 3: Schedule & Personnel */}
-      <Card
-        title={<Title level={4} style={{ margin: 0 }}>Schedule & Personnel</Title>}
-        style={{ marginBottom: 24, borderRadius: 12, overflow: 'hidden' }}
-        styles={{ body: { padding: 0 } }}
-      >
-        <ValidationItem
-          status={hasSchedule ? 'success' : 'warning'}
-          title="Kickoff schedule set"
-          detail={
-            hasSchedule
-              ? `Start: ${formatDate(hackathon.event_start, 'MMM DD, YYYY')}. End: ${formatDate(hackathon.event_end, 'MMM DD, YYYY')}.`
-              : 'Event schedule has not been configured.'
-          }
-        />
-        <ValidationItem
-          status="warning"
-          title="Judges assigned to all Rounds"
-          detail="Judge assignment feature is not yet implemented. Please assign judges manually."
-          linkText="Manage Judges"
-          linkAction={() => {}}
-        />
+        {blockers.map((b, idx) => (
+          <ValidationItem
+            key={`blocker-${idx}`}
+            status="error"
+            title="Lỗi chặn cấu hình"
+            detail={b.message}
+          />
+        ))}
+
+        {warnings.map((w, idx) => (
+          <ValidationItem
+            key={`warning-${idx}`}
+            status="warning"
+            title="Cảnh báo cấu hình"
+            detail={w.message}
+          />
+        ))}
       </Card>
 
       {/* Activation Area */}
@@ -353,7 +235,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
         style={{
           marginTop: 32,
           borderRadius: 12,
-          borderLeft: hasBlockingErrors ? '4px solid #ff4d4f' : '4px solid #52c41a',
+          borderLeft: blockers.length > 0 ? '4px solid #ff4d4f' : '4px solid #52c41a',
         }}
       >
         <div
@@ -367,20 +249,20 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
         >
           <div style={{ flex: 1, minWidth: 300 }}>
             <Title level={3} style={{ margin: 0, marginBottom: 8 }}>
-              Ready to Open Hackathon
+              Kích hoạt sự kiện Hackathon
             </Title>
             <Paragraph type="secondary" style={{ fontSize: 16, margin: 0, maxWidth: 600 }}>
-              {hasBlockingErrors ? (
+              {blockers.length > 0 ? (
                 <>
-                  Your event configuration has{' '}
+                  Cấu hình sự kiện của bạn có{' '}
                   <strong style={{ color: '#ff4d4f' }}>
-                    {totalErrors} critical error{totalErrors !== 1 ? 's' : ''}
+                    {blockers.length} lỗi chặn
                   </strong>{' '}
-                  that must be resolved before you can activate the hackathon and open registrations.
+                  cần được khắc phục trước khi bạn có thể kích hoạt sự kiện để mở cổng đăng ký.
                 </>
               ) : (
                 <>
-                  All critical checks have passed. You can now activate the hackathon and open registrations.
+                  Tất cả các điều kiện bắt buộc đã sẵn sàng. Bạn có thể kích hoạt sự kiện ngay bây giờ.
                 </>
               )}
             </Paragraph>
@@ -388,8 +270,10 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
           <Button
             type="primary"
             size="large"
-            disabled={hasBlockingErrors}
-            icon={hasBlockingErrors ? <Lock size={16} /> : null}
+            disabled={blockers.length > 0 || hackathon.status !== 'DRAFT'}
+            loading={activating}
+            icon={blockers.length > 0 ? <Lock size={16} /> : null}
+            onClick={handleActivate}
             style={{
               height: 48,
               paddingLeft: 32,
@@ -398,7 +282,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
               fontWeight: 600,
             }}
           >
-            {hasBlockingErrors ? 'Activate Hackathon' : '🚀 Activate Hackathon'}
+            {hackathon.status === 'ONGOING' ? '🚀 Sự kiện đã kích hoạt' : blockers.length > 0 ? 'Chưa đủ điều kiện kích hoạt' : '🚀 Kích hoạt Hackathon'}
           </Button>
         </div>
       </Card>

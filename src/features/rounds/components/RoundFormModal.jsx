@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 const { TextArea } = Input;
 const { Option } = Select;
 
-const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tracks }) => {
+const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title }) => {
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -55,7 +55,9 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           sequence_order: 1,
           tiebreak_rule: 'PENALTY_SCORE',
           is_active: false,
-          wildcard_enabled: false
+          wildcard_enabled: false,
+          is_final: false,
+          round_type: 'PRELIMINARY'
         }}
       >
         <Row gutter={24}>
@@ -79,17 +81,30 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
           </Col>
         </Row>
 
-        <Form.Item
-          name="track_id"
-          label="Track (Bảng đấu)"
-          rules={[{ required: true, message: 'Vui lòng chọn track' }]}
-        >
-          <Select placeholder="Chọn track">
-            {tracks.map(t => (
-              <Option key={t.id} value={t.id}>{t.name}</Option>
-            ))}
-          </Select>
-        </Form.Item>
+        <Row gutter={24}>
+          <Col span={12}>
+            <Form.Item
+              name="round_type"
+              label="Loại vòng thi"
+              rules={[{ required: true, message: 'Vui lòng chọn loại' }]}
+            >
+              <Select>
+                <Option value="PRELIMINARY">Sơ loại (Preliminary)</Option>
+                <Option value="SEMIFINAL">Bán kết (Semifinal)</Option>
+                <Option value="FINAL">Chung kết (Final)</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="is_final"
+              label="Là vòng chung kết"
+              valuePropName="checked"
+            >
+              <Switch />
+            </Form.Item>
+          </Col>
+        </Row>
 
         <Row gutter={24}>
           <Col span={12}>
@@ -210,7 +225,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, tra
               label="Đang hoạt động"
               valuePropName="checked"
             >
-              <Switch />
+              <Switch disabled={!!initialValues?.is_active} />
             </Form.Item>
           </Col>
         </Row>
