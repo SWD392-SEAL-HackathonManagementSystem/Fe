@@ -84,12 +84,12 @@ export const criteriaApi = {
   },
 
   // 5. POST clone
-  cloneCriteria: async (roundId, trackId, sourceRoundId, replaceExisting = false) => {
+  cloneCriteria: async (roundId, trackId, sourceRoundId, sourceTrackId, replaceExisting = false) => {
     const path = getParentPath(roundId, trackId);
     const response = await fetch(`${BASE_URL}${path}/criteria/clone`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sourceRoundId, replaceExisting })
+      body: JSON.stringify({ sourceRoundId, sourceTrackId, replaceExisting })
     });
     return handleResponse(response);
   },

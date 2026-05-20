@@ -118,12 +118,11 @@ export const useCriteriaManagement = (hackathonId) => {
   const handleCloneCriteria = useCallback(async (sourceRoundId, sourceTrackId) => {
     setIsLoading(true);
     try {
-      // Vì API POST /clone yêu cầu sourceRoundId. Nếu clone từ track thì phải truyền trackId.
-      // Dựa vào logic API hiện tại ta truyền ID vào params.
       await criteriaApi.cloneCriteria(
         currentRound?.is_final ? selectedRoundId : null,
         currentRound?.is_final ? null : selectedTrackId,
-        sourceRoundId || sourceTrackId,
+        sourceRoundId,
+        sourceTrackId,
         false
       );
       message.success('Sao chép tiêu chí thành công');
