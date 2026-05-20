@@ -73,62 +73,19 @@ const HackathonSetupPage = () => {
 
   const items = [
     {
-      key: 'tracks',
-      label: 'Bảng đấu (Tracks)',
-      children: <TrackManagementPage hackathonId={hackathon.id} />,
-    },
-    {
       key: 'rounds',
       label: 'Vòng thi (Rounds)',
       children: <RoundManagementPage hackathonId={hackathon.id} />,
     },
     {
-      key: 'criteria',
-      label: 'Criteria',
-      children: (
-        <div>
-          {rounds.length === 0 ? (
-            <Card>Please create at least one round before managing criteria.</Card>
-          ) : (
-            <>
-              <div style={{ marginBottom: 16 }}>
-                <Space>
-                  <span style={{ fontWeight: 500 }}>Select Round:</span>
-                  <Select
-                    placeholder="Choose a round to manage criteria"
-                    style={{ width: 300 }}
-                    onChange={setSelectedRoundId}
-                    value={selectedRoundId}
-                  >
-                    {rounds.map(r => (
-                      <Option key={r.id} value={r.id}>
-                        {r.name} {r.is_final || r.isFinal ? '(Chung kết)' : ''}
-                      </Option>
-                    ))}
-                  </Select>
-                </Space>
-              </div>
-              {selectedRoundId ? (
-                <CriteriaManagementPage
-                  hackathonId={hackathon.id}
-                  roundId={selectedRoundId}
-                  roundName={rounds.find(r => r.id === selectedRoundId)?.name}
-                  onBack={() => setSelectedRoundId(null)}
-                />
-              ) : (
-                <Card style={{ textAlign: 'center', padding: '40px 0' }}>
-                  Please select a round above to manage its scoring criteria.
-                </Card>
-              )}
-            </>
-          )}
-        </div>
-      ),
+      key: 'tracks',
+      label: 'Bảng đấu (Tracks)',
+      children: <TrackManagementPage hackathonId={hackathon.id} />,
     },
     {
-      key: 'review',
-      label: 'Review & Validate',
-      children: <ReviewValidatePage hackathonId={hackathon.id} />,
+      key: 'criteria',
+      label: 'Tiêu chí đánh giá (Criteria)',
+      children: <CriteriaManagementPage hackathonId={hackathon.id} />, 
     },
     {
       key: 'people',
@@ -140,6 +97,11 @@ const HackathonSetupPage = () => {
       label: 'Lịch trình (Events)',
       children: <EventManagementPage hackathonId={hackathon.id} />,
     },
+    {
+      key: 'review',
+      label: 'Đánh giá & Kiểm tra (Review & Validate)',
+      children: <ReviewValidatePage hackathonId={hackathon.id} />, 
+    }
   ];
 
   return (
