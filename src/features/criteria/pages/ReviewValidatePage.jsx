@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, Button, Typography, Tag, Alert } from 'antd';
+import { Card, Button, Typography, Tag, Alert, Spin } from 'antd';
 import { CheckCircle, XCircle, AlertTriangle, Lock } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatDate } from '../../../shared/utils/date';
@@ -48,19 +48,12 @@ const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
       <div style={{ marginTop: 2 }}>{getIcon()}</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 500, fontSize: 16, marginBottom: 4 }}>{title}</div>
-        {status === 'error' && detail && (
+        {detail && (
           <div
             style={{
-              background: '#fff1f0',
-              border: '1px solid #ffccc7',
-              padding: '6px 12px',
-              borderRadius: 6,
-              marginTop: 4,
-              marginBottom: 8,
+              padding: '2px 0',
               fontSize: 13,
-              color: '#cf1322',
-              fontWeight: 500,
-              display: 'inline-block',
+              color: status === 'error' ? '#cf1322' : status === 'warning' ? '#ad6800' : '#595959',
             }}
           >
             Lỗi: {detail}
@@ -89,13 +82,6 @@ const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
             {detail}
           </Text>
         )}
-        {linkText && linkAction && (
-          <div style={{ marginTop: 8 }}>
-            <Button type="link" size="small" onClick={linkAction} style={{ paddingLeft: 0 }}>
-              {linkText} →
-            </Button>
-          </div>
-        )}
       </div>
       <div>{getStatusTag()}</div>
     </div>
@@ -118,8 +104,17 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
     hasKickoffEvent,
     hasSchedule,
     totalErrors,
-    hasBlockingErrors
+    hasBlockingErrors,
+    isLoadingData
   } = useHackathonValidation(hId);
+
+  if (isLoadingData) {
+    return (
+      <div style={{ textAlign: 'center', padding: 50 }}>
+        <Spin size="large" tip="Đang tải dữ liệu validation..." />
+      </div>
+    );
+  }
 
   if (!hackathon) {
     return (
@@ -128,6 +123,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
       </div>
     );
   }
+
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
@@ -149,16 +145,9 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
               fontSize: 12,
             }}
           >
-            ID: HCK-{hackathon.id}
+            Trạng thái hiện tại: {hackathon.status}
           </Tag>
         </div>
-        <Button
-          type="text"
-          onClick={() => navigate(-1)}
-          style={{ fontSize: 16 }}
-        >
-          ✕
-        </Button>
       </div>
 
       <Paragraph type="secondary" style={{ fontSize: 16, marginBottom: 24 }}>
@@ -342,7 +331,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
           <Button
             type="primary"
             size="large"
-            disabled={hasBlockingErrors}
+            disabled={hasBlockingErrors || hackathon.status !== 'DRAFT'}
             icon={hasBlockingErrors ? <Lock size={16} /> : null}
             style={{
               height: 48,

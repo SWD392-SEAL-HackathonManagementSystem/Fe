@@ -10,10 +10,12 @@ const { Option } = Select;
 
 const CriteriaManagementPage = ({ hackathonId }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingCriteria, setEditingCriteria] = useState(null);
+  
+  // State for cloning
   const [isCloneModalVisible, setIsCloneModalVisible] = useState(false);
   const [cloneSourceId, setCloneSourceId] = useState(null);
   const [cloneSourceType, setCloneSourceType] = useState('TRACK'); // 'TRACK' | 'ROUND'
-  const [editingCriteria, setEditingCriteria] = useState(null);
 
   // Gọi Custom Hook để tách toàn bộ logic tính toán ra khỏi UI
   const {
@@ -113,7 +115,7 @@ const CriteriaManagementPage = ({ hackathonId }) => {
       title: 'Điểm tối đa',
       dataIndex: 'max_score',
       key: 'max_score',
-      width: 100,
+      width: 110,
       align: 'right',
     },
     {
@@ -136,6 +138,8 @@ const CriteriaManagementPage = ({ hackathonId }) => {
       ),
     },
   ];
+
+  const isFinal = currentRound?.is_final || currentRound?.round_type === 'FINAL';
 
   return (
     <div>

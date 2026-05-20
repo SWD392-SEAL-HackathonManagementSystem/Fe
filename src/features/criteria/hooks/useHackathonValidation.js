@@ -1,15 +1,52 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../../../app/AppContext';
-import { CRITERIA_TYPES, MAX_WEIGHT_TOTAL } from '../constants/criteria.constants';
 import { criteriaApi } from '../api/criteria.api';
+import { hackathonService } from '../../hackathons/services/hackathonService';
+import { roundService } from '../../rounds/services/roundService';
+import { trackService } from '../../tracks/services/trackService';
+import { eventService } from '../../events/services/eventService';
+import { mapRoundToFE } from '../../rounds/mappers/roundMapper';
+import { mapTrackToFE } from '../../tracks/mappers/trackMapper';
+import { mapHackathonToFE } from '../../hackathons/mappers/hackathonMapper';
 
 export const useHackathonValidation = (hackathonId) => {
-  const { hackathons, tracks, rounds, events = [], assignments = [] } = useAppContext();
+  const { assignments = [] } = useAppContext();
 
-  const hackathon = useMemo(() => hackathons.find((h) => h.id === hackathonId), [hackathons, hackathonId]);
+  const [hackathon, setHackathon] = useState(null);
+  const [rounds, setRounds] = useState([]);
+  const [tracks, setTracks] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  const fetchBaseData = useCallback(async () => {
+    try {
+      setIsLoadingData(true);
+      const [hRes, rRes, tRes, eRes] = await Promise.all([
+        hackathonService.getById(hackathonId),
+        roundService.listByHackathon(hackathonId),
+        trackService.listByHackathon(hackathonId),
+        eventService.listByHackathon(hackathonId)
+      ]);
+      setHackathon(mapHackathonToFE(hRes));
+      setRounds((rRes || []).map(mapRoundToFE));
+      setTracks((tRes || []).map(mapTrackToFE));
+      
+      // Giả sử API event trả về mảng trực tiếp hoặc { data: items } - xử lý an toàn
+      const eventItems = Array.isArray(eRes) ? eRes : (eRes?.data || []);
+      setEvents(eventItems);
+    } catch (err) {
+      console.error('Lỗi khi tải dữ liệu validation:', err);
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, [hackathonId]);
+
+  useEffect(() => {
+    fetchBaseData();
+  }, [fetchBaseData]);
 
   // Lọc dữ liệu rounds
-  const hackathonRounds = useMemo(() => rounds.filter((r) => r.hackathon_id === hackathonId), [rounds, hackathonId]);
+  const hackathonRounds = useMemo(() => rounds.sort((a, b) => a.sequence_order - b.sequence_order), [rounds]);
   
   const prelimRounds = useMemo(() => hackathonRounds.filter(r => !r.is_final), [hackathonRounds]);
   const finalRounds = useMemo(() => hackathonRounds.filter(r => r.is_final), [hackathonRounds]);
@@ -159,6 +196,7 @@ export const useHackathonValidation = (hackathonId) => {
     hasKickoffEvent,
     totalErrors,
     hasBlockingErrors,
-    isValidatingCriteria
+    isValidatingCriteria,
+    isLoadingData
   };
 };

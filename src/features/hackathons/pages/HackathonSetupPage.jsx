@@ -6,10 +6,13 @@ import TrackManagementPage from '../../tracks/pages/TrackManagementPage';
 import RoundManagementPage from '../../rounds/pages/RoundManagementPage';
 import CriteriaManagementPage from '../../criteria/pages/CriteriaManagementPage';
 import ReviewValidatePage from '../../criteria/pages/ReviewValidatePage';
-import { useAppContext } from '../../../app/AppContext';
 import { ROUTES } from '../../../shared/constants/routes';
 import PeopleManagementPage from '../../people/pages/PeopleManagementPage';
 import EventManagementPage from '../../events/pages/EventManagementPage';
+import { hackathonService } from '../services/hackathonService';
+import { roundService } from '../../rounds/services/roundService';
+import { mapHackathonToFE } from '../mappers/hackathonMapper';
+import { mapRoundToFE } from '../../rounds/mappers/roundMapper';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -17,13 +20,45 @@ const { Option } = Select;
 const HackathonSetupPage = () => {
   const { hackathonId } = useParams();
   const navigate = useNavigate();
-  const { hackathons, tracks, rounds } = useAppContext();
+  const [hackathon, setHackathon] = useState(null);
+  const [rounds, setRounds] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedRoundId, setSelectedRoundId] = useState(null);
   
-  const hackathon = hackathons.find(h => h.id === parseInt(hackathonId));
-  const hackathonTracks = tracks.filter(t => t.hackathon_id === parseInt(hackathonId));
-  const trackIds = hackathonTracks.map(t => t.id);
-  const hackathonRounds = rounds.filter(r => trackIds.includes(r.track_id));
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [hackData, roundsData] = await Promise.all([
+          hackathonService.getById(hackathonId),
+          roundService.listByHackathon(hackathonId)
+        ]);
+        
+        const fullRounds = await Promise.all(
+          (roundsData || []).map(async (r) => {
+            try {
+              const detail = await roundService.getById(r.id);
+              return mapRoundToFE(detail);
+            } catch (e) {
+              return mapRoundToFE(r);
+            }
+          })
+        );
+        
+        setHackathon(mapHackathonToFE(hackData));
+        setRounds(fullRounds);
+      } catch (error) {
+        // Fallback for not found or errors
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [hackathonId]);
+
+  if (loading) {
+    return <Card style={{ textAlign: 'center', padding: '40px 0' }}>Đang tải...</Card>;
+  }
 
   if (!hackathon) {
     return (
@@ -38,24 +73,19 @@ const HackathonSetupPage = () => {
 
   const items = [
     {
-      key: 'tracks',
-      label: 'Bảng đấu (Tracks)',
-      children: <TrackManagementPage hackathonId={hackathon.id} />,
-    },
-    {
       key: 'rounds',
       label: 'Vòng thi (Rounds)',
       children: <RoundManagementPage hackathonId={hackathon.id} />,
     },
     {
+      key: 'tracks',
+      label: 'Bảng đấu (Tracks)',
+      children: <TrackManagementPage hackathonId={hackathon.id} />,
+    },
+    {
       key: 'criteria',
       label: 'Tiêu chí đánh giá (Criteria)',
       children: <CriteriaManagementPage hackathonId={hackathon.id} />, 
-    },
-    {
-      key: 'review',
-      label: 'Đánh giá & Kiểm tra (Review & Validate)',
-      children: <ReviewValidatePage hackathonId={hackathon.id} />, 
     },
     {
       key: 'people',
@@ -67,6 +97,11 @@ const HackathonSetupPage = () => {
       label: 'Lịch trình (Events)',
       children: <EventManagementPage hackathonId={hackathon.id} />,
     },
+    {
+      key: 'review',
+      label: 'Đánh giá & Kiểm tra (Review & Validate)',
+      children: <ReviewValidatePage hackathonId={hackathon.id} />, 
+    }
   ];
 
   return (

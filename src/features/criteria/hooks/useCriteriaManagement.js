@@ -1,11 +1,18 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useAppContext } from '../../../app/AppContext';
+
 import { CRITERIA_TYPES, MAX_WEIGHT_TOTAL } from '../constants/criteria.constants';
 import { criteriaApi } from '../api/criteria.api';
 import { message } from 'antd';
 
+import { roundService } from '../../rounds/services/roundService';
+import { trackService } from '../../tracks/services/trackService';
+import { mapRoundToFE } from '../../rounds/mappers/roundMapper';
+import { mapTrackToFE } from '../../tracks/mappers/trackMapper';
+
 export const useCriteriaManagement = (hackathonId) => {
-  const { rounds = [], tracks = [], updateRound } = useAppContext();
+  const [rounds, setRounds] = useState([]);
+  const [tracks, setTracks] = useState([]);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   
   const [selectedRoundId, setSelectedRoundId] = useState(null);
   const [selectedTrackId, setSelectedTrackId] = useState(null);
@@ -14,12 +21,32 @@ export const useCriteriaManagement = (hackathonId) => {
   const [criteriaList, setCriteriaList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  const fetchBaseData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [roundsRes, tracksRes] = await Promise.all([
+        roundService.listByHackathon(hackathonId),
+        trackService.listByHackathon(hackathonId)
+      ]);
+      setRounds((roundsRes || []).map(mapRoundToFE));
+      setTracks((tracksRes || []).map(mapTrackToFE));
+      setIsDataLoaded(true);
+    } catch (err) {
+      message.error('Lỗi khi tải dữ liệu Vòng thi/Bảng đấu');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [hackathonId]);
+
+  useEffect(() => {
+    fetchBaseData();
+  }, [fetchBaseData]);
+
   // 1. Lấy danh sách Vòng thi (Rounds) của Hackathon
   const hackathonRounds = useMemo(() => {
     return rounds
-      .filter(r => r.hackathon_id === hackathonId)
       .sort((a, b) => a.sequence_order - b.sequence_order);
-  }, [rounds, hackathonId]);
+  }, [rounds]);
   
   const currentRound = hackathonRounds.find(r => r.id === selectedRoundId);
   
@@ -33,9 +60,8 @@ export const useCriteriaManagement = (hackathonId) => {
 
   // Lấy toàn bộ Tracks của Hackathon để phục vụ tính năng Clone
   const hackathonTracks = useMemo(() => {
-    const roundIds = hackathonRounds.map(r => r.id);
-    return tracks.filter(t => roundIds.includes(t.round_id));
-  }, [tracks, hackathonRounds]);
+    return tracks;
+  }, [tracks]);
 
   // Reset Track khi chọn Round khác
   useEffect(() => {
@@ -195,7 +221,15 @@ export const useCriteriaManagement = (hackathonId) => {
     handleCloneCriteria,
     handleSaveCriteria,
     deleteCriteria: handleDeleteCriteria,
-    updateRound,
+    updateRound: async (id, data) => {
+      try {
+        await roundService.update(id, data);
+        message.success('Cập nhật trạng thái vòng thi thành công');
+        fetchBaseData();
+      } catch (err) {
+        message.error('Lỗi khi cập nhật vòng thi');
+      }
+    },
     isLoading
   };
 };
