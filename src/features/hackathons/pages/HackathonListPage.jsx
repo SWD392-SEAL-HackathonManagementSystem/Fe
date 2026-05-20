@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Button, Card, Col, Row, Empty, Space, Typography, Popconfirm, message, Tag, Input, Select } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Button, Card, Col, Row, Empty, Space, Typography, Popconfirm, message, Tag, Input, Select, Spin } from 'antd';
 import { Plus, Edit, Trash2, Settings, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../shared/components/ui/PageHeader';
 import StatusBadge from '../../../shared/components/ui/StatusBadge';
 import { ROUTES } from '../../../shared/constants/routes';
-import { useAppContext } from '../../../app/AppContext';
+import { hackathonService } from '../services/hackathonService';
+import { mapHackathonToFE } from '../mappers/hackathonMapper';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -13,13 +14,51 @@ const { Search: AntSearch } = Input;
 
 const HackathonListPage = () => {
   const navigate = useNavigate();
-  const { hackathons, deleteHackathon } = useAppContext();
+  const [hackathons, setHackathons] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
-  const handleDelete = (id) => {
-    deleteHackathon(id);
-    message.success('Hackathon deleted successfully');
+  const fetchHackathons = async () => {
+    try {
+      setLoading(true);
+      const res = await hackathonService.search({ size: 100 });
+      // In Spring Boot PageResponse, the array is usually in 'items' or 'content'
+      const dataArray = res.items || res.content || res;
+      
+      const fullHackathons = await Promise.all(
+        (Array.isArray(dataArray) ? dataArray : []).map(async (h) => {
+          try {
+            const detail = await hackathonService.getById(h.id);
+            return mapHackathonToFE(detail);
+          } catch (e) {
+            return mapHackathonToFE(h);
+          }
+        })
+      );
+      
+      setHackathons(fullHackathons);
+    } catch (error) {
+      message.error(error.message || 'Lỗi khi tải danh sách Hackathon');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHackathons();
+  }, []);
+
+  const handleDelete = async (id) => {
+    try {
+      setLoading(true);
+      await hackathonService.delete(id);
+      message.success('Hackathon deleted successfully');
+      fetchHackathons();
+    } catch (error) {
+      message.error(error.message || 'Lỗi khi xóa Hackathon');
+      setLoading(false);
+    }
   };
 
   const filteredHackathons = hackathons.filter(h => {
@@ -76,7 +115,11 @@ const HackathonListPage = () => {
         </Row>
       </Card>
 
-      {filteredHackathons.length === 0 ? (
+      {loading ? (
+        <Card style={{ textAlign: 'center', padding: '40px 0', borderRadius: 12 }}>
+          <Spin size="large" />
+        </Card>
+      ) : filteredHackathons.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: '40px 0', borderRadius: 12 }}>
           <Empty description={searchText || statusFilter !== 'ALL' ? "Không tìm thấy kết quả phù hợp" : "Chưa có sự kiện nào"} />
           {!searchText && statusFilter === 'ALL' && (
@@ -142,7 +185,7 @@ const HackathonListPage = () => {
                       </div>
                       <Paragraph ellipsis={{ rows: 2 }}>{hackathon.description}</Paragraph>
                       <div style={{ fontSize: 12, color: '#8c8c8c' }}>
-                        Reg: {hackathon.registration_start} - {hackathon.registration_end}
+                        Reg: {hackathon.registration_start || 'N/A'} - {hackathon.registration_end || 'N/A'}
                       </div>
                     </div>
                   }

@@ -1,32 +1,48 @@
-import React, { useState } from 'react';
-import { Table, Button, Space, Popconfirm, message, Select, Timeline, Tag, Card, Divider, Typography } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Table, Button, Space, Popconfirm, message, Timeline, Tag, Card, Spin, Typography } from 'antd';
 import { Plus, Edit, Trash2, Calendar, List } from 'lucide-react';
 import RoundFormModal from '../components/RoundFormModal';
-import { useAppContext } from '../../../app/AppContext';
+import { roundService } from '../services/roundService';
+import { mapRoundToFE, mapRoundToBE } from '../mappers/roundMapper';
 import { formatDate } from '../../../shared/utils/date';
 
-const { Option } = Select;
+const { Title } = Typography;
 
 const RoundManagementPage = ({ hackathonId }) => {
-  const { tracks, rounds, addRound, updateRound, deleteRound } = useAppContext();
+  const [rounds, setRounds] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingRound, setEditingRound] = useState(null);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'timeline'
-  const [selectedTrackId, setSelectedTrackId] = useState(null);
 
-  const hackathonTracks = tracks.filter(t => t.hackathon_id === hackathonId);
-  
-  // Filter rounds by tracks belonging to this hackathon
-  const trackIds = hackathonTracks.map(t => t.id);
-  let filteredRounds = rounds.filter(r => trackIds.includes(r.track_id));
+  const fetchRounds = async () => {
+    try {
+      setLoading(true);
+      const res = await roundService.listByHackathon(hackathonId);
+      
+      const fullRounds = await Promise.all(
+        (res || []).map(async (r) => {
+          try {
+            const detail = await roundService.getById(r.id);
+            return mapRoundToFE(detail);
+          } catch (e) {
+            return mapRoundToFE(r);
+          }
+        })
+      );
+      
+      fullRounds.sort((a, b) => a.sequence_order - b.sequence_order);
+      setRounds(fullRounds);
+    } catch (error) {
+      message.error(error.message || 'Lỗi khi tải danh sách vòng thi');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Further filter by selected track if any
-  if (selectedTrackId) {
-    filteredRounds = filteredRounds.filter(r => r.track_id === selectedTrackId);
-  }
-
-  // Sort rounds by sequence order
-  filteredRounds.sort((a, b) => a.sequence_order - b.sequence_order);
+  useEffect(() => {
+    fetchRounds();
+  }, [hackathonId]);
 
   const handleAdd = () => {
     setEditingRound(null);
@@ -38,20 +54,51 @@ const RoundManagementPage = ({ hackathonId }) => {
     setIsModalVisible(true);
   };
 
-  const handleDelete = (id) => {
-    deleteRound(id);
-    message.success('Đã xóa vòng thi thành công');
+  const handleDelete = async (id) => {
+    try {
+      setLoading(true);
+      await roundService.delete(id);
+      message.success('Đã xóa vòng thi thành công');
+      fetchRounds();
+    } catch (error) {
+      message.error(error.message || 'Lỗi khi xóa vòng thi');
+      setLoading(false);
+    }
   };
 
-  const handleModalFinish = (values) => {
-    if (editingRound) {
-      updateRound(editingRound.id, values);
-      message.success('Đã cập nhật vòng thi thành công');
-    } else {
-      addRound(values);
-      message.success('Đã tạo vòng thi mới thành công');
+  const handleModalFinish = async (values) => {
+    try {
+      setLoading(true);
+      const payload = mapRoundToBE(values);
+      let roundId = editingRound?.id;
+      let createdOrUpdatedRound;
+      
+      if (editingRound) {
+        createdOrUpdatedRound = await roundService.update(editingRound.id, payload);
+        roundId = editingRound.id;
+      } else {
+        createdOrUpdatedRound = await roundService.createByHackathon(hackathonId, payload);
+        roundId = createdOrUpdatedRound.id;
+      }
+
+      // If user wants to activate the round and it is not already active
+      if (values.is_active && (!editingRound || !editingRound.is_active)) {
+        try {
+          await roundService.activate(roundId, { note: 'Kích hoạt từ giao diện cấu hình' });
+          message.success(editingRound ? 'Đã cập nhật và kích hoạt vòng thi thành công' : 'Đã tạo và kích hoạt vòng thi thành công');
+        } catch (actError) {
+          message.warning(`Đã lưu vòng thi, nhưng chưa thể kích hoạt: ${actError.message || 'Thiếu tiêu chí đánh giá hoặc phân công giám khảo'}`);
+        }
+      } else {
+        message.success(editingRound ? 'Đã cập nhật vòng thi thành công' : 'Đã tạo vòng thi mới thành công');
+      }
+
+      setIsModalVisible(false);
+      fetchRounds();
+    } catch (error) {
+      message.error(error.message || 'Lỗi khi lưu vòng thi');
+      setLoading(false);
     }
-    setIsModalVisible(false);
   };
 
   const columns = [
@@ -68,11 +115,7 @@ const RoundManagementPage = ({ hackathonId }) => {
       render: (text, record) => (
         <div>
           <strong>{text}</strong>
-          {!selectedTrackId && (
-            <div style={{ fontSize: 12, color: '#8c8c8c' }}>
-              Track: {hackathonTracks.find(t => t.id === record.track_id)?.name}
-            </div>
-          )}
+          {record.is_final && <Tag color="gold" style={{ marginLeft: 8 }}>Chung kết</Tag>}
         </div>
       ),
     },
@@ -81,8 +124,8 @@ const RoundManagementPage = ({ hackathonId }) => {
       key: 'period',
       render: (_, record) => (
         <div style={{ fontSize: 13 }}>
-          <div>Mở: {formatDate(record.submission_open)}</div>
-          <div>Hạn chót: {formatDate(record.submission_deadline)}</div>
+          <div>Mở: {record.submission_open ? formatDate(record.submission_open) : '-'}</div>
+          <div>Hạn chót: {record.submission_deadline ? formatDate(record.submission_deadline) : '-'}</div>
         </div>
       ),
     },
@@ -126,21 +169,15 @@ const RoundManagementPage = ({ hackathonId }) => {
     },
   ];
 
+  if (loading && rounds.length === 0) {
+    return <Card style={{ textAlign: 'center', padding: '40px 0' }}><Spin size="large" /></Card>;
+  }
+
   return (
     <div>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
         <Space>
-          <Select 
-            placeholder="Lọc theo Track" 
-            style={{ width: 200 }} 
-            allowClear
-            onChange={setSelectedTrackId}
-          >
-            {hackathonTracks.map(t => (
-              <Option key={t.id} value={t.id}>{t.name}</Option>
-            ))}
-          </Select>
-          <Button.Group>
+          <Button.Group style={{ marginRight: 16 }}>
             <Button 
               icon={<List size={16} />} 
               type={viewMode === 'table' ? 'primary' : 'default'}
@@ -156,44 +193,44 @@ const RoundManagementPage = ({ hackathonId }) => {
               Dòng thời gian
             </Button>
           </Button.Group>
+          
+          <Button 
+            type="primary" 
+            icon={<Plus size={16} />} 
+            onClick={handleAdd}
+          >
+            Thêm vòng thi
+          </Button>
         </Space>
-        
-        <Button 
-          type="primary" 
-          icon={<Plus size={16} />} 
-          onClick={handleAdd}
-          disabled={hackathonTracks.length === 0}
-        >
-          Thêm vòng thi
-        </Button>
       </div>
 
-      {hackathonTracks.length === 0 ? (
-        <Card>Vui lòng tạo ít nhất một track trước khi quản lý các vòng thi.</Card>
-      ) : viewMode === 'table' ? (
+      {viewMode === 'table' ? (
         <Table scroll={{ x: 'max-content' }}
           columns={columns} 
-          dataSource={filteredRounds} 
+          dataSource={rounds} 
           rowKey="id"
           pagination={false}
+          loading={loading}
         />
       ) : (
-        <Card>
+        <Card loading={loading}>
           <Timeline
             mode="left"
-            items={filteredRounds.map(round => ({
-              label: formatDate(round.submission_open),
+            items={rounds.map(round => ({
+              label: round.submission_open ? formatDate(round.submission_open) : 'Chưa thiết lập',
               children: (
                 <div style={{ paddingBottom: 20 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Title level={5} style={{ margin: 0 }}>{round.name}</Title>
+                    <Title level={5} style={{ margin: 0 }}>
+                      {round.name}
+                      {round.is_final && <Tag color="gold" style={{ marginLeft: 8 }}>Chung kết</Tag>}
+                    </Title>
                     <Tag color={round.is_active ? 'green' : 'default'}>
                       {round.is_active ? 'Đang hoạt động' : 'Ngưng hoạt động'}
                     </Tag>
                   </div>
                   <div style={{ color: '#8c8c8c', marginBottom: 8 }}>
-                    Track: {hackathonTracks.find(t => t.id === round.track_id)?.name} | 
-                    Hạn chót: {formatDate(round.submission_deadline)}
+                    Hạn chót: {round.submission_deadline ? formatDate(round.submission_deadline) : '-'}
                   </div>
                   <div>
                     <Button size="small" icon={<Edit size={14} />} onClick={() => handleEdit(round)}>Sửa</Button>
@@ -202,23 +239,21 @@ const RoundManagementPage = ({ hackathonId }) => {
               ),
             }))}
           />
-          {filteredRounds.length === 0 && <div>Không tìm thấy vòng thi nào.</div>}
+          {rounds.length === 0 && <div>Không tìm thấy vòng thi nào.</div>}
         </Card>
       )}
 
-      <RoundFormModal
-        visible={isModalVisible}
-        title={editingRound ? 'Sửa vòng thi' : 'Thêm vòng thi'}
-        initialValues={editingRound}
-        tracks={hackathonTracks}
-        onCancel={() => setIsModalVisible(false)}
-        onFinish={handleModalFinish}
-      />
+      {isModalVisible && (
+        <RoundFormModal
+          visible={isModalVisible}
+          title={editingRound ? 'Sửa vòng thi' : 'Thêm vòng thi'}
+          initialValues={editingRound}
+          onCancel={() => setIsModalVisible(false)}
+          onFinish={handleModalFinish}
+        />
+      )}
     </div>
   );
 };
-
-// Internal Title component
-const { Title } = Typography;
 
 export default RoundManagementPage;

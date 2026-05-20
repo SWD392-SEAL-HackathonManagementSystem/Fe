@@ -1,9 +1,13 @@
 import React, { useEffect } from 'react';
 import { Modal, Form, Input, InputNumber, Select } from 'antd';
-import { CRITERIA_TYPES } from '../data/criteria.mock';
-
-const { TextArea } = Input;
 const { Option } = Select;
+const { TextArea } = Input;
+
+const CRITERIA_TYPES = [
+  { value: 'TECHNICAL', label: 'Technical' },
+  { value: 'SOFT_SKILL', label: 'Soft Skill' },
+  { value: 'PENALTY', label: 'Penalty' }
+];
 
 const CriteriaFormModal = ({ visible, title, initialValues, onCancel, onFinish }) => {
   const [form] = Form.useForm();
@@ -46,7 +50,7 @@ const CriteriaFormModal = ({ visible, title, initialValues, onCancel, onFinish }
         form={form}
         layout="vertical"
         initialValues={{
-          type: 'General',
+          type: 'TECHNICAL',
           weight: 0.1,
           max_score: 100,
           ...initialValues,
@@ -67,8 +71,8 @@ const CriteriaFormModal = ({ visible, title, initialValues, onCancel, onFinish }
         >
           <Select placeholder="Select type">
             {CRITERIA_TYPES.map((type) => (
-              <Option key={type} value={type}>
-                {type}
+              <Option key={type.value} value={type.value}>
+                {type.label}
               </Option>
             ))}
           </Select>

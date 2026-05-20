@@ -6,10 +6,13 @@ import TrackManagementPage from '../../tracks/pages/TrackManagementPage';
 import RoundManagementPage from '../../rounds/pages/RoundManagementPage';
 import CriteriaManagementPage from '../../criteria/pages/CriteriaManagementPage';
 import ReviewValidatePage from '../../criteria/pages/ReviewValidatePage';
-import { useAppContext } from '../../../app/AppContext';
 import { ROUTES } from '../../../shared/constants/routes';
 import PeopleManagementPage from '../../people/pages/PeopleManagementPage';
 import EventManagementPage from '../../events/pages/EventManagementPage';
+import { hackathonService } from '../services/hackathonService';
+import { roundService } from '../../rounds/services/roundService';
+import { mapHackathonToFE } from '../mappers/hackathonMapper';
+import { mapRoundToFE } from '../../rounds/mappers/roundMapper';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -17,13 +20,45 @@ const { Option } = Select;
 const HackathonSetupPage = () => {
   const { hackathonId } = useParams();
   const navigate = useNavigate();
-  const { hackathons, tracks, rounds } = useAppContext();
+  const [hackathon, setHackathon] = useState(null);
+  const [rounds, setRounds] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedRoundId, setSelectedRoundId] = useState(null);
   
-  const hackathon = hackathons.find(h => h.id === parseInt(hackathonId));
-  const hackathonTracks = tracks.filter(t => t.hackathon_id === parseInt(hackathonId));
-  const trackIds = hackathonTracks.map(t => t.id);
-  const hackathonRounds = rounds.filter(r => trackIds.includes(r.track_id));
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [hackData, roundsData] = await Promise.all([
+          hackathonService.getById(hackathonId),
+          roundService.listByHackathon(hackathonId)
+        ]);
+        
+        const fullRounds = await Promise.all(
+          (roundsData || []).map(async (r) => {
+            try {
+              const detail = await roundService.getById(r.id);
+              return mapRoundToFE(detail);
+            } catch (e) {
+              return mapRoundToFE(r);
+            }
+          })
+        );
+        
+        setHackathon(mapHackathonToFE(hackData));
+        setRounds(fullRounds);
+      } catch (error) {
+        // Fallback for not found or errors
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [hackathonId]);
+
+  if (loading) {
+    return <Card style={{ textAlign: 'center', padding: '40px 0' }}>Đang tải...</Card>;
+  }
 
   if (!hackathon) {
     return (
@@ -52,7 +87,7 @@ const HackathonSetupPage = () => {
       label: 'Criteria',
       children: (
         <div>
-          {hackathonRounds.length === 0 ? (
+          {rounds.length === 0 ? (
             <Card>Please create at least one round before managing criteria.</Card>
           ) : (
             <>
@@ -65,21 +100,19 @@ const HackathonSetupPage = () => {
                     onChange={setSelectedRoundId}
                     value={selectedRoundId}
                   >
-                    {hackathonRounds.map(r => {
-                      const track = hackathonTracks.find(t => t.id === r.track_id);
-                      return (
-                        <Option key={r.id} value={r.id}>
-                          {track?.name} → {r.name}
-                        </Option>
-                      );
-                    })}
+                    {rounds.map(r => (
+                      <Option key={r.id} value={r.id}>
+                        {r.name} {r.is_final || r.isFinal ? '(Chung kết)' : ''}
+                      </Option>
+                    ))}
                   </Select>
                 </Space>
               </div>
               {selectedRoundId ? (
                 <CriteriaManagementPage
+                  hackathonId={hackathon.id}
                   roundId={selectedRoundId}
-                  roundName={hackathonRounds.find(r => r.id === selectedRoundId)?.name}
+                  roundName={rounds.find(r => r.id === selectedRoundId)?.name}
                   onBack={() => setSelectedRoundId(null)}
                 />
               ) : (
@@ -95,7 +128,7 @@ const HackathonSetupPage = () => {
     {
       key: 'review',
       label: 'Review & Validate',
-      children: <ReviewValidatePage />,
+      children: <ReviewValidatePage hackathonId={hackathon.id} />,
     },
     {
       key: 'people',
