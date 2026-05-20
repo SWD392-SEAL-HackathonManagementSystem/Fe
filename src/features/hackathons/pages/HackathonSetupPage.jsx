@@ -89,12 +89,12 @@ const HackathonSetupPage = () => {
     },
     {
       key: 'people',
-      label: 'Nhân sự (People)',
+      label: 'Nhân sự',
       children: <PeopleManagementPage hackathonId={hackathon.id} />,
     },
     {
       key: 'events',
-      label: 'Lịch trình (Events)',
+      label: 'Lịch trình & Sự kiện',
       children: <EventManagementPage hackathonId={hackathon.id} />,
     },
     {

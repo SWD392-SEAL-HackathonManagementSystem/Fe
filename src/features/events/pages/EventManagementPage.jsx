@@ -114,7 +114,7 @@ const EventManagementPage = ({ hackathonId }) => {
     { title: 'Loại', dataIndex: 'type', key: 'type', render: type => <Tag color="purple">{type}</Tag> },
     { title: 'Bắt đầu', dataIndex: 'starts_at', key: 'starts' },
     { title: 'Kết thúc', dataIndex: 'ends_at', key: 'ends' },
-    { title: 'Public', dataIndex: 'is_public', key: 'public', render: (pub) => pub ? <Tag color="green">Public</Tag> : <Tag>Private</Tag> },
+    { title: 'Trạng thái', dataIndex: 'is_public', key: 'public', render: (pub) => pub ? <Tag color="green">Mở</Tag> : <Tag>Đóng</Tag> },
   ];
 
   // LOGIC RENDER CALENDAR CELL
