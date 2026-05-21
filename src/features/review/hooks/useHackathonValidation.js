@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../../../app/AppContext';
-import { criteriaApi } from '../api/criteria.api';
+import { criteriaService } from '../../criteria/services/criteriaService';
 import { hackathonService } from '../../hackathons/services/hackathonService';
 import { roundService } from '../../rounds/services/roundService';
 import { trackService } from '../../tracks/services/trackService';
@@ -28,10 +28,21 @@ export const useHackathonValidation = (hackathonId) => {
         eventService.listByHackathon(hackathonId)
       ]);
       setHackathon(mapHackathonToFE(hRes));
-      setRounds((rRes || []).map(mapRoundToFE));
+      
+      const fullRounds = await Promise.all(
+        (rRes || []).map(async (r) => {
+          try {
+            const detail = await roundService.getById(r.id);
+            return mapRoundToFE(detail);
+          } catch (e) {
+            return mapRoundToFE(r);
+          }
+        })
+      );
+      setRounds(fullRounds);
+      
       setTracks((tRes || []).map(mapTrackToFE));
       
-      // Giả sử API event trả về mảng trực tiếp hoặc { data: items } - xử lý an toàn
       const eventItems = Array.isArray(eRes) ? eRes : (eRes?.data || []);
       setEvents(eventItems);
     } catch (err) {
@@ -45,24 +56,20 @@ export const useHackathonValidation = (hackathonId) => {
     fetchBaseData();
   }, [fetchBaseData]);
 
-  // Lọc dữ liệu rounds
   const hackathonRounds = useMemo(() => rounds.sort((a, b) => a.sequence_order - b.sequence_order), [rounds]);
   
   const prelimRounds = useMemo(() => hackathonRounds.filter(r => !r.is_final), [hackathonRounds]);
   const finalRounds = useMemo(() => hackathonRounds.filter(r => r.is_final), [hackathonRounds]);
   
-  // 1. Validate số lượng Vòng thi
   const hasPrelim = prelimRounds.length >= 1;
   const hasFinal = finalRounds.length === 1;
   const hasCorrectRounds = hasPrelim && hasFinal;
   
-  // 2. Validate Vòng Sơ loại có Bảng đấu không
   const prelimRoundsHaveTracks = useMemo(() => {
     if (prelimRounds.length === 0) return false;
     return prelimRounds.every(r => tracks.some(t => t.round_id === r.id));
   }, [prelimRounds, tracks]);
 
-  // 3. Validate Trọng số và sự tồn tại của Tiêu chí qua API
   const [weightErrors, setWeightErrors] = useState([]);
   const [missingCriteriaErrors, setMissingCriteriaErrors] = useState([]);
   const [isValidatingCriteria, setIsValidatingCriteria] = useState(false);
@@ -89,9 +96,8 @@ export const useHackathonValidation = (hackathonId) => {
         hackathonRounds.forEach((r) => {
           if (r.is_final) {
             promises.push(
-              criteriaApi.getWeightSummary(r.id, null).then(res => {
-                const summary = res.data;
-                if (!summary || summary.items.length === 0) {
+              criteriaService.getWeightSummaryByRound(r.id).then(summary => {
+                if (!summary || (Array.isArray(summary.items) && summary.items.length === 0)) {
                   mErrors.push(`Vòng Chung kết chưa có tiêu chí đánh giá.`);
                 } else if (summary.status === 'WARN') {
                   wErrors.push(`Vòng Chung kết: Tổng trọng số đang là ${summary.total.toFixed(2)}`);
@@ -104,9 +110,8 @@ export const useHackathonValidation = (hackathonId) => {
             const rTracks = tracks.filter((t) => t.round_id === r.id);
             rTracks.forEach((t) => {
               promises.push(
-                criteriaApi.getWeightSummary(null, t.id).then(res => {
-                  const summary = res.data;
-                  if (!summary || summary.items.length === 0) {
+                criteriaService.getWeightSummaryByTrack(t.id).then(summary => {
+                  if (!summary || (Array.isArray(summary.items) && summary.items.length === 0)) {
                     mErrors.push(`Bảng đấu '${t.name}' (Vòng ${r.name}) chưa có tiêu chí đánh giá.`);
                   } else if (summary.status === 'WARN') {
                     wErrors.push(`Bảng đấu '${t.name}' (Vòng ${r.name}): Tổng trọng số đang là ${summary.total.toFixed(2)}`);
@@ -139,25 +144,25 @@ export const useHackathonValidation = (hackathonId) => {
     };
   }, [hackathonRounds, tracks]);
 
-  // 4. Validate sự kiện KICKOFF
   const hasKickoffEvent = useMemo(() => {
-    return events.some(e => e.hackathon_id === hackathonId && e.type === 'KICKOFF');
+    if (events.length === 0) return true;
+    return events.some(e => 
+      (e.hackathon_id === hackathonId || e.hackathonId === hackathonId) && 
+      (e.type === 'KICKOFF' || e.eventType === 'KICKOFF')
+    );
   }, [events, hackathonId]);
 
-  // 5. Validate Phân công Nhân sự (Mentor/Judge) sơ bộ
   const personnelErrors = useMemo(() => {
     const errors = [];
     const hAssignments = assignments.filter(a => a.hackathon_id === hackathonId);
     
     hackathonRounds.forEach((r) => {
       if (r.is_final) {
-        // Chung kết: Phải có Judge (không có Mentor)
         const finalJudges = hAssignments.filter(a => a.round_id === r.id && a.type === 'JUDGE');
         if (finalJudges.length === 0) {
           errors.push(`Vòng Chung kết chưa được phân công Giám khảo (Judge).`);
         }
       } else {
-        // Sơ loại: Mỗi Track phải có Mentor và Judge
         const rTracks = tracks.filter((t) => t.round_id === r.id);
         rTracks.forEach((t) => {
           const trackJudges = hAssignments.filter(a => a.track_id === t.id && a.type === 'JUDGE');
@@ -175,7 +180,6 @@ export const useHackathonValidation = (hackathonId) => {
     return errors;
   }, [assignments, hackathonId, hackathonRounds, tracks]);
 
-  // Tính tổng số lỗi
   const totalErrors = useMemo(() => {
     let count = 0;
     if (!hasCorrectRounds || !prelimRoundsHaveTracks) count += 1;

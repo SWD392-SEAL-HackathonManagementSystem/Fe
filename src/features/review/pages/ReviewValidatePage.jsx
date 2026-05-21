@@ -1,9 +1,9 @@
 import React from 'react';
-import { Card, Button, Typography, Tag, Alert, Spin } from 'antd';
+import { Card, Button, Typography, Tag, Alert, Spin, message } from 'antd';
 import { CheckCircle, XCircle, AlertTriangle, Lock } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { formatDate } from '../../../shared/utils/date';
 import { useHackathonValidation } from '../hooks/useHackathonValidation';
+import { reviewService } from '../services/reviewService';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -102,11 +102,20 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
     missingCriteriaErrors,
     personnelErrors,
     hasKickoffEvent,
-    hasSchedule,
     totalErrors,
     hasBlockingErrors,
     isLoadingData
   } = useHackathonValidation(hId);
+
+  const handleActivate = async () => {
+    try {
+      await reviewService.changeStatus(hId, 'ONGOING');
+      message.success('Kích hoạt giải đấu thành công!');
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      message.error(error.message || 'Không thể kích hoạt giải đấu');
+    }
+  };
 
   if (isLoadingData) {
     return (
@@ -332,6 +341,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
             type="primary"
             size="large"
             disabled={hasBlockingErrors || hackathon.status !== 'DRAFT'}
+            onClick={handleActivate}
             icon={hasBlockingErrors ? <Lock size={16} /> : null}
             style={{
               height: 48,

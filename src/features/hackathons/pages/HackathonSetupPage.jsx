@@ -5,7 +5,7 @@ import PageHeader from '../../../shared/components/ui/PageHeader';
 import TrackManagementPage from '../../tracks/pages/TrackManagementPage';
 import RoundManagementPage from '../../rounds/pages/RoundManagementPage';
 import CriteriaManagementPage from '../../criteria/pages/CriteriaManagementPage';
-import ReviewValidatePage from '../../criteria/pages/ReviewValidatePage';
+import ReviewValidatePage from '../../review/pages/ReviewValidatePage';
 import { ROUTES } from '../../../shared/constants/routes';
 import PeopleManagementPage from '../../people/pages/PeopleManagementPage';
 import EventManagementPage from '../../events/pages/EventManagementPage';
