@@ -11,7 +11,7 @@ import HackathonSetupPage from '../features/hackathons/pages/HackathonSetupPage'
 import TrackManagementPage from '../features/tracks/pages/TrackManagementPage';
 import RoundManagementPage from '../features/rounds/pages/RoundManagementPage';
 import CriteriaManagementPage from '../features/criteria/pages/CriteriaManagementPage';
-import ReviewValidatePage from '../features/criteria/pages/ReviewValidatePage';
+import ReviewValidatePage from '../features/review/pages/ReviewValidatePage';
 import { useParams, useNavigate } from 'react-router-dom';
 
 const TrackWrapper = () => {

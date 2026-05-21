@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 
 import { CRITERIA_TYPES, MAX_WEIGHT_TOTAL } from '../constants/criteria.constants';
-import { criteriaApi } from '../api/criteria.api';
+import { criteriaService } from '../services/criteriaService';
 import { message } from 'antd';
 
 import { roundService } from '../../rounds/services/roundService';
@@ -24,11 +24,21 @@ export const useCriteriaManagement = (hackathonId) => {
   const fetchBaseData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [roundsRes, tracksRes] = await Promise.all([
-        roundService.listByHackathon(hackathonId),
-        trackService.listByHackathon(hackathonId)
-      ]);
-      setRounds((roundsRes || []).map(mapRoundToFE));
+      const roundsRes = await roundService.listByHackathon(hackathonId);
+      const tracksRes = await trackService.listByHackathon(hackathonId);
+      
+      const fullRounds = await Promise.all(
+        (roundsRes || []).map(async (r) => {
+          try {
+            const detail = await roundService.getById(r.id);
+            return mapRoundToFE(detail);
+          } catch (e) {
+            return mapRoundToFE(r);
+          }
+        })
+      );
+
+      setRounds(fullRounds);
       setTracks((tracksRes || []).map(mapTrackToFE));
       setIsDataLoaded(true);
     } catch (err) {
@@ -75,11 +85,13 @@ export const useCriteriaManagement = (hackathonId) => {
 
     setIsLoading(true);
     try {
-      const res = await criteriaApi.getCriteria(
-        currentRound.is_final ? selectedRoundId : null,
-        currentRound.is_final ? null : selectedTrackId
-      );
-      setCriteriaList(res.data?.items || []);
+      let items;
+      if (currentRound.is_final) {
+        items = await criteriaService.listByFinalRound(selectedRoundId);
+      } else {
+        items = await criteriaService.listByTrack(selectedTrackId);
+      }
+      setCriteriaList(Array.isArray(items) ? items : []);
     } catch (error) {
       console.error('Fetch criteria failed:', error);
       message.error('Không thể tải danh sách tiêu chí');
@@ -124,7 +136,7 @@ export const useCriteriaManagement = (hackathonId) => {
         weightToAssign = evenWeight;
         remaining -= evenWeight;
       }
-      return criteriaApi.updateCriterion(c.id, { ...c, weight: weightToAssign });
+      return criteriaService.update(c.id, { ...c, weight: weightToAssign });
     });
 
     setIsLoading(true);
@@ -144,13 +156,11 @@ export const useCriteriaManagement = (hackathonId) => {
   const handleCloneCriteria = useCallback(async (sourceRoundId, sourceTrackId) => {
     setIsLoading(true);
     try {
-      await criteriaApi.cloneCriteria(
-        currentRound?.is_final ? selectedRoundId : null,
-        currentRound?.is_final ? null : selectedTrackId,
-        sourceRoundId,
-        sourceTrackId,
-        false
-      );
+      if (currentRound?.is_final) {
+        await criteriaService.cloneForFinalRound(selectedRoundId, { sourceRoundId, sourceTrackId, replaceExisting: false });
+      } else {
+        await criteriaService.cloneForTrack(selectedTrackId, { sourceRoundId, sourceTrackId, replaceExisting: false });
+      }
       message.success('Sao chép tiêu chí thành công');
       fetchCriteria();
       return 1; // Return 1 to indicate success
@@ -169,14 +179,14 @@ export const useCriteriaManagement = (hackathonId) => {
     setIsLoading(true);
     try {
       if (editingId) {
-        await criteriaApi.updateCriterion(editingId, criteriaData);
+        await criteriaService.update(editingId, criteriaData);
         message.success('Cập nhật tiêu chí thành công');
       } else {
-        await criteriaApi.createCriterion(
-          currentRound?.is_final ? selectedRoundId : null,
-          currentRound?.is_final ? null : selectedTrackId,
-          criteriaData
-        );
+        if (currentRound?.is_final) {
+          await criteriaService.createForFinalRound(selectedRoundId, criteriaData);
+        } else {
+          await criteriaService.createForTrack(selectedTrackId, criteriaData);
+        }
         message.success('Thêm tiêu chí thành công');
       }
       fetchCriteria();
@@ -191,7 +201,7 @@ export const useCriteriaManagement = (hackathonId) => {
   const handleDeleteCriteria = useCallback(async (id) => {
     setIsLoading(true);
     try {
-      await criteriaApi.deleteCriterion(id);
+      await criteriaService.delete(id);
       message.success('Đã xóa tiêu chí');
       fetchCriteria();
     } catch (error) {

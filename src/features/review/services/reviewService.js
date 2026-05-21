@@ -8,7 +8,7 @@ export const reviewService = {
     });
   },
   
-  changeStatus: async (hackathonId, status) => {
-    return axiosClient.patch(ENDPOINTS.HACKATHONS.STATUS(hackathonId), { status });
+  changeStatus: async (hackathonId, targetStatus) => {
+    return axiosClient.patch(ENDPOINTS.HACKATHONS.STATUS(hackathonId), { targetStatus });
   }
 };
