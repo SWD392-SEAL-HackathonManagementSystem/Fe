@@ -5,7 +5,7 @@ import { hackathonService } from '../../hackathons/services/hackathonService';
 import { roundService } from '../../rounds/services/roundService';
 import { trackService } from '../../tracks/services/trackService';
 import { eventService } from '../../events/services/eventService';
-import { mapRoundToFE } from '../../rounds/mappers/roundMapper';
+import { mapRoundToFE, sortRoundsByExamAt } from '../../rounds/mappers/roundMapper';
 import { mapTrackToFE } from '../../tracks/mappers/trackMapper';
 import { mapHackathonToFE } from '../../hackathons/mappers/hackathonMapper';
 
@@ -56,7 +56,7 @@ export const useHackathonValidation = (hackathonId) => {
     fetchBaseData();
   }, [fetchBaseData]);
 
-  const hackathonRounds = useMemo(() => rounds.sort((a, b) => a.sequence_order - b.sequence_order), [rounds]);
+  const hackathonRounds = useMemo(() => sortRoundsByExamAt(rounds), [rounds]);
   
   const prelimRounds = useMemo(() => hackathonRounds.filter(r => !r.is_final), [hackathonRounds]);
   const finalRounds = useMemo(() => hackathonRounds.filter(r => r.is_final), [hackathonRounds]);
