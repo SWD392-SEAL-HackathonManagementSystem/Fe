@@ -3,7 +3,8 @@ import { Table, Button, Space, Popconfirm, message, Timeline, Tag, Card, Spin, T
 import { Plus, Edit, Trash2, Calendar, List } from 'lucide-react';
 import RoundFormModal from '../components/RoundFormModal';
 import { roundService } from '../services/roundService';
-import { mapRoundToFE, mapRoundToBE } from '../mappers/roundMapper';
+import { mapRoundToFE, mapRoundToBE, sortRoundsByExamAt } from '../mappers/roundMapper';
+import { getRoundErrorMessage } from '../../../shared/constants/roundErrors';
 import { formatDate } from '../../../shared/utils/date';
 
 const { Title } = Typography;
@@ -31,8 +32,7 @@ const RoundManagementPage = ({ hackathonId }) => {
         })
       );
       
-      fullRounds.sort((a, b) => a.sequence_order - b.sequence_order);
-      setRounds(fullRounds);
+      setRounds(sortRoundsByExamAt(fullRounds));
     } catch (error) {
       message.error(error.message || 'Lỗi khi tải danh sách vòng thi');
     } finally {
@@ -96,17 +96,18 @@ const RoundManagementPage = ({ hackathonId }) => {
       setIsModalVisible(false);
       fetchRounds();
     } catch (error) {
-      message.error(error.message || 'Lỗi khi lưu vòng thi');
+      message.error(getRoundErrorMessage(error));
       setLoading(false);
     }
   };
 
   const columns = [
     {
-      title: 'Thứ tự',
-      dataIndex: 'sequence_order',
-      key: 'sequence_order',
-      width: 80,
+      title: 'Ngày giờ thi',
+      dataIndex: 'exam_at',
+      key: 'exam_at',
+      width: 180,
+      render: (val) => (val ? formatDate(val) : '-'),
     },
     {
       title: 'Tên vòng thi',
@@ -217,7 +218,7 @@ const RoundManagementPage = ({ hackathonId }) => {
           <Timeline
             mode="left"
             items={rounds.map(round => ({
-              label: round.submission_open ? formatDate(round.submission_open) : 'Chưa thiết lập',
+              label: round.exam_at ? formatDate(round.exam_at) : 'Chưa thiết lập',
               children: (
                 <div style={{ paddingBottom: 20 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -229,8 +230,13 @@ const RoundManagementPage = ({ hackathonId }) => {
                       {round.is_active ? 'Đang hoạt động' : 'Ngưng hoạt động'}
                     </Tag>
                   </div>
+                  <div style={{ color: '#8c8c8c', marginBottom: 4 }}>
+                    Thi: {round.exam_at ? formatDate(round.exam_at) : '-'}
+                  </div>
                   <div style={{ color: '#8c8c8c', marginBottom: 8 }}>
-                    Hạn chót: {round.submission_deadline ? formatDate(round.submission_deadline) : '-'}
+                    Nộp bài: {round.submission_open ? formatDate(round.submission_open) : '-'}
+                    {' → '}
+                    {round.submission_deadline ? formatDate(round.submission_deadline) : '-'}
                   </div>
                   <div>
                     <Button size="small" icon={<Edit size={14} />} onClick={() => handleEdit(round)}>Sửa</Button>
@@ -248,6 +254,7 @@ const RoundManagementPage = ({ hackathonId }) => {
           visible={isModalVisible}
           title={editingRound ? 'Sửa vòng thi' : 'Thêm vòng thi'}
           initialValues={editingRound}
+          existingRounds={rounds}
           onCancel={() => setIsModalVisible(false)}
           onFinish={handleModalFinish}
         />
