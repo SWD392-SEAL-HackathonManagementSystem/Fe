@@ -1,23 +1,21 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-
-import { CRITERIA_TYPES, MAX_WEIGHT_TOTAL } from '../constants/criteria.constants';
-import { criteriaService } from '../services/criteriaService';
-import { message } from 'antd';
-
-import { roundService } from '../../rounds/services/roundService';
-import { trackService } from '../../tracks/services/trackService';
-import { mapRoundToFE } from '../../rounds/mappers/roundMapper';
-import { mapTrackToFE } from '../../tracks/mappers/trackMapper';
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { message } from "antd";
+import {
+  CRITERIA_TYPES,
+  MAX_WEIGHT_TOTAL,
+} from "../constants/criteria.constants";
+import { criteriaService } from "../services/criteriaService";
+import { roundService } from "../../rounds/services/roundService";
+import { trackService } from "../../tracks/services/trackService";
+import { mapRoundToFE } from "../../rounds/mappers/roundMapper";
+import { mapTrackToFE } from "../../tracks/mappers/trackMapper";
 
 export const useCriteriaManagement = (hackathonId) => {
   const [rounds, setRounds] = useState([]);
   const [tracks, setTracks] = useState([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  
   const [selectedRoundId, setSelectedRoundId] = useState(null);
   const [selectedTrackId, setSelectedTrackId] = useState(null);
-  
-  // State lưu trữ dữ liệu từ API
   const [criteriaList, setCriteriaList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -26,7 +24,6 @@ export const useCriteriaManagement = (hackathonId) => {
       setIsLoading(true);
       const roundsRes = await roundService.listByHackathon(hackathonId);
       const tracksRes = await trackService.listByHackathon(hackathonId);
-      
       const fullRounds = await Promise.all(
         (roundsRes || []).map(async (r) => {
           try {
@@ -35,14 +32,13 @@ export const useCriteriaManagement = (hackathonId) => {
           } catch (e) {
             return mapRoundToFE(r);
           }
-        })
+        }),
       );
-
       setRounds(fullRounds);
       setTracks((tracksRes || []).map(mapTrackToFE));
       setIsDataLoaded(true);
     } catch (err) {
-      message.error('Lỗi khi tải dữ liệu Vòng thi/Bảng đấu');
+      message.error("Lỗi khi tải dữ liệu Vòng thi/Bảng đấu");
     } finally {
       setIsLoading(false);
     }
@@ -52,49 +48,35 @@ export const useCriteriaManagement = (hackathonId) => {
     fetchBaseData();
   }, [fetchBaseData]);
 
-  // 1. Lấy danh sách Vòng thi (Rounds) của Hackathon
-  const hackathonRounds = useMemo(() => {
-    return rounds
-      .sort((a, b) => a.sequence_order - b.sequence_order);
-  }, [rounds]);
-  
-  const currentRound = hackathonRounds.find(r => r.id === selectedRoundId);
-  
-  // 2. Lấy danh sách Bảng đấu (Tracks) thuộc về Vòng thi đang chọn
+  const hackathonRounds = useMemo(
+    () => [...rounds].sort((a, b) => a.sequence_order - b.sequence_order),
+    [rounds],
+  );
+  const currentRound = hackathonRounds.find((r) => r.id === selectedRoundId);
+
   const roundTracks = useMemo(() => {
     if (!currentRound || currentRound.is_final) return [];
-    return tracks
-      .filter(t => t.round_id === selectedRoundId)
+    return [...tracks]
+      .filter((t) => t.round_id === selectedRoundId)
       .sort((a, b) => a.sequence_order - b.sequence_order);
   }, [tracks, currentRound, selectedRoundId]);
 
-  // Lấy toàn bộ Tracks của Hackathon để phục vụ tính năng Clone
-  const hackathonTracks = useMemo(() => {
-    return tracks;
-  }, [tracks]);
+  const hackathonTracks = useMemo(() => tracks, [tracks]);
 
-  // Reset Track khi chọn Round khác
   useEffect(() => {
     setSelectedTrackId(null);
   }, [selectedRoundId]);
 
-  // 3. Gọi API Lấy danh sách Tiêu chí
   const fetchCriteria = useCallback(async () => {
-    if (!currentRound) return;
-    if (!currentRound.is_final && !selectedTrackId) return;
-
+    if (!currentRound || (!currentRound.is_final && !selectedTrackId)) return;
     setIsLoading(true);
     try {
-      let items;
-      if (currentRound.is_final) {
-        items = await criteriaService.listByFinalRound(selectedRoundId);
-      } else {
-        items = await criteriaService.listByTrack(selectedTrackId);
-      }
+      let items = currentRound.is_final
+        ? await criteriaService.listByFinalRound(selectedRoundId)
+        : await criteriaService.listByTrack(selectedTrackId);
       setCriteriaList(Array.isArray(items) ? items : []);
     } catch (error) {
-      console.error('Fetch criteria failed:', error);
-      message.error('Không thể tải danh sách tiêu chí');
+      message.error("Không thể tải danh sách tiêu chí");
       setCriteriaList([]);
     } finally {
       setIsLoading(false);
@@ -105,115 +87,140 @@ export const useCriteriaManagement = (hackathonId) => {
     fetchCriteria();
   }, [fetchCriteria]);
 
-  const currentCriteria = useMemo(() => {
-    return [...criteriaList].sort((a, b) => a.displayOrder - b.displayOrder);
-  }, [criteriaList]);
+  const currentCriteria = useMemo(
+    () => [...criteriaList].sort((a, b) => a.display_order - b.display_order),
+    [criteriaList],
+  );
 
-  // 4. Tính tổng trọng số
   const totalWeight = useMemo(() => {
     return currentCriteria
-      .filter(c => c.type !== CRITERIA_TYPES.PENALTY)
+      .filter((c) => c.type !== CRITERIA_TYPES.PENALTY)
       .reduce((sum, c) => sum + (c.weight || 0), 0);
   }, [currentCriteria]);
 
   const isWeightValid = Math.abs(totalWeight - MAX_WEIGHT_TOTAL) < 0.001;
 
-  // 5. Hàm cân bằng điểm tự động (Dùng Batch API)
   const handleAutoBalance = useCallback(async () => {
-    const nonPenalty = currentCriteria.filter(c => c.type !== CRITERIA_TYPES.PENALTY);
+    const nonPenalty = currentCriteria.filter(
+      (c) => c.type !== CRITERIA_TYPES.PENALTY,
+    );
     if (nonPenalty.length === 0) return;
-    
-    const evenWeight = parseFloat((MAX_WEIGHT_TOTAL / nonPenalty.length).toFixed(2));
+    const evenWeight = parseFloat(
+      (MAX_WEIGHT_TOTAL / nonPenalty.length).toFixed(2),
+    );
     let remaining = MAX_WEIGHT_TOTAL;
-
-    // Chuẩn bị payload batch update (Thực tế FR-04 không nói rõ API PUT /batch, nhưng ta có thể gọi PUT từng cái hoặc tạo mới batch. 
-    // Giả sử gọi update lần lượt cho an toàn vì API chưa support batch update)
     const promises = nonPenalty.map((c, index) => {
-      let weightToAssign;
-      if (index === nonPenalty.length - 1) {
-        weightToAssign = parseFloat(remaining.toFixed(2));
-      } else {
-        weightToAssign = evenWeight;
-        remaining -= evenWeight;
-      }
+      let weightToAssign =
+        index === nonPenalty.length - 1
+          ? parseFloat(remaining.toFixed(2))
+          : evenWeight;
+      remaining -= evenWeight;
       return criteriaService.update(c.id, { ...c, weight: weightToAssign });
     });
-
     setIsLoading(true);
     try {
       await Promise.all(promises);
-      message.success('Đã cân bằng trọng số tự động');
+      message.success("Đã cân bằng trọng số tự động");
       fetchCriteria();
     } catch (error) {
-      message.error(error.message || 'Lỗi khi cân bằng trọng số');
+      message.error("Lỗi khi cân bằng trọng số");
     } finally {
       setIsLoading(false);
     }
-
   }, [currentCriteria, fetchCriteria]);
 
-  // 6. Hàm Clone Tiêu chí (Sao chép từ Round/Track khác)
-  const handleCloneCriteria = useCallback(async (sourceRoundId, sourceTrackId) => {
-    setIsLoading(true);
-    try {
-      if (currentRound?.is_final) {
-        await criteriaService.cloneForFinalRound(selectedRoundId, { sourceRoundId, sourceTrackId, replaceExisting: false });
-      } else {
-        await criteriaService.cloneForTrack(selectedTrackId, { sourceRoundId, sourceTrackId, replaceExisting: false });
-      }
-      message.success('Sao chép tiêu chí thành công');
-      fetchCriteria();
-      return 1; // Return 1 to indicate success
-    } catch (error) {
-      message.error(error.message || 'Lỗi khi sao chép tiêu chí');
-      return 0;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentRound, selectedRoundId, selectedTrackId, fetchCriteria]);
-
-  // 7. Hàm lưu Criteria (Thêm mới / Cập nhật)
-  const handleSaveCriteria = useCallback(async (values, editingId) => {
-    const criteriaData = { ...values };
-    
-    setIsLoading(true);
-    try {
-      if (editingId) {
-        await criteriaService.update(editingId, criteriaData);
-        message.success('Cập nhật tiêu chí thành công');
-      } else {
+  const handleCloneCriteria = useCallback(
+    async (sourceRoundId, sourceTrackId, replaceExisting = false) => {
+      setIsLoading(true);
+      try {
         if (currentRound?.is_final) {
-          await criteriaService.createForFinalRound(selectedRoundId, criteriaData);
+          await criteriaService.cloneForFinalRound(selectedRoundId, {
+            sourceRoundId,
+            sourceTrackId,
+            replaceExisting,
+          });
         } else {
-          await criteriaService.createForTrack(selectedTrackId, criteriaData);
+          await criteriaService.cloneForTrack(selectedTrackId, {
+            sourceRoundId,
+            sourceTrackId,
+            replaceExisting,
+          });
         }
-        message.success('Thêm tiêu chí thành công');
+        message.success("Sao chép tiêu chí thành công");
+        fetchCriteria();
+        return 1;
+      } catch (error) {
+        message.error("Lỗi khi sao chép tiêu chí");
+        return 0;
+      } finally {
+        setIsLoading(false);
       }
-      fetchCriteria();
-    } catch (error) {
-      message.error(error.message || 'Có lỗi xảy ra');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentRound, selectedRoundId, selectedTrackId, fetchCriteria]);
+    },
+    [currentRound, selectedRoundId, selectedTrackId, fetchCriteria],
+  );
 
-  // 8. Hàm Xóa
-  const handleDeleteCriteria = useCallback(async (id) => {
-    setIsLoading(true);
-    try {
-      await criteriaService.delete(id);
-      message.success('Đã xóa tiêu chí');
-      fetchCriteria();
-    } catch (error) {
-      if (error.status === 409) {
-        message.error('Không thể xóa do tiêu chí đã có dữ liệu chấm điểm');
-      } else {
-        message.error(error.message || 'Lỗi khi xóa tiêu chí');
+  const handleSaveCriteria = useCallback(
+    async (values, editingId) => {
+      setIsLoading(true);
+      try {
+        if (editingId) {
+          await criteriaService.update(editingId, values);
+          message.success("Cập nhật tiêu chí thành công");
+        } else {
+          if (currentRound?.is_final)
+            await criteriaService.createForFinalRound(selectedRoundId, values);
+          else await criteriaService.createForTrack(selectedTrackId, values);
+          message.success("Thêm tiêu chí thành công");
+        }
+        fetchCriteria();
+      } catch (error) {
+        message.error("Có lỗi xảy ra");
+      } finally {
+        setIsLoading(false);
       }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [fetchCriteria]);
+    },
+    [currentRound, selectedRoundId, selectedTrackId, fetchCriteria],
+  );
+
+  const handleBatchSaveCriteria = useCallback(
+    async (itemsData) => {
+      setIsLoading(true);
+      try {
+        if (currentRound?.is_final)
+          await criteriaService.createBatchForFinalRound(
+            selectedRoundId,
+            itemsData,
+          );
+        else
+          await criteriaService.createBatchForTrack(selectedTrackId, itemsData);
+        message.success(`Đã thêm thành công ${itemsData.length} tiêu chí mới!`);
+        fetchCriteria();
+      } catch (error) {
+        message.error("Lỗi khi thêm hàng loạt tiêu chí");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentRound, selectedRoundId, selectedTrackId, fetchCriteria],
+  );
+
+  const handleDeleteCriteria = useCallback(
+    async (id) => {
+      setIsLoading(true);
+      try {
+        await criteriaService.delete(id);
+        message.success("Đã xóa tiêu chí");
+        fetchCriteria();
+      } catch (error) {
+        error.status === 409
+          ? message.error("Không thể xóa do tiêu chí đã có dữ liệu chấm điểm")
+          : message.error("Lỗi khi xóa tiêu chí");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [fetchCriteria],
+  );
 
   return {
     hackathonRounds,
@@ -230,16 +237,17 @@ export const useCriteriaManagement = (hackathonId) => {
     handleAutoBalance,
     handleCloneCriteria,
     handleSaveCriteria,
+    handleBatchSaveCriteria,
     deleteCriteria: handleDeleteCriteria,
     updateRound: async (id, data) => {
       try {
         await roundService.update(id, data);
-        message.success('Cập nhật trạng thái vòng thi thành công');
+        message.success("Cập nhật trạng thái vòng thi thành công");
         fetchBaseData();
       } catch (err) {
-        message.error('Lỗi khi cập nhật vòng thi');
+        message.error("Lỗi khi cập nhật vòng thi");
       }
     },
-    isLoading
+    isLoading,
   };
 };

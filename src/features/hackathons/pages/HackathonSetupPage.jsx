@@ -84,7 +84,7 @@ const HackathonSetupPage = () => {
     },
     {
       key: 'criteria',
-      label: 'Tiêu chí đánh giá (Criteria)',
+      label: 'Tiêu chí đánh giá',
       children: <CriteriaManagementPage hackathonId={hackathon.id} />, 
     },
     {
@@ -99,7 +99,7 @@ const HackathonSetupPage = () => {
     },
     {
       key: 'review',
-      label: 'Đánh giá & Kiểm tra (Review & Validate)',
+      label: 'Đánh giá & Kiểm tra',
       children: <ReviewValidatePage hackathonId={hackathon.id} />, 
     }
   ];
