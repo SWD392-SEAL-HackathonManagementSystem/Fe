@@ -1,23 +1,27 @@
 import React from 'react';
-import { Card, Button, Typography, Tag, Alert, Spin, message } from 'antd';
+import { Card, Button, Typography, Tag, Alert, Spin, message, theme } from 'antd';
 import { CheckCircle, XCircle, AlertTriangle, Lock } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useHackathonValidation } from '../hooks/useHackathonValidation';
 import { reviewService } from '../services/reviewService';
 
 const { Title, Text, Paragraph } = Typography;
+const { useToken } = theme;
 
 const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
+  // Trích xuất design tokens từ Ant Design để hỗ trợ Dark/Light Mode
+  const { token } = useToken();
+
   const getIcon = () => {
     switch (status) {
       case 'success':
-        return <CheckCircle size={20} color="#52c41a" />;
+        return <CheckCircle size={20} color={token.colorSuccess} />;
       case 'error':
-        return <XCircle size={20} color="#ff4d4f" />;
+        return <XCircle size={20} color={token.colorError} />;
       case 'warning':
-        return <AlertTriangle size={20} color="#faad14" />;
+        return <AlertTriangle size={20} color={token.colorWarning} />;
       default:
-        return <CheckCircle size={20} color="#52c41a" />;
+        return <CheckCircle size={20} color={token.colorSuccess} />;
     }
   };
 
@@ -41,46 +45,37 @@ const ValidationItem = ({ status, title, detail, linkText, linkAction }) => {
         alignItems: 'flex-start',
         gap: 16,
         padding: '16px 24px',
-        borderBottom: '1px solid #f0f0f0',
-        background: status === 'error' ? '#fff2f0' : 'white',
+        borderBottom: `1px solid ${token.colorBorderSecondary}`,
+        // Nền đổi màu tự động theo status và theme
+        background: status === 'error' ? token.colorErrorBg : token.colorBgContainer,
+        transition: 'background-color 0.3s ease',
       }}
     >
       <div style={{ marginTop: 2 }}>{getIcon()}</div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 500, fontSize: 16, marginBottom: 4 }}>{title}</div>
+        <div style={{ fontWeight: 500, fontSize: 16, marginBottom: 4, color: token.colorText }}>
+          {title}
+        </div>
+        
         {detail && (
           <div
             style={{
               padding: '2px 0',
               fontSize: 13,
-              color: status === 'error' ? '#cf1322' : status === 'warning' ? '#ad6800' : '#595959',
+              // Chữ đổi màu dựa trên status token
+              color: status === 'error' ? token.colorErrorText : status === 'warning' ? token.colorWarningText : token.colorTextSecondary,
             }}
           >
-            Lỗi: {detail}
-          </div>
-        )}
-        {status === 'warning' && detail && (
-          <div
-            style={{
-              background: '#fffbe6',
-              border: '1px solid #ffe58f',
-              padding: '6px 12px',
-              borderRadius: 6,
-              marginTop: 4,
-              marginBottom: 8,
-              fontSize: 13,
-              color: '#ad6800',
-              fontWeight: 500,
-              display: 'inline-block',
-            }}
-          >
-            Cảnh báo: {detail}
-          </div>
-        )}
-        {status === 'success' && detail && (
-          <Text type="secondary" style={{ fontSize: 13 }}>
+            {status === 'error' || status === 'warning' ? `${status === 'error' ? 'Lỗi' : 'Cảnh báo'}: ` : ''} 
             {detail}
-          </Text>
+          </div>
+        )}
+
+        {/* Nút điều hướng (linkText) nếu có */}
+        {linkText && linkAction && (
+           <Button type="link" onClick={linkAction} style={{ padding: 0, marginTop: 4 }}>
+             {linkText}
+           </Button>
         )}
       </div>
       <div>{getStatusTag()}</div>
@@ -92,8 +87,8 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
   const navigate = useNavigate();
   const params = useParams();
   const hId = propHackathonId || parseInt(params.hackathonId);
+  const { token } = useToken();
 
-  // Gọi Custom Hook để lấy logic validation
   const {
     hackathon,
     hasCorrectRounds,
@@ -133,9 +128,8 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
     );
   }
 
-
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto' }}>
+    <div style={{ maxWidth: 960, margin: '0 auto', color: token.colorText }}>
       <div
         style={{
           display: 'flex',
@@ -201,7 +195,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
           marginBottom: 24,
           borderRadius: 12,
           overflow: 'hidden',
-          borderColor: (weightErrors.length > 0 || missingCriteriaErrors.length > 0) ? '#ff4d4f' : undefined,
+          borderColor: (weightErrors.length > 0 || missingCriteriaErrors.length > 0) ? token.colorError : token.colorBorderSecondary,
         }}
         styles={{ body: { padding: 0 } }}
       >
@@ -252,7 +246,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
           marginBottom: 24,
           borderRadius: 12,
           overflow: 'hidden',
-          borderColor: personnelErrors.length > 0 ? '#ff4d4f' : undefined,
+          borderColor: personnelErrors.length > 0 ? token.colorError : token.colorBorderSecondary,
         }}
         styles={{ body: { padding: 0 } }}
       >
@@ -264,8 +258,8 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
               ? 'Tất cả các Bảng đấu (Sơ loại) và Vòng chung kết đều đã được phân công đủ Mentor và Giám khảo.'
               : (
                 <div>
-                  <Paragraph style={{ margin: 0, color: '#ff4d4f' }}>Yêu cầu bổ sung nhân sự:</Paragraph>
-                  <ul style={{ margin: '4px 0 0 20px', padding: 0 }}>
+                  <Paragraph style={{ margin: 0, color: token.colorErrorText }}>Yêu cầu bổ sung nhân sự:</Paragraph>
+                  <ul style={{ margin: '4px 0 0 20px', padding: 0, color: token.colorTextSecondary }}>
                     {personnelErrors.map((err, i) => <li key={`personnel-${i}`}>{err}</li>)}
                   </ul>
                 </div>
@@ -279,9 +273,15 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
           }
         />
       </Card>
+
       <Card
         title={<Title level={4} style={{ margin: 0 }}>Lịch trình sự kiện</Title>}
-        style={{ marginBottom: 24, borderRadius: 12, overflow: 'hidden', borderColor: !hasKickoffEvent ? '#ff4d4f' : undefined }}
+        style={{ 
+          marginBottom: 24, 
+          borderRadius: 12, 
+          overflow: 'hidden', 
+          borderColor: !hasKickoffEvent ? token.colorError : token.colorBorderSecondary 
+        }}
         styles={{ body: { padding: 0 } }}
       >
         <ValidationItem
@@ -290,12 +290,12 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
           detail={
             hasKickoffEvent
               ? 'Đã cấu hình sự kiện Khai mạc (KICKOFF) để tiến hành bốc thăm chia bảng.'
-              : 'Yêu cầu bắt buộc: Phải có ít nhất 1 sự kiện thuộc loại "KICKOFF" trong Lịch trình sự kiện (Event Management).'
+              : 'Yêu cầu bắt buộc: Phải có ít nhất 1 sự kiện thuộc loại "KICKOFF" trong Lịch trình sự kiện.'
           }
           linkText={!hasKickoffEvent ? 'Đi tới Lịch trình' : null}
           linkAction={
             !hasKickoffEvent
-              ? () => navigate(`/hackathons/${hId}/setup`) // Điều hướng về tab setup chung (có Events)
+              ? () => navigate(`/hackathons/${hId}/setup`)
               : null
           }
         />
@@ -305,7 +305,8 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
         style={{
           marginTop: 32,
           borderRadius: 12,
-          borderLeft: hasBlockingErrors ? '4px solid #ff4d4f' : '4px solid #52c41a',
+          borderLeft: `4px solid ${hasBlockingErrors ? token.colorError : token.colorSuccess}`,
+          background: token.colorBgContainer,
         }}
       >
         <div
@@ -325,14 +326,14 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
               {hasBlockingErrors ? (
                 <>
                   Hệ thống phát hiện có{' '}
-                  <strong style={{ color: '#ff4d4f' }}>
+                  <strong style={{ color: token.colorErrorText }}>
                     {totalErrors} lỗi cấu hình
                   </strong>{' '}
                   cần được khắc phục trước khi kích hoạt giải đấu (ONGOING) và mở cổng đăng ký.
                 </>
               ) : (
                 <>
-                  Tất cả các kiểm tra hệ thống bắt buộc đều đã hợp lệ. Giải đấu đã sẵn sàng để kích hoạt và mở cổng đăng ký cho sinh viên.
+                  Tất cả các kiểm tra hệ thống bắt buộc đều đã hợp lệ. Giải đấu đã sẵn sàng để kích hoạt và mở cổng đăng ký.
                 </>
               )}
             </Paragraph>
@@ -343,6 +344,7 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
             disabled={hasBlockingErrors || hackathon.status !== 'DRAFT'}
             onClick={handleActivate}
             icon={hasBlockingErrors ? <Lock size={16} /> : null}
+            danger={hasBlockingErrors} // Ant Design prop cho nút báo lỗi
             style={{
               height: 48,
               paddingLeft: 32,

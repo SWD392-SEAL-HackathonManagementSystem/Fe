@@ -17,13 +17,17 @@ export const mapCriterionToFE = (beData) => {
 
 export const mapCriterionToBE = (feData) => {
   if (!feData) return null;
-  return {
-    name: feData.name,
+  const payload = {
+    name: feData.name?.trim(),
     type: feData.type,
-    weight: Number(feData.weight),
-    maxScore: Number(feData.max_score),
-    description: feData.description,
-    rubricUrl: feData.rubric_url || null,
-    displayOrder: feData.display_order ? Number(feData.display_order) : 0,
+    weight: Number(feData.weight) || 0,
+    maxScore: Number(feData.max_score) || 0,
+    description: feData.description?.trim(),
+    rubricUrl: feData.rubric_url?.trim() || null,
+    displayOrder: feData.display_order ? Number(feData.display_order) : 1,
   };
+  if (feData.id) {
+    payload.id = feData.id;
+  }
+  return payload;
 };
