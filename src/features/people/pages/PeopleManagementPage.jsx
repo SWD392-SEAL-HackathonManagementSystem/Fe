@@ -14,7 +14,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
   const hackathonRounds = rounds.filter(r => hackathonTracks.map(t => t.id).includes(r.track_id));
   const hackathonAssignments = assignments.filter(a => a.hackathon_id === hackathonId);
 
-  const preliminaryRounds = hackathonRounds.filter(r => r.sequence_order === 1);
+  const preliminaryRounds = hackathonRounds.filter(r => !r.is_final);
 
   const handleAddGuestJudge = (values) => {
     addPerson({ ...values, role: 'JUDGE' });
@@ -40,7 +40,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
 
   const checkIsFinalRound = (round) => {
     if (!round) return false;
-    return round.sequence_order > 1 || round.name.toLowerCase().includes('chung kết') || round.name.toLowerCase().includes('final');
+    return !!round.is_final || round.name.toLowerCase().includes('chung kết') || round.name.toLowerCase().includes('final');
   };
 
   const handleAssign = (values, type) => {

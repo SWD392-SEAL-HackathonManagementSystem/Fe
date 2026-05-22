@@ -6,7 +6,7 @@ import { message } from 'antd';
 
 import { roundService } from '../../rounds/services/roundService';
 import { trackService } from '../../tracks/services/trackService';
-import { mapRoundToFE } from '../../rounds/mappers/roundMapper';
+import { mapRoundToFE, sortRoundsByExamAt } from '../../rounds/mappers/roundMapper';
 import { mapTrackToFE } from '../../tracks/mappers/trackMapper';
 
 export const useCriteriaManagement = (hackathonId) => {
@@ -53,10 +53,7 @@ export const useCriteriaManagement = (hackathonId) => {
   }, [fetchBaseData]);
 
   // 1. Lấy danh sách Vòng thi (Rounds) của Hackathon
-  const hackathonRounds = useMemo(() => {
-    return rounds
-      .sort((a, b) => a.sequence_order - b.sequence_order);
-  }, [rounds]);
+  const hackathonRounds = useMemo(() => sortRoundsByExamAt(rounds), [rounds]);
   
   const currentRound = hackathonRounds.find(r => r.id === selectedRoundId);
   

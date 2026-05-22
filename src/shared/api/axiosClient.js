@@ -42,7 +42,11 @@ axiosClient.interceptors.response.use(
     if (error.response) {
       customError.status = error.response.status;
       customError.data = error.response.data;
-      if (error.response.data && error.response.data.message) {
+      const apiError = error.response.data?.error;
+      if (apiError) {
+        customError.code = apiError.code;
+        customError.message = apiError.message || customError.message;
+      } else if (error.response.data && error.response.data.message) {
         customError.message = error.response.data.message;
       } else {
         switch (error.response.status) {
