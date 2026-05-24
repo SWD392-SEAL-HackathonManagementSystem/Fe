@@ -93,9 +93,9 @@ export const AppProvider = ({ children }) => {
 
       // Update Hackathons
       const updatedHackathons = hackathons.map(h => {
-        if (h.event_end && dayjs(h.event_end).isBefore(now) && h.status !== 'COMPLETED') {
+        if (h.event_end && dayjs(h.event_end).isBefore(now) && h.status !== 'FINISHED') {
           changed = true;
-          return { ...h, status: 'COMPLETED' };
+          return { ...h, status: 'FINISHED' };
         }
         return h;
       });
@@ -103,7 +103,7 @@ export const AppProvider = ({ children }) => {
       // Update Tracks (Close if hackathon completed)
       const updatedTracks = tracks.map(t => {
         const hackathon = updatedHackathons.find(h => h.id === t.hackathon_id);
-        if (hackathon?.status === 'COMPLETED' && t.status !== 'CLOSED') {
+        if (hackathon?.status === 'FINISHED' && t.status !== 'CLOSED') {
           changed = true;
           return { ...t, status: 'CLOSED' };
         }

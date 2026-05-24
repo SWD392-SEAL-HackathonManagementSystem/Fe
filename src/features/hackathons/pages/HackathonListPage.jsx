@@ -106,7 +106,7 @@ const HackathonListPage = () => {
               <Option value="DRAFT">Nháp</Option>
               <Option value="PUBLISHED">Đã công bố</Option>
               <Option value="ONGOING">Đang diễn ra</Option>
-              <Option value="COMPLETED">Đã hoàn thành</Option>
+              <Option value="FINISHED">Đã hoàn thành</Option>
             </Select>
           </Col>
           <Col xs={24} md={6} lg={4}>
@@ -152,7 +152,7 @@ const HackathonListPage = () => {
                   </div>
                 }
                 actions={[
-                  hackathon.status !== 'COMPLETED' && (
+                  hackathon.status !== 'FINISHED' && (
                     <Button 
                       type="text" 
                       icon={<Settings size={16} />} 

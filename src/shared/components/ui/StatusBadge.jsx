@@ -10,8 +10,8 @@ const StatusBadge = ({ status }) => {
         return { color: 'blue', text: 'Đã công bố' };
       case 'ONGOING':
         return { color: 'green', text: 'Đang diễn ra' };
-      case 'COMPLETED':
-        return { color: 'purple', text: 'Đã hoàn thành' };
+      case 'FINISHED':
+        return { color: 'orange', text: 'Đã hoàn thành' };
       case 'OPEN':
         return { color: 'green', text: 'Mở' };
       case 'CLOSED':
