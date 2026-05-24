@@ -156,9 +156,9 @@ export const CriteriaCloneModal = ({
             padding: "16px",
             backgroundColor: replaceExisting
               ? token.colorErrorBg
-              : token.colorInfoBg,
+              : token.colorSuccessBg,
             borderRadius: 12,
-            border: `1px solid ${replaceExisting ? token.colorErrorBorder : token.colorInfoBorder}`,
+            border: `1px solid ${replaceExisting ? token.colorErrorBorder : token.colorSuccessBorder}`,
             transition: "all 0.3s ease",
           }}
         >
@@ -184,15 +184,15 @@ export const CriteriaCloneModal = ({
             {replaceExisting ? (
               <span style={{ color: token.colorError }}>
                 <strong style={{ display: "inline-block", marginRight: 6 }}>
-                  ⚠️ CẢNH BÁO:
+                  CẢNH BÁO:
                 </strong>
                 Toàn bộ tiêu chí hiện tại của vòng/bảng này sẽ bị xóa sạch và
                 thay thế hoàn toàn.
               </span>
             ) : (
-              <span style={{ color: token.colorPrimary }}>
-                <strong style={{ display: "inline-block", marginRight: 6 }}>
-                  ✅ AN TOÀN:
+              <span style={{ color: token.colorSuccess}}>
+                <strong style={{ display: "inline-block", marginRight: 6}}>
+                  AN TOÀN:
                 </strong>
                 Dữ liệu sao chép sẽ được nối tiếp vào danh sách tiêu chí hiện
                 tại của bạn.
