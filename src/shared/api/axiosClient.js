@@ -5,6 +5,9 @@ const axiosClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
   },
 });
 

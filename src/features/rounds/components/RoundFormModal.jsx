@@ -143,7 +143,11 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
                 }),
               ]}
             >
-              <DatePicker showTime style={{ width: '100%' }} />
+              <DatePicker 
+                showTime 
+                style={{ width: '100%' }} 
+                disabledDate={(current) => current && current < dayjs().startOf('day')}
+              />
             </Form.Item>
           </Col>
           <Col span={12}>

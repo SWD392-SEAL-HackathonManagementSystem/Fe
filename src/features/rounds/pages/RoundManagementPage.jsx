@@ -6,6 +6,7 @@ import { roundService } from '../services/roundService';
 import { mapRoundToFE, mapRoundToBE, sortRoundsByExamAt } from '../mappers/roundMapper';
 import { getRoundErrorMessage } from '../../../shared/constants/roundErrors';
 import { formatDate } from '../../../shared/utils/date';
+import dayjs from 'dayjs';
 
 const { Title } = Typography;
 
@@ -20,7 +21,7 @@ const RoundManagementPage = ({ hackathonId }) => {
     try {
       setLoading(true);
       const res = await roundService.listByHackathon(hackathonId);
-      
+
       const fullRounds = await Promise.all(
         (res || []).map(async (r) => {
           try {
@@ -31,7 +32,7 @@ const RoundManagementPage = ({ hackathonId }) => {
           }
         })
       );
-      
+
       setRounds(sortRoundsByExamAt(fullRounds));
     } catch (error) {
       message.error(error.message || 'Lỗi khi tải danh sách vòng thi');
@@ -69,10 +70,17 @@ const RoundManagementPage = ({ hackathonId }) => {
   const handleModalFinish = async (values) => {
     try {
       setLoading(true);
+
+      if (editingRound) {
+        values.sequenceOrder = editingRound.sequenceOrder || editingRound.sequence_order || 1;
+      } else {
+        values.sequenceOrder = rounds.length + 1;
+      }
+
       const payload = mapRoundToBE(values);
       let roundId = editingRound?.id;
       let createdOrUpdatedRound;
-      
+
       if (editingRound) {
         createdOrUpdatedRound = await roundService.update(editingRound.id, payload);
         roundId = editingRound.id;
@@ -94,7 +102,7 @@ const RoundManagementPage = ({ hackathonId }) => {
       }
 
       setIsModalVisible(false);
-      fetchRounds();
+      await fetchRounds();
     } catch (error) {
       message.error(getRoundErrorMessage(error));
       setLoading(false);
@@ -138,35 +146,45 @@ const RoundManagementPage = ({ hackathonId }) => {
     },
     {
       title: 'Trạng thái',
-      dataIndex: 'is_active',
       key: 'status',
-      render: (active) => (
-        <Tag color={active ? 'green' : 'default'}>
-          {active ? 'Đang hoạt động' : 'Ngưng hoạt động'}
-        </Tag>
-      ),
+      render: (_, record) => {
+        const isEnded = record.submission_deadline && dayjs().isAfter(dayjs(record.submission_deadline));
+        if (isEnded) {
+          return <Tag color="red">Đã kết thúc</Tag>;
+        }
+        return (
+          <Tag color={record.is_active ? 'green' : 'default'}>
+            {record.is_active ? 'Đang hoạt động' : 'Ngưng hoạt động'}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Thao tác',
       key: 'actions',
-      render: (_, record) => (
-        <Space size="middle">
-          <Button 
-            type="text" 
-            icon={<Edit size={16} />} 
-            onClick={() => handleEdit(record)}
-          />
-          <Popconfirm
-            title="Xóa vòng thi"
-            description="Bạn có chắc chắn muốn xóa vòng thi này?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-          >
-            <Button type="text" danger icon={<Trash2 size={16} />} />
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_, record) => {
+        if (record.is_active) {
+          return <span style={{ color: '#8c8c8c', fontSize: 13 }}>Không thể thao tác</span>;
+        }
+        return (
+          <Space size="middle">
+            <Button
+              type="text"
+              icon={<Edit size={16} />}
+              onClick={() => handleEdit(record)}
+            />
+            <Popconfirm
+              title="Xóa vòng thi"
+              description="Bạn có chắc chắn muốn xóa vòng thi này?"
+              onConfirm={() => handleDelete(record.id)}
+              okText="Xóa"
+              cancelText="Hủy"
+            >
+              <Button type="text" danger icon={<Trash2 size={16} />} />
+            </Popconfirm>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -179,25 +197,25 @@ const RoundManagementPage = ({ hackathonId }) => {
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
         <Space>
           <Button.Group style={{ marginRight: 16 }}>
-            <Button 
-              icon={<List size={16} />} 
+            <Button
+              icon={<List size={16} />}
               type={viewMode === 'table' ? 'primary' : 'default'}
               onClick={() => setViewMode('table')}
             >
               Bảng
             </Button>
-            <Button 
-              icon={<Calendar size={16} />} 
+            <Button
+              icon={<Calendar size={16} />}
               type={viewMode === 'timeline' ? 'primary' : 'default'}
               onClick={() => setViewMode('timeline')}
             >
               Dòng thời gian
             </Button>
           </Button.Group>
-          
-          <Button 
-            type="primary" 
-            icon={<Plus size={16} />} 
+
+          <Button
+            type="primary"
+            icon={<Plus size={16} />}
             onClick={handleAdd}
           >
             Thêm vòng thi
@@ -207,8 +225,8 @@ const RoundManagementPage = ({ hackathonId }) => {
 
       {viewMode === 'table' ? (
         <Table scroll={{ x: 'max-content' }}
-          columns={columns} 
-          dataSource={rounds} 
+          columns={columns}
+          dataSource={rounds}
           rowKey="id"
           pagination={false}
           loading={loading}
@@ -226,9 +244,15 @@ const RoundManagementPage = ({ hackathonId }) => {
                       {round.name}
                       {round.is_final && <Tag color="gold" style={{ marginLeft: 8 }}>Chung kết</Tag>}
                     </Title>
-                    <Tag color={round.is_active ? 'green' : 'default'}>
-                      {round.is_active ? 'Đang hoạt động' : 'Ngưng hoạt động'}
-                    </Tag>
+                    {(() => {
+                      const isEnded = round.submission_deadline && dayjs().isAfter(dayjs(round.submission_deadline));
+                      if (isEnded) return <Tag color="blue">Đã kết thúc</Tag>;
+                      return (
+                        <Tag color={round.is_active ? 'green' : 'default'}>
+                          {round.is_active ? 'Đang hoạt động' : 'Ngưng hoạt động'}
+                        </Tag>
+                      );
+                    })()}
                   </div>
                   <div style={{ color: '#8c8c8c', marginBottom: 4 }}>
                     Thi: {round.exam_at ? formatDate(round.exam_at) : '-'}
@@ -239,7 +263,9 @@ const RoundManagementPage = ({ hackathonId }) => {
                     {round.submission_deadline ? formatDate(round.submission_deadline) : '-'}
                   </div>
                   <div>
-                    <Button size="small" icon={<Edit size={14} />} onClick={() => handleEdit(round)}>Sửa</Button>
+                    {!round.is_active && (
+                      <Button size="small" icon={<Edit size={14} />} onClick={() => handleEdit(round)}>Sửa</Button>
+                    )}
                   </div>
                 </div>
               ),

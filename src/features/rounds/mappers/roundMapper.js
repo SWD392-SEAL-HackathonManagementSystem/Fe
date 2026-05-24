@@ -14,7 +14,7 @@ export const mapRoundToFE = (beData) => {
   if (!beData) return null;
   return {
     ...beData,
-    exam_at: beData.examAt,
+    exam_at: beData.examAt || beData.problemReleasedAt,
     is_final: beData.isFinal,
     round_type: beData.roundType,
     late_submission_policy: beData.lateSubmissionPolicy,
@@ -37,6 +37,7 @@ export const mapRoundToBE = (feData) => {
 
   const payload = {
     name: feData.name,
+    sequenceOrder: feData.sequenceOrder || 1,
     examAt: formatDateTime(feData.exam_at),
     isFinal,
     roundType: feData.round_type || 'PRELIMINARY',
@@ -47,7 +48,7 @@ export const mapRoundToBE = (feData) => {
       ? parseInt(feData.coding_duration_hours, 10)
       : null,
     problemStatementUrl: feData.problem_statement_url,
-    problemReleasedAt: formatDateTime(feData.problem_released_at),
+    problemReleasedAt: formatDateTime(feData.exam_at), // Tạm mượn trường này để lưu Ngày giờ thi
     wildcardEnabled: !!feData.wildcard_enabled,
     tiebreakRule: feData.tiebreak_rule || 'PENALTY_SCORE',
   };
