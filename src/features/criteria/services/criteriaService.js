@@ -31,7 +31,7 @@ export const criteriaService = {
     return axiosClient.post(ENDPOINTS.ROUNDS.CRITERIA(roundId), mapCriterionToBE(data));
   },
 
-  //5. POST tạo hàng loạt (Batch) tiêu chí cho Track
+  // 5. POST tạo hàng loạt (Batch) tiêu chí cho Track
   createBatchForTrack: async (trackId, itemsData) => {
     const payload = {
       items: itemsData.map(item => mapCriterionToBE(item))
@@ -39,7 +39,7 @@ export const criteriaService = {
     return axiosClient.post(`${ENDPOINTS.TRACKS.CRITERIA(trackId)}/batch`, payload);
   },
 
-  //6. POST tạo hàng loạt (Batch) tiêu chí cho Round (Chung kết)
+  // 6. POST tạo hàng loạt (Batch) tiêu chí cho Round (Chung kết)
   createBatchForFinalRound: async (roundId, itemsData) => {
     const payload = {
       items: itemsData.map(item => mapCriterionToBE(item))
@@ -73,7 +73,7 @@ export const criteriaService = {
     return axiosClient.delete(ENDPOINTS.CRITERIA.DETAIL(id));
   },
 
-  //12. GET tóm tắt tỷ trọng trọng số (Weight) theo Track
+  // 12. GET tóm tắt tỷ trọng trọng số (Weight) theo Track
   getWeightSummaryByTrack: async (trackId) => {
     return axiosClient.get(`${ENDPOINTS.TRACKS.CRITERIA(trackId)}/weight-summary`);
   },
@@ -82,4 +82,9 @@ export const criteriaService = {
   getWeightSummaryByRound: async (roundId) => {
     return axiosClient.get(`${ENDPOINTS.ROUNDS.CRITERIA(roundId)}/weight-summary`);
   },
+
+  // 14. GET danh sách track làm nguồn để clone (API MỚI BỔ SUNG)
+  getCloneSourcesForTrack: async (trackId) => {
+    return axiosClient.get(`/api/v1/tracks/${trackId}/criteria/clone-sources`);
+  }
 };
