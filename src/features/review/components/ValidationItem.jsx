@@ -13,7 +13,25 @@ export const ValidationItem = ({ status, code, details, message, index }) => {
   const bgSoft = isError ? token.colorErrorBg : token.colorWarningBg;
 
   const generateCustomMessage = () => {
+    const getTargetName = () => {
+      if (!message) return "Hạng mục này";
+
+      if (message.includes("Round Chung kết") || message.includes("FINAL")) {
+        return "Vòng Chung kết";
+      }
+
+      const match = message.match(/Track '(.*?)'/);
+      if (match && match[1]) {
+        return `Bảng đấu "${match[1]}" (Sơ loại)`;
+      }
+
+      return "Hạng mục này";
+    };
+
+    const targetName = getTargetName();
+
     switch (code) {
+      // --- NHÓM 1: TIÊU CHÍ & TRỌNG SỐ ---
       case "TRACK_CRITERIA_WEIGHT":
       case "FINAL_CRITERIA_WEIGHT": {
         const totalWeight = details?.total
@@ -21,7 +39,8 @@ export const ValidationItem = ({ status, code, details, message, index }) => {
           : "0.00";
         return (
           <span>
-            Tổng trọng số (Weight) của các tiêu chí đang là{" "}
+            Tổng trọng số (Weight) của các tiêu chí tại{" "}
+            <strong>{targetName}</strong> đang là{" "}
             <strong style={{ color: token.colorError }}>{totalWeight}</strong>.
             <br />
             <Text type="secondary">
@@ -36,8 +55,8 @@ export const ValidationItem = ({ status, code, details, message, index }) => {
       case "ROUND_NO_CRITERIA":
         return (
           <span>
-            Hạng mục này <strong>chưa có Tiêu chí chấm điểm</strong> nào được
-            thiết lập.
+            <strong>{targetName}</strong> hiện tại chưa có Tiêu chí chấm điểm
+            nào được thiết lập.
             <br />
             <Text type="secondary">
               Vui lòng thêm ít nhất 1 tiêu chí để Giám khảo có thể chấm bài.
@@ -45,6 +64,7 @@ export const ValidationItem = ({ status, code, details, message, index }) => {
           </span>
         );
 
+      // --- NHÓM 2: VÒNG THI & TRACK ---
       case "MISSING_PRELIMINARY_ROUND":
         return (
           <span>
@@ -69,6 +89,7 @@ export const ValidationItem = ({ status, code, details, message, index }) => {
           </span>
         );
 
+      // --- NHÓM 3: LỊCH TRÌNH SỰ KIỆN ---
       case "EVENT_KICKOFF_MISSING":
         return (
           <span>
@@ -103,10 +124,11 @@ export const ValidationItem = ({ status, code, details, message, index }) => {
         );
       }
 
+      // --- NHÓM 4: CẢNH BÁO ---
       case "READINESS_WARNING":
         return (
           <span>
-            Hạng mục này hiện tại <strong>chưa có Mentor (Cố vấn)</strong> nào
+            <strong>{targetName}</strong> hiện tại chưa có Mentor (Cố vấn) nào
             được phân công hỗ trợ.
           </span>
         );
@@ -115,7 +137,6 @@ export const ValidationItem = ({ status, code, details, message, index }) => {
         if (!message) return <span>Có lỗi xảy ra, vui lòng kiểm tra lại.</span>;
 
         let cleanedFallback = message.replace(/\s*\([^)]*=[^)]*\)/g, "");
-
         cleanedFallback = cleanedFallback.replace(
           /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/g,
           (match) => {
