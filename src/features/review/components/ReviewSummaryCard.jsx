@@ -14,6 +14,7 @@ import { Lock, Unlock } from "lucide-react";
 const { Title, Text } = Typography;
 const { useToken } = theme;
 
+// === COMPONENT: THẺ TỔNG QUAN ===
 export const ReviewSummaryCard = ({
   isReady,
   hackathonStatus,
@@ -23,12 +24,14 @@ export const ReviewSummaryCard = ({
 }) => {
   const { token } = useToken();
 
+  // 1. Logic text cho nút bấm
   const getButtonText = () => {
     if (!isReady) return "Vui lòng xử lý lỗi";
     if (hackathonStatus !== "DRAFT") return "Không thể kích hoạt lúc này";
     return "Xác nhận Kích hoạt";
   };
 
+  // 2. Logic text cho chú thích (Tooltip) khi trỏ chuột vào nút
   const getTooltipText = () => {
     if (!isReady) return `Còn ${blockersCount} lỗi bắt buộc cần xử lý`;
     if (hackathonStatus !== "DRAFT")
@@ -36,6 +39,7 @@ export const ReviewSummaryCard = ({
     return "Mọi thứ đã sẵn sàng!";
   };
 
+  // 3. Điều kiện vô hiệu hóa nút
   const isDisabled = !isReady || hackathonStatus !== "DRAFT";
 
   return (
@@ -60,7 +64,9 @@ export const ReviewSummaryCard = ({
               ? token.colorSuccessBg
               : token.colorErrorBg,
             marginBottom: 20,
-            border: `1px solid ${isReady ? token.colorSuccessBorder : token.colorErrorBorder}`,
+            border: `1px solid ${
+              isReady ? token.colorSuccessBorder : token.colorErrorBorder
+            }`,
           }}
         >
           {isReady ? (
@@ -98,7 +104,11 @@ export const ReviewSummaryCard = ({
                 blockersCount > 0 ? token.colorErrorBg : token.colorSuccessBg,
               padding: "4px 12px",
               borderRadius: 20,
-              border: `1px solid ${blockersCount > 0 ? token.colorErrorBorder : token.colorSuccessBorder}`,
+              border: `1px solid ${
+                blockersCount > 0
+                  ? token.colorErrorBorder
+                  : token.colorSuccessBorder
+              }`,
             }}
           >
             <Text
@@ -129,7 +139,11 @@ export const ReviewSummaryCard = ({
                 warningsCount > 0 ? token.colorWarningBg : token.colorBgLayout,
               padding: "4px 12px",
               borderRadius: 20,
-              border: `1px solid ${warningsCount > 0 ? token.colorWarningBorder : token.colorBorderSecondary}`,
+              border: `1px solid ${
+                warningsCount > 0
+                  ? token.colorWarningBorder
+                  : token.colorBorderSecondary
+              }`,
             }}
           >
             <Text

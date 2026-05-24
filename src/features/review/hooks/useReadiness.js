@@ -3,12 +3,14 @@ import { reviewService } from "../services/reviewService";
 import { hackathonService } from "../../hackathons/services/hackathonService";
 import { mapHackathonToFE } from "../../hackathons/mappers/hackathonMapper";
 
+// === HOOK: LẤY DỮ LIỆU ĐỂ KIỂM TRA ĐIỀU KIỆN PHÁT HÀNH ===
 export const useReadiness = (hackathonId) => {
   const [readinessData, setReadinessData] = useState(null);
   const [hackathon, setHackathon] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Hàm gọi API
   const fetchReadiness = useCallback(async () => {
     try {
       setIsLoading(true);

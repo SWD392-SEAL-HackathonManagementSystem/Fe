@@ -18,21 +18,26 @@ import { reviewService } from "../services/reviewService";
 import { ReviewTabs } from "../components/ReviewTabs";
 import { ReviewSummaryCard } from "../components/ReviewSummaryCard";
 
-const { Title, Paragraph, Text } = Typography;
+const { Title, Paragraph } = Typography;
 const { useToken } = theme;
 
+// === PAGE: TRANG REVIEW VÀ VALIDATE ĐIỀU KIỆN KÍCH HOẠT ===
 const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
   const navigate = useNavigate();
   const params = useParams();
   const { token } = useToken();
   const hId = propHackathonId || parseInt(params.hackathonId);
+
+  // 1. Fetch dữ liệu từ Custom Hook
   const {
     hackathon,
     readinessData,
     isLoading,
     error: apiError,
+    refetch,
   } = useReadiness(hId);
 
+  // 2. Hàm gọi API kích hoạt giải đấu
   const handleActivate = async () => {
     try {
       await reviewService.changeStatus(hId, "ONGOING");
@@ -43,8 +48,11 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
     }
   };
 
+  // 3. Hàm kiểm tra lại
   const handleRefetch = () => {
-    navigate(0);
+    if (refetch) {
+      refetch();
+    }
   };
 
   const blockers = readinessData?.blockers || [];
@@ -52,23 +60,26 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
   const isReady = readinessData?.ready;
 
   const groupedBlockers = useMemo(() => {
-    const groups = { rounds: [], criteria: [], personnel: [], schedule: [] };
-    blockers.forEach((b) => {
-      const code = b.code?.toUpperCase() || "";
-      if (code.includes("ROUND")) groups.rounds.push(b);
-      else if (code.includes("CRITERIA") || code.includes("WEIGHT"))
-        groups.criteria.push(b);
-      else if (
-        code.includes("PERSONNEL") ||
-        code.includes("JUDGE") ||
-        code.includes("MENTOR")
-      )
-        groups.personnel.push(b);
-      else groups.schedule.push(b);
-    });
-    return groups;
+    return blockers.reduce(
+      (groups, b) => {
+        const code = b.code?.toUpperCase() || "";
+        if (code.includes("ROUND")) groups.rounds.push(b);
+        else if (code.includes("CRITERIA") || code.includes("WEIGHT"))
+          groups.criteria.push(b);
+        else if (
+          code.includes("PERSONNEL") ||
+          code.includes("JUDGE") ||
+          code.includes("MENTOR")
+        )
+          groups.personnel.push(b);
+        else groups.schedule.push(b);
+        return groups;
+      },
+      { rounds: [], criteria: [], personnel: [], schedule: [] },
+    );
   }, [blockers]);
 
+  // === RENDER KHI ĐANG LOADING HOẶC CÓ LỖI API ===
   if (isLoading) {
     return (
       <div
@@ -120,7 +131,6 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
         }}
       >
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-          {/* Header & Progress Info */}
           <div
             style={{
               display: "flex",

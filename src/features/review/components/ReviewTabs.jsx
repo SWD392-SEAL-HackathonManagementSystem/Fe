@@ -59,6 +59,7 @@ export const ReviewTabs = ({ groupedBlockers, warnings }) => {
         </div>
       );
     }
+
     return (
       <div style={{ minHeight: 250, paddingTop: 8 }}>
         {errorList.map((item, index) => (
@@ -67,6 +68,7 @@ export const ReviewTabs = ({ groupedBlockers, warnings }) => {
             index={index}
             status={statusType}
             code={item.code}
+            details={item.details}
             message={item.message}
           />
         ))}
@@ -104,6 +106,7 @@ export const ReviewTabs = ({ groupedBlockers, warnings }) => {
     );
   };
 
+  // === DANH SÁCH CẤU HÌNH CÁC TAB ===
   const tabItems = [
     {
       key: "rounds",
