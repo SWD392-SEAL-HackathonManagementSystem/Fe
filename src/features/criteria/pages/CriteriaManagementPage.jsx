@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Table,
   Button,
@@ -8,8 +8,20 @@ import {
   Card,
   Alert,
   Typography,
+  theme,
+  Input,
+  Select,
+  Divider,
 } from "antd";
-import { Plus, Edit, Trash2, Copy, FileText } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Copy,
+  FileText,
+  Inbox,
+  Search,
+} from "lucide-react";
 import { useCriteriaManagement } from "../hooks/useCriteriaManagement";
 import {
   CRITERIA_TYPES,
@@ -20,26 +32,27 @@ import { CriteriaFormModal } from "../components/CriteriaFormModal";
 import { CriteriaCloneModal } from "../components/CriteriaCloneModal";
 import { CriteriaBatchModal } from "../components/CriteriaBatchModal";
 
-const { Text } = Typography;
-
 const CriteriaManagementPage = ({ hackathonId }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCloneVisible, setIsCloneVisible] = useState(false);
   const [isBatchVisible, setIsBatchVisible] = useState(false);
   const [editingCriteria, setEditingCriteria] = useState(null);
+  const [searchText, setSearchText] = useState("");
+  const [filterType, setFilterType] = useState(null);
+  const { token } = theme.useToken();
 
   const {
     hackathonRounds,
     hackathonTracks,
-    currentRound,
     roundTracks,
-    currentCriteria,
-    totalWeight,
-    isWeightValid,
+    currentRound,
     selectedRoundId,
     setSelectedRoundId,
     selectedTrackId,
     setSelectedTrackId,
+    currentCriteria,
+    totalWeight,
+    isWeightValid,
     handleAutoBalance,
     handleCloneCriteria,
     handleSaveCriteria,
@@ -48,23 +61,17 @@ const CriteriaManagementPage = ({ hackathonId }) => {
     updateRound,
   } = useCriteriaManagement(hackathonId);
 
-  const handleEdit = (record) => {
-    setEditingCriteria(record);
-    setIsModalVisible(true);
-  };
-
-  const executeClone = (type, id, replaceExisting) => {
-    handleCloneCriteria(
-      type === "ROUND" ? id : null,
-      type === "TRACK" ? id : null,
-      replaceExisting,
+  const filteredCriteria = useMemo(() => {
+    return currentCriteria.filter(
+      (i) =>
+        i.name.toLowerCase().includes(searchText.toLowerCase()) &&
+        (filterType ? i.type === filterType : true),
     );
-    setIsCloneVisible(false);
-  };
+  }, [currentCriteria, searchText, filterType]);
 
   const columns = [
     {
-      title: "Thứ tự",
+      title: "STT",
       dataIndex: "display_order",
       key: "order",
       width: 80,
@@ -74,67 +81,61 @@ const CriteriaManagementPage = ({ hackathonId }) => {
       title: "Tên tiêu chí",
       dataIndex: "name",
       key: "name",
-      render: (text) => <strong>{text}</strong>,
+      render: (t) => <strong>{t}</strong>,
     },
     {
-      title: "Phân loại",
+      title: "Loại",
       dataIndex: "type",
       key: "type",
-      width: 120,
-      render: (type) => (
-        <Tag color={CRITERIA_COLORS[type] || CRITERIA_COLORS.DEFAULT}>
-          {type}
-        </Tag>
-      ),
+      width: 140,
+      render: (t) => <Tag color={CRITERIA_COLORS[t]}>{t}</Tag>,
     },
     {
       title: "Trọng số",
       dataIndex: "weight",
       key: "weight",
-      width: 100,
+      width: 120,
       align: "right",
-      render: (w, r) => (
-        <span
-          style={{
-            fontWeight: 600,
-            color: r.type === CRITERIA_TYPES.PENALTY ? "#ff4d4f" : "inherit",
-          }}
-        >
-          {r.type === CRITERIA_TYPES.PENALTY ? "-" : w?.toFixed(2)}
-        </span>
-      ),
+      render: (w, r) => (r.type === "PENALTY" ? "-" : w?.toFixed(2)),
     },
     {
-      title: "Điểm tối đa",
+      title: "Điểm max",
       dataIndex: "max_score",
       key: "max_score",
-      width: 110,
+      width: 120,
       align: "right",
     },
     {
-      title: "Hành động",
+      title: "Thao tác",
       key: "actions",
-      width: 100,
+      width: 120,
       align: "right",
       render: (_, r) => (
-        <Space size="small">
+        <Space>
           <Button
             type="text"
             icon={<Edit size={16} />}
-            onClick={() => handleEdit(r)}
+            onClick={() => {
+              setEditingCriteria(r);
+              setIsModalVisible(true);
+            }}
           />
-          <Popconfirm
-            title="Bạn có chắc muốn xoá?"
-            onConfirm={() => deleteCriteria(r.id)}
-            okText="Xoá"
-            cancelText="Hủy"
-          >
+          <Popconfirm title="Xoá?" onConfirm={() => deleteCriteria(r.id)}>
             <Button type="text" danger icon={<Trash2 size={16} />} />
           </Popconfirm>
         </Space>
       ),
     },
   ];
+
+  const executeClone = (type, id, replaceExisting) => {
+    handleCloneCriteria(
+      type === "ROUND" ? id : null,
+      type === "TRACK" ? id : null,
+      replaceExisting,
+    );
+    setIsCloneVisible(false);
+  };
 
   return (
     <div>
@@ -150,134 +151,118 @@ const CriteriaManagementPage = ({ hackathonId }) => {
           updateRound,
         }}
       />
-
       {!currentRound || (!currentRound.is_final && !selectedTrackId) ? (
-        <Card
-          style={{ textAlign: "center", padding: "40px 0", borderRadius: 12 }}
-        >
-          <Text type="secondary">
-            Vui lòng chọn Vòng thi{" "}
-            {currentRound && !currentRound.is_final ? "và Bảng đấu " : ""}để
-            thiết lập tiêu chí.
-          </Text>
+        <Card style={{ textAlign: "center", padding: "80px 0" }}>
+          <Inbox size={40} color="#ccc" />
+          <Typography.Text type="secondary">
+            Vui lòng chọn Vòng/Bảng để thiết lập.
+          </Typography.Text>
         </Card>
       ) : (
-        <>
-          {currentCriteria.length > 0 && !isWeightValid && (
+        <Card style={{ borderRadius: 16 }}>
+          {currentCriteria.length > 0 && (
             <Alert
-              type="error"
-              showIcon
-              style={{ marginBottom: 16, borderRadius: 8 }}
-              message={<strong>Cảnh báo trọng số</strong>}
-              description={
-                <span>
-                  Tổng trọng số hiện tại là {totalWeight.toFixed(2)}. Tổng trọng
-                  số bắt buộc phải bằng 1.0 (không tính loại PENALTY).
-                </span>
+              type={isWeightValid ? "success" : "error"}
+              style={{ marginBottom: 16 }}
+              message={
+                isWeightValid
+                  ? `Trọng số: ${totalWeight.toFixed(2)}`
+                  : `Sai trọng số: ${totalWeight.toFixed(2)}`
               }
               action={
-                <Button
-                  size="small"
-                  type="primary"
-                  danger
-                  onClick={handleAutoBalance}
-                >
-                  Cân bằng tự động
-                </Button>
+                !isWeightValid && (
+                  <Button size="small" onClick={handleAutoBalance}>
+                    Cân bằng
+                  </Button>
+                )
               }
             />
           )}
-          {currentCriteria.length > 0 && isWeightValid && (
-            <Alert
-              type="success"
-              showIcon
-              style={{ marginBottom: 16, borderRadius: 8 }}
-              message={
-                <strong>Trọng số hợp lệ: {totalWeight.toFixed(2)}</strong>
-              }
+          <div style={{ marginBottom: 16, display: "flex", gap: 16 }}>
+            <Input
+              prefix={<Search size={16} />}
+              placeholder="Tìm kiếm..."
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{ width: 250 }}
             />
-          )}
-
-          <Card style={{ borderRadius: 12 }}>
-            <Table
-              columns={columns}
-              dataSource={currentCriteria}
-              rowKey="id"
-              pagination={false}
-              locale={{ emptyText: "Chưa có tiêu chí nào được thiết lập." }}
-              footer={() => (
-                <div
-                  style={{ display: "flex", justifyContent: "center", gap: 16 }}
-                >
-                  <Button
-                    type="default"
-                    icon={<Copy size={16} />}
-                    onClick={() => setIsCloneVisible(true)}
-                  >
-                    Sao chép tiêu chí
-                  </Button>
-                  <Button
-                    type="dashed"
-                    icon={<FileText size={16} />}
-                    onClick={() => setIsBatchVisible(true)}
-                  >
-                    Thêm nhiều (Batch)
-                  </Button>
-                  <Button
-                    type="primary"
-                    icon={<Plus size={16} />}
-                    onClick={() => {
-                      setEditingCriteria(null);
-                      setIsModalVisible(true);
-                    }}
-                  >
-                    Thêm 1 tiêu chí
-                  </Button>
-                </div>
-              )}
-            />
-          </Card>
-
-          <CriteriaFormModal
-            visible={isModalVisible}
-            title={editingCriteria ? "Cập nhật tiêu chí" : "Thêm tiêu chí"}
-            initialValues={editingCriteria}
-            onCancel={() => {
-              setIsModalVisible(false);
-              setEditingCriteria(null);
-            }}
-            onFinish={(vals) => {
-              handleSaveCriteria(vals, editingCriteria?.id);
-              setIsModalVisible(false);
-            }}
+            <Select
+              placeholder="Loại"
+              allowClear
+              onChange={setFilterType}
+              style={{ width: 150 }}
+            >
+              {CRITERIA_TYPES.map((t) => (
+                <Select.Option key={t} value={t}>
+                  {t}
+                </Select.Option>
+              ))}
+            </Select>
+          </div>
+          <Table
+            columns={columns}
+            dataSource={filteredCriteria}
+            rowKey="id"
+            pagination={{ pageSize: 5 }}
           />
-
-          <CriteriaCloneModal
-            visible={isCloneVisible}
-            onCancel={() => setIsCloneVisible(false)}
-            onClone={executeClone}
-            {...{
-              currentHackathonId: hackathonId,
-              hackathonRounds,
-              hackathonTracks,
-              currentRound,
-              selectedRoundId,
-              selectedTrackId,
-            }}
-          />
-
-          <CriteriaBatchModal
-            visible={isBatchVisible}
-            onCancel={() => setIsBatchVisible(false)}
-            onFinish={(items) => {
-              handleBatchSaveCriteria(items);
-              setIsBatchVisible(false);
-            }}
-          />
-        </>
+          <Divider />
+          <Space style={{ display: "flex", justifyContent: "center" }}>
+            <Button
+              icon={<Copy size={16} />}
+              onClick={() => setIsCloneVisible(true)}
+            >
+              Sao chép
+            </Button>
+            <Button
+              icon={<FileText size={16} />}
+              onClick={() => setIsBatchVisible(true)}
+            >
+              Thêm nhiều
+            </Button>
+            <Button
+              type="primary"
+              icon={<Plus size={16} />}
+              onClick={() => {
+                setEditingCriteria(null);
+                setIsModalVisible(true);
+              }}
+            >
+              Thêm mới
+            </Button>
+          </Space>
+        </Card>
       )}
+      <CriteriaFormModal
+        visible={isModalVisible}
+        title={editingCriteria ? "Sửa" : "Thêm"}
+        initialValues={editingCriteria}
+        onCancel={() => setIsModalVisible(false)}
+        onFinish={(v) => {
+          handleSaveCriteria(v, editingCriteria?.id);
+          setIsModalVisible(false);
+        }}
+      />
+      <CriteriaCloneModal
+        visible={isCloneVisible}
+        onCancel={() => setIsCloneVisible(false)}
+        onClone={executeClone}
+        {...{
+          currentHackathonId: hackathonId,
+          hackathonRounds,
+          hackathonTracks,
+          currentRound,
+          selectedRoundId,
+          selectedTrackId,
+        }}
+      />
+      <CriteriaBatchModal
+        visible={isBatchVisible}
+        onCancel={() => setIsBatchVisible(false)}
+        onFinish={(i) => {
+          handleBatchSaveCriteria(i);
+          setIsBatchVisible(false);
+        }}
+      />
     </div>
   );
 };
-
 export default CriteriaManagementPage;

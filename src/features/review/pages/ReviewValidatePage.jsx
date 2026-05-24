@@ -124,10 +124,8 @@ const ReviewValidatePage = ({ hackathonId: propHackathonId }) => {
       </style>
       <div
         style={{
-          backgroundColor: token.colorBgLayout,
           minHeight: "100vh",
-          padding: "40px 24px",
-          margin: "-24px",
+          padding: "24px 0",
         }}
       >
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>

@@ -9,23 +9,27 @@ import {
   Row,
   Col,
   Divider,
+  theme,
 } from "antd";
-import { PlusOutlined, MinusCircleOutlined } from "@ant-design/icons";
-
-const { Option } = Select;
-const CRITERIA_TYPES = ["TECHNICAL", "SOFT_SKILL", "PENALTY"];
+import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { CRITERIA_TYPES } from "../constants/criteria.constants";
 
 export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
   const [form] = Form.useForm();
+  const { token } = theme.useToken();
 
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
-      if (values.items && values.items.length > 0) {
+      if (values.items?.length > 0) {
         onFinish(values.items);
         form.resetFields();
       }
     } catch (err) {}
+  };
+
+  const preventNegative = (e) => {
+    if (e.key === "-" || e.key === "e") e.preventDefault();
   };
 
   return (
@@ -37,8 +41,10 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
         form.resetFields();
         onCancel();
       }}
-      width={1100}
+      width={1200}
       destroyOnClose
+      style={{ top: 30 }}
+      styles={{ content: { borderRadius: 16 } }}
     >
       <Form
         form={form}
@@ -49,22 +55,22 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
           ],
         }}
       >
-        <Row gutter={8} style={{ marginBottom: 8, fontWeight: "bold" }}>
-          <Col span={5}>
-            Tên tiêu chí <span style={{ color: "red" }}>*</span>
-          </Col>
-          <Col span={4}>
-            Phân loại <span style={{ color: "red" }}>*</span>
-          </Col>
-          <Col span={3}>
-            Trọng số <span style={{ color: "red" }}>*</span>
-          </Col>
-          <Col span={3}>
-            Điểm tối đa <span style={{ color: "red" }}>*</span>
-          </Col>
-          <Col span={8}>
-            Mô tả <span style={{ color: "red" }}>*</span>
-          </Col>
+        <Row
+          gutter={16}
+          style={{
+            marginBottom: 12,
+            padding: "0 8px",
+            color: token.colorTextSecondary,
+            fontWeight: 600,
+            fontSize: 13,
+            textTransform: "uppercase",
+          }}
+        >
+          <Col span={5}>Tên tiêu chí *</Col>
+          <Col span={4}>Phân loại *</Col>
+          <Col span={3}>Trọng số *</Col>
+          <Col span={3}>Điểm tối đa *</Col>
+          <Col span={8}>Mô tả *</Col>
           <Col span={1}></Col>
         </Row>
         <Form.List name="items">
@@ -72,31 +78,31 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
             <>
               {fields.map(({ key, name, ...restField }) => (
                 <Row
-                  gutter={8}
+                  gutter={16}
                   key={key}
-                  style={{ marginBottom: 16 }}
+                  style={{ marginBottom: 12 }}
                   align="top"
                 >
                   <Col span={5}>
                     <Form.Item
                       {...restField}
                       name={[name, "name"]}
-                      rules={[{ required: true, message: "Nhập tên" }]}
+                      rules={[{ required: true }]}
                     >
-                      <Input placeholder="Nhập tên tiêu chí..." />
+                      <Input placeholder="Tên tiêu chí..." />
                     </Form.Item>
                   </Col>
                   <Col span={4}>
                     <Form.Item
                       {...restField}
                       name={[name, "type"]}
-                      rules={[{ required: true, message: "Chọn loại" }]}
+                      rules={[{ required: true }]}
                     >
                       <Select placeholder="Phân loại">
                         {CRITERIA_TYPES.map((t) => (
-                          <Option key={t} value={t}>
+                          <Select.Option key={t} value={t}>
                             {t}
-                          </Option>
+                          </Select.Option>
                         ))}
                       </Select>
                     </Form.Item>
@@ -105,14 +111,14 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
                     <Form.Item
                       {...restField}
                       name={[name, "weight"]}
-                      rules={[{ required: true, message: "Nhập TS" }]}
+                      rules={[{ required: true }]}
                     >
                       <InputNumber
                         style={{ width: "100%" }}
                         min={0.01}
                         max={1}
                         step={0.05}
-                        placeholder="Trọng số"
+                        onKeyDown={preventNegative}
                       />
                     </Form.Item>
                   </Col>
@@ -120,13 +126,13 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
                     <Form.Item
                       {...restField}
                       name={[name, "max_score"]}
-                      rules={[{ required: true, message: "Nhập Max" }]}
+                      rules={[{ required: true }]}
                     >
                       <InputNumber
                         style={{ width: "100%" }}
                         min={1}
                         max={100}
-                        placeholder="Điểm max"
+                        onKeyDown={preventNegative}
                       />
                     </Form.Item>
                   </Col>
@@ -134,49 +140,46 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
                     <Form.Item
                       {...restField}
                       name={[name, "description"]}
-                      rules={[{ required: true, message: "Nhập mô tả" }]}
+                      rules={[{ required: true }]}
                     >
-                      <Input placeholder="Mô tả chi tiết..." />
+                      <Input placeholder="Mô tả..." />
                     </Form.Item>
                   </Col>
                   <Col
                     span={1}
                     style={{
                       display: "flex",
-                      alignItems: "center",
                       justifyContent: "center",
-                      height: "32px",
+                      marginTop: 4,
                     }}
                   >
-                    <MinusCircleOutlined
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
                       onClick={() => remove(name)}
-                      style={{
-                        color: "#ff4d4f",
-                        fontSize: "18px",
-                        cursor: "pointer",
-                      }}
                     />
                   </Col>
                 </Row>
               ))}
-              <Divider style={{ margin: "12px 0" }} />
-              <Form.Item>
-                <Button
-                  type="dashed"
-                  onClick={() =>
-                    add({
-                      type: "TECHNICAL",
-                      weight: 0.1,
-                      max_score: 10,
-                      display_order: fields.length + 1,
-                    })
-                  }
-                  block
-                  icon={<PlusOutlined />}
-                >
-                  Thêm một dòng tiêu chí mới
-                </Button>
-              </Form.Item>
+              <Divider style={{ margin: "16px 0" }} />
+              <Button
+                type="dashed"
+                size="large"
+                onClick={() =>
+                  add({
+                    type: "TECHNICAL",
+                    weight: 0.1,
+                    max_score: 10,
+                    display_order: fields.length + 1,
+                  })
+                }
+                block
+                icon={<PlusOutlined />}
+                style={{ borderRadius: 8 }}
+              >
+                Thêm dòng tiêu chí
+              </Button>
             </>
           )}
         </Form.List>

@@ -1,8 +1,4 @@
-export const CRITERIA_TYPES = {
-  TECHNICAL: 'TECHNICAL',
-  SOFT_SKILL: 'SOFT_SKILL',
-  PENALTY: 'PENALTY',
-};
+export const CRITERIA_TYPES = ['TECHNICAL', 'SOFT_SKILL', 'PENALTY'];
 
 export const CRITERIA_COLORS = {
   TECHNICAL: 'blue',
