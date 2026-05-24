@@ -1,123 +1,52 @@
 import React, { useState } from 'react';
-import { Card, Button, Table, Tag, Modal, Form, Input, DatePicker, Select, Switch, message, notification, Calendar, Badge, Radio } from 'antd';
-import { Plus, List, Calendar as CalendarIcon } from 'lucide-react';
+import { Card, Button, Table, Form, Input, Modal, Select, Tag, Radio, Badge, Calendar, Space, Spin, Popconfirm, DatePicker, Switch } from 'antd';
+import { Plus, List, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
 import dayjs from 'dayjs';
 import { useAppContext } from '../../../app/AppContext';
+import { useEventManagement } from '../hooks/useEventManagement';
 
 const { TextArea } = Input;
 
 const EventManagementPage = ({ hackathonId }) => {
-  const { events, addEvent, hackathons, addNotification } = useAppContext();
+  const { addNotification } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
+  const [viewMode, setViewMode] = useState('list');
   const [form] = Form.useForm();
-  
-  const currentHackathon = hackathons.find(h => h.id === hackathonId);
-  const hackathonEvents = events.filter(e => e.hackathon_id === hackathonId);
 
-  // MOCK NOTIFICATION 
-  const openNotification = (title, desc) => {
-    notification.info({
-      message: <strong>{title}</strong>,
-      description: desc,
-      placement: 'bottomRight',
-      duration: 5,
-    });
-  };
+  // Gọi API thông qua Custom Hook thay vì dùng Mock Data
+  const { events, isLoading, createEvent, deleteEvent } = useEventManagement(hackathonId, addNotification);
 
   const handleFinish = (values) => {
-    const eStart = dayjs(values.starts_at);
-    const eEnd = values.ends_at ? dayjs(values.ends_at) : null;
-    const hStart = currentHackathon?.event_start ? dayjs(currentHackathon.event_start) : null;
-    const hEnd = currentHackathon?.event_end ? dayjs(currentHackathon.event_end).add(1, 'day') : null;
-    const rStart = currentHackathon?.registration_start ? dayjs(currentHackathon.registration_start) : hStart;
-
-    // --- LỚP 1: Chặn cứng (Nằm ngoài khung giải đấu) ---
-    if (hStart && hEnd) {
-      const minStartTime = values.type === 'WORKSHOP' ? rStart : hStart;
-      if (eStart.isBefore(minStartTime) || (eEnd && eEnd.isAfter(hEnd))) {
-        return message.error(`Lỗi Lớp 1: Thời gian không hợp lệ. ${values.type === 'WORKSHOP' ? 'Workshop phải nằm trong hoặc sau thời gian đăng ký' : 'Sự kiện phải nằm trong thời gian giải đấu'}.`);
-      }
-    }
-
-    // --- LỚP 2: Chặn cứng (Chồng lấn KICKOFF hoặc AWARDS) ---
-    const isOverlap = hackathonEvents.some(e => {
-      if ((values.type === 'KICKOFF' && e.type === 'KICKOFF') || (values.type === 'AWARDS' && e.type === 'AWARDS')) {
-        const existStart = dayjs(e.starts_at);
-        const existEnd = e.ends_at ? dayjs(e.ends_at) : existStart.add(1, 'hour');
-        return eStart.isBefore(existEnd) && (eEnd ? eEnd.isAfter(existStart) : eStart.isAfter(existStart));
-      }
-      return false;
-    });
-
-    if (isOverlap) {
-      return message.error(`Lỗi Lớp 2: Đã có sự kiện ${values.type} trong khoảng thời gian này!`);
-    }
-
-    // --- LỚP 3: Logic tùy chỉnh theo yêu cầu mới ---
-    const kickoffEvent = hackathonEvents.find(e => e.type === 'KICKOFF');
-    const kickoffStart = kickoffEvent ? dayjs(kickoffEvent.starts_at) : hStart;
-    const regEnd = currentHackathon?.registration_end ? dayjs(currentHackathon.registration_end) : null;
-
-    // 🔴 CHẶN CỨNG ĐỐI VỚI WORKSHOP 
-    if (values.type === 'WORKSHOP') {
-      if (regEnd && eStart.isBefore(regEnd)) {
-        return message.error('WORKSHOP training nên diễn ra sau ngày đóng đăng ký.');
-      }
-      if (kickoffStart && eStart.isAfter(kickoffStart)) {
-        return message.error('WORKSHOP training nên diễn ra trước ngày Khai mạc (Kick-off).');
-      }
-    }
-
-    // 🟡 CẢNH BÁO MỀM (Chỉ còn áp dụng cho KICKOFF nếu diễn ra quá muộn)
-    let warningMsg = '';
-    if (values.type === 'KICKOFF' && hStart && eStart.isAfter(hStart.add(1, 'day'))) {
-      warningMsg = 'KICKOFF nên nằm trong ngày đầu tiên của sự kiện.';
-    }
-
-    const saveEvent = () => {
-      const formattedValues = {
-        ...values,
-        starts_at: values.starts_at?.format('YYYY-MM-DD HH:mm'),
-        ends_at: values.ends_at?.format('YYYY-MM-DD HH:mm'),
-      };
-      addEvent({ ...formattedValues, hackathon_id: hackathonId });
-      message.success('Đã tạo lịch sự kiện thành công');
+    createEvent(values, () => {
       setIsModalOpen(false);
-      
-      addNotification({
-        type: 'REMINDER',
-        title: 'Reminder Created',
-        description: `Hệ thống đã tự động lên lịch nhắc nhở cho sự kiện: ${values.title}`
-      });
-      
-      notification.info({
-        message: <strong>Reminder Scheduled</strong>,
-        description: `Hệ thống đã tự động lên lịch nhắc nhở (type=REMINDER) cho sự kiện: ${values.title}`,
-        placement: 'bottomRight',
-      });
-    };
-
-    if (warningMsg) {
-      Modal.confirm({
-        title: 'Cảnh báo (Thứ tự Logic)',
-        content: `${warningMsg} Bạn có chắc chắn muốn bỏ qua cảnh báo và lưu không?`,
-        onOk: saveEvent
-      });
-    } else {
-      saveEvent();
-    }
+      form.resetFields();
+    });
   };
 
   const columns = [
     { title: 'Tên sự kiện', dataIndex: 'title', key: 'title', render: text => <strong>{text}</strong> },
     { title: 'Loại', dataIndex: 'type', key: 'type', render: type => <Tag color="purple">{type}</Tag> },
-    { title: 'Bắt đầu', dataIndex: 'starts_at', key: 'starts' },
-    { title: 'Kết thúc', dataIndex: 'ends_at', key: 'ends' },
+    { title: 'Bắt đầu', dataIndex: 'starts_at', key: 'starts', render: text => dayjs(text).format('YYYY-MM-DD HH:mm') },
+    { title: 'Kết thúc', dataIndex: 'ends_at', key: 'ends', render: text => text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '-' },
     { title: 'Trạng thái', dataIndex: 'is_public', key: 'public', render: (pub) => pub ? <Tag color="green">Mở</Tag> : <Tag>Đóng</Tag> },
+    {
+      title: 'Thao tác',
+      key: 'actions',
+      width: 80,
+      render: (_, record) => (
+        <Popconfirm
+          title="Xóa sự kiện"
+          description="Bạn có chắc chắn muốn xóa sự kiện này?"
+          onConfirm={() => deleteEvent(record.id)}
+          okText="Xóa"
+          cancelText="Hủy"
+        >
+          <Button type="text" danger icon={<Trash2 size={16} />} />
+        </Popconfirm>
+      ),
+    },
   ];
 
-  // LOGIC RENDER CALENDAR CELL
   const getBadgeStatus = (type) => {
     switch (type) {
       case 'KICKOFF': return 'error';
@@ -128,7 +57,7 @@ const EventManagementPage = ({ hackathonId }) => {
   };
 
   const dateCellRender = (value) => {
-    const listData = hackathonEvents.filter(e => dayjs(e.starts_at).isSame(value, 'day'));
+    const listData = events.filter(e => dayjs(e.starts_at).isSame(value, 'day'));
     return (
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {listData.map((item) => (
@@ -159,14 +88,16 @@ const EventManagementPage = ({ hackathonId }) => {
       </div>
 
       <Card styles={{ body: { padding: viewMode === 'calendar' ? 0 : 24 } }}>
-        {viewMode === 'list' ? (
-          <Table scroll={{ x: 'max-content' }} dataSource={hackathonEvents} columns={columns} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có sự kiện nào được tạo.' }} />
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}><Spin size="large" /></div>
+        ) : viewMode === 'list' ? (
+          <Table scroll={{ x: 'max-content' }} dataSource={events} columns={columns} rowKey="id" pagination={false} locale={{ emptyText: 'Chưa có sự kiện nào được tạo.' }} />
         ) : (
           <Calendar cellRender={cellRender} />
         )}
       </Card>
 
-      <Modal title="Tạo Lịch Sự kiện" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} width={700} okText="Lưu">
+      <Modal title="Tạo Lịch Sự kiện" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} width={700} okText="Lưu" confirmLoading={isLoading}>
         <Form form={form} layout="vertical" onFinish={handleFinish} initialValues={{ is_public: true }}>
           <Form.Item name="title" label="Tiêu đề Sự kiện" rules={[{ required: true }]}><Input placeholder="VD: Lễ Trao giải Hackathon" /></Form.Item>
           
@@ -203,8 +134,41 @@ const EventManagementPage = ({ hackathonId }) => {
             </Form.Item>
           </div>
 
-          <Form.Item name="location" label="Địa điểm (Offline)"><Input placeholder="VD: Tòa nhà Beta" /></Form.Item>
-          <Form.Item name="meet_url" label="Link Họp (Online)"><Input placeholder="https://meet.google.com/..." /></Form.Item>
+          <Form.Item 
+            name="location" 
+            label="Địa điểm (Offline)"
+            dependencies={['meet_url']}
+            rules={[
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (value || getFieldValue('meet_url')) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('Bắt buộc nhập Địa điểm HOẶC Link họp'));
+                },
+              }),
+            ]}
+          >
+            <Input placeholder="VD: Tòa nhà Beta" />
+          </Form.Item>
+
+          <Form.Item 
+            name="meet_url" 
+            label="Link Họp (Online)"
+            dependencies={['location']}
+            rules={[
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (value || getFieldValue('location')) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('Bắt buộc nhập Địa điểm HOẶC Link họp'));
+                },
+              }),
+            ]}
+          >
+            <Input placeholder="https://meet.google.com/..." />
+          </Form.Item>
           <Form.Item name="description" label="Mô tả"><TextArea rows={3} /></Form.Item>
         </Form>
       </Modal>
