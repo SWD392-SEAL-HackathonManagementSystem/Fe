@@ -112,17 +112,6 @@ export const CriteriaHeader = ({
               ? currentRound.name
               : `${currentRound.name} — Bảng: ${roundTracks?.find((t) => t.id === selectedTrackId)?.name}`}
           </Title>
-          <Space size="middle">
-            <Text strong style={{ color: token.colorTextSecondary }}>
-              Kích hoạt vòng thi:
-            </Text>
-            <Switch
-              checked={currentRound?.is_active}
-              onChange={(checked) =>
-                updateRound(currentRound.id, { is_active: checked })
-              }
-            />
-          </Space>
         </div>
       )}
     </div>
