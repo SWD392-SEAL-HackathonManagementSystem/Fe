@@ -11,7 +11,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
   const { people, addPerson, assignments, assignRole, removeAssignment, addNotification } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // SỬA LỖI: Khởi tạo 3 form độc lập để không bị xung đột (đơ nút)
+  // Khởi tạo 3 form độc lập để không bị xung đột (đơ nút)
   const [inviteForm] = Form.useForm();
   const [mentorForm] = Form.useForm();
   const [judgeForm] = Form.useForm();
@@ -51,10 +51,10 @@ const PeopleManagementPage = ({ hackathonId }) => {
 
   const checkIsFinalRound = (round) => {
     if (!round) return false;
-    return round.is_final || round.name.toLowerCase().includes('chung kết') || round.name.toLowerCase().includes('final');
+    // Đã gộp code của nhánh main (thêm !! để an toàn kiểu dữ liệu)
+    return !!round.is_final || round.name.toLowerCase().includes('chung kết') || round.name.toLowerCase().includes('final');
   };
 
-  // SỬA LỖI: Nhận thêm biến formInstance để reset dữ liệu sau khi submit thành công
   const handleAssign = (values, type, formInstance) => {
     let assignTrackId = values.track_id;
     let assignRoundId = values.round_id;
@@ -141,7 +141,6 @@ const PeopleManagementPage = ({ hackathonId }) => {
 
           <Tabs.TabPane tab="Phân công người hướng dẫn" key="2">
              <Card type="inner" style={{ marginBottom: 24, background: '#fafafa' }}>
-               {/* Sử dụng mentorForm ở đây */}
                <Form layout="inline" onFinish={(vals) => handleAssign(vals, 'MENTOR', mentorForm)} form={mentorForm}>
                   <Form.Item name="person_id" rules={[{ required: true, message: 'Chọn Mentor' }]}>
                     <Select placeholder="Chọn người hướng dẫn" style={{ width: 220 }}>
@@ -165,7 +164,6 @@ const PeopleManagementPage = ({ hackathonId }) => {
 
           <Tabs.TabPane tab="Phân công giám khảo" key="3">
              <Card type="inner" style={{ marginBottom: 24, background: '#fafafa' }}>
-               {/* Sử dụng judgeForm ở đây */}
                <Form layout="inline" onFinish={(vals) => handleAssign(vals, 'JUDGE', judgeForm)} form={judgeForm} initialValues={{ assignment_type: 'NORMAL' }}>
                   <Form.Item name="person_id" rules={[{ required: true, message: 'Chọn GK' }]}>
                     <Select placeholder="Chọn giám khảo" style={{ width: 220 }}>
@@ -175,10 +173,10 @@ const PeopleManagementPage = ({ hackathonId }) => {
                   <Form.Item name="assignment_target" rules={[{ required: true, message: 'Chọn hạng mục chấm' }]}>
                     <Select placeholder="Chọn Bảng đấu / Vòng thi" style={{ width: 280 }}>
                         <Select.OptGroup label="Chấm Sơ loại (Theo Bảng đấu)">
-    {tracks.map(t => (
-        <Option key={`TRACK_${t.id}`} value={`TRACK_${t.id}`}>{t.name}</Option>
-    ))}
-</Select.OptGroup>
+                            {tracks.map(t => (
+                                <Option key={`TRACK_${t.id}`} value={`TRACK_${t.id}`}>{t.name}</Option>
+                            ))}
+                        </Select.OptGroup>
                         <Select.OptGroup label="Chấm Chung kết (Toàn Vòng)">
                             {rounds.filter(checkIsFinalRound).map(r => (
                                 <Option key={`ROUND_${r.id}`} value={`ROUND_${r.id}`}>{r.name} (Vòng Chung kết)</Option>
@@ -206,7 +204,6 @@ const PeopleManagementPage = ({ hackathonId }) => {
         </Tabs>
       </Card>
 
-      {/* Sử dụng inviteForm ở đây */}
       <Modal title="Mời Giám khảo khách mời" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => inviteForm.submit()} okText="Gửi lời mời">
          <Form form={inviteForm} layout="vertical" onFinish={handleAddGuestJudge}>
             <Form.Item name="name" label="Họ và Tên" rules={[{ required: true, message: 'Bắt buộc nhập' }]}><Input placeholder="VD: Nguyễn Văn A" /></Form.Item>

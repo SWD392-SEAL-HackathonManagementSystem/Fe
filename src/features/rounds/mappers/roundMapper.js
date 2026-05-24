@@ -1,10 +1,20 @@
 import dayjs from 'dayjs';
 
+const formatDateTime = (value) =>
+  value ? dayjs(value).format('YYYY-MM-DDTHH:mm:ss') : null;
+
+export const sortRoundsByExamAt = (rounds) => {
+  if (!rounds?.length) return rounds ?? [];
+  return [...rounds].sort(
+    (a, b) => dayjs(a.exam_at).valueOf() - dayjs(b.exam_at).valueOf()
+  );
+};
+
 export const mapRoundToFE = (beData) => {
   if (!beData) return null;
   return {
     ...beData,
-    sequence_order: beData.sequenceOrder,
+    exam_at: beData.examAt,
     is_final: beData.isFinal,
     round_type: beData.roundType,
     late_submission_policy: beData.lateSubmissionPolicy,
@@ -23,20 +33,33 @@ export const mapRoundToFE = (beData) => {
 
 export const mapRoundToBE = (feData) => {
   if (!feData) return null;
-  return {
+  const isFinal = !!feData.is_final;
+
+  const payload = {
     name: feData.name,
-    sequenceOrder: feData.sequence_order ? parseInt(feData.sequence_order) : 1,
-    isFinal: !!feData.is_final,
+    examAt: formatDateTime(feData.exam_at),
+    isFinal,
     roundType: feData.round_type || 'PRELIMINARY',
     lateSubmissionPolicy: feData.late_submission_policy || 'HARD_LOCK',
-    submissionOpen: feData.submission_open ? dayjs(feData.submission_open).format('YYYY-MM-DDTHH:mm:ss') : null,
-    submissionDeadline: feData.submission_deadline ? dayjs(feData.submission_deadline).format('YYYY-MM-DDTHH:mm:ss') : null,
-    codingDurationHours: feData.coding_duration_hours ? parseInt(feData.coding_duration_hours) : null,
+    submissionOpen: formatDateTime(feData.submission_open),
+    submissionDeadline: formatDateTime(feData.submission_deadline),
+    codingDurationHours: feData.coding_duration_hours
+      ? parseInt(feData.coding_duration_hours, 10)
+      : null,
     problemStatementUrl: feData.problem_statement_url,
-    problemReleasedAt: feData.problem_released_at ? dayjs(feData.problem_released_at).format('YYYY-MM-DDTHH:mm:ss') : null,
-    topNAdvance: feData.top_n_advance ? parseInt(feData.top_n_advance) : null,
+    problemReleasedAt: formatDateTime(feData.problem_released_at),
     wildcardEnabled: !!feData.wildcard_enabled,
-    minTeamsFinal: feData.min_teams_final ? parseInt(feData.min_teams_final) : null,
     tiebreakRule: feData.tiebreak_rule || 'PENALTY_SCORE',
   };
+
+  if (!isFinal) {
+    payload.topNAdvance = feData.top_n_advance
+      ? parseInt(feData.top_n_advance, 10)
+      : null;
+    payload.minTeamsFinal = feData.min_teams_final
+      ? parseInt(feData.min_teams_final, 10)
+      : null;
+  }
+
+  return payload;
 };

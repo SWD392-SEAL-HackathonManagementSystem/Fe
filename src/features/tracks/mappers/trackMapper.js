@@ -17,7 +17,6 @@ export const mapTrackToBE = (feData) => {
     name: feData.name,
     description: feData.description,
     topic: feData.topic,
-    sequenceOrder: feData.sequence_order ? parseInt(feData.sequence_order) : 1,
     maxTeams: feData.max_teams ? parseInt(feData.max_teams) : null,
     maxTeamsPerGroup: feData.max_teams_per_group ? parseInt(feData.max_teams_per_group) : null,
     minTeamSize: feData.min_team_size ? parseInt(feData.min_team_size) : 1,
