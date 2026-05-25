@@ -128,16 +128,17 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
                 </span>
               }
               dependencies={['submission_open']}
+              validateTrigger={['onChange', 'onBlur']}
               rules={[
                 { required: true, message: 'Vui lòng chọn ngày giờ thi' },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     const open = getFieldValue('submission_open');
-                    if (!value || !open || !dayjs(value).isBefore(dayjs(open))) {
+                    if (!value || !open || dayjs(value).isBefore(dayjs(open))) {
                       return Promise.resolve();
                     }
                     return Promise.reject(
-                      new Error('Ngày thi phải sau thời điểm mở nộp bài')
+                      new Error('Ngày giờ thi phải trước thời điểm mở nộp bài')
                     );
                   },
                 }),
@@ -155,6 +156,20 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
               name="submission_open"
               label="Mở nộp bài"
               dependencies={['exam_at', 'submission_deadline']}
+              validateTrigger={['onChange', 'onBlur']}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const examAt = getFieldValue('exam_at');
+                    if (!value || !examAt || dayjs(value).isAfter(dayjs(examAt))) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(
+                      new Error('Thời điểm mở nộp bài phải sau ngày giờ thi')
+                    );
+                  },
+                }),
+              ]}
             >
               <DatePicker
                 showTime

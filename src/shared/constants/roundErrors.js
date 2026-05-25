@@ -3,7 +3,7 @@ export const ROUND_ERROR_MESSAGES = {
   ROUND_PRELIM_EXAM_ORDER: 'Ngày thi Sơ loại phải trước Chung kết',
   ROUND_FINAL_REQUIRES_PRELIM: 'Tạo vòng Sơ loại trước',
   ROUND_DUPLICATE_FINAL: 'Đã có vòng Chung kết',
-  ROUND_EXAM_BEFORE_SUBMISSION_OPEN: 'Ngày thi phải sau thời điểm mở nộp bài',
+  ROUND_EXAM_BEFORE_SUBMISSION_OPEN: 'Ngày giờ thi phải trước thời điểm mở nộp bài',
 };
 
 export const getRoundErrorMessage = (error) => {
