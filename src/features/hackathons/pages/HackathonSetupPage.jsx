@@ -76,7 +76,7 @@ const HackathonSetupPage = () => {
     {
       key: 'rounds',
       label: 'Vòng thi (Rounds)',
-      children: <RoundManagementPage hackathonId={hackathon.id} />,
+      children: <RoundManagementPage hackathonId={hackathon.id} hackathon={hackathon} />,
     },
     {
       key: 'tracks',

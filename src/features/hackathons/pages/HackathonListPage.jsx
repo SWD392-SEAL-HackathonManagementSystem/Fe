@@ -136,9 +136,11 @@ const HackathonListPage = () => {
       ) : (
         <Row gutter={[24, 24]}>
           {filteredHackathons.map((hackathon) => (
-            <Col xs={24} sm={12} lg={8} key={hackathon.id}>
+            <Col xs={24} sm={12} lg={8} key={hackathon.id} style={{ display: 'flex' }}>
               <Card
                 hoverable
+                style={{ width: '100%', display: 'flex', flexDirection: 'column' }}
+                bodyStyle={{ flex: 1 }}
                 cover={
                   <div style={{ height: 160, overflow: 'hidden', position: 'relative' }}>
                     <img
