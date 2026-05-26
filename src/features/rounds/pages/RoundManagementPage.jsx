@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Space, Popconfirm, message, Timeline, Tag, Card, Spin, Typography } from 'antd';
+import { Table, Button, Space, Popconfirm, message, Timeline, Tag, Card, Spin, Typography, Modal } from 'antd';
 import { Plus, Edit, Trash2, Calendar, List } from 'lucide-react';
 import RoundFormModal from '../components/RoundFormModal';
 import { roundService } from '../services/roundService';
@@ -10,7 +10,7 @@ import dayjs from 'dayjs';
 
 const { Title } = Typography;
 
-const RoundManagementPage = ({ hackathonId }) => {
+const RoundManagementPage = ({ hackathonId, hackathon }) => {
   const [rounds, setRounds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -95,7 +95,18 @@ const RoundManagementPage = ({ hackathonId }) => {
           await roundService.activate(roundId, { note: 'Kích hoạt từ giao diện cấu hình' });
           message.success(editingRound ? 'Đã cập nhật và kích hoạt vòng thi thành công' : 'Đã tạo và kích hoạt vòng thi thành công');
         } catch (actError) {
-          message.warning(`Đã lưu vòng thi, nhưng chưa thể kích hoạt: ${actError.message || 'Thiếu tiêu chí đánh giá hoặc phân công giám khảo'}`);
+          Modal.error({
+            title: 'Không thể kích hoạt vòng thi',
+            content: (
+              <div>
+                <p>Vòng thi chưa đủ điều kiện để hoạt động. Vui lòng kiểm tra lại:</p>
+                <div style={{ padding: '8px', backgroundColor: '#fff2f0', border: '1px solid #ffccc7', borderRadius: '4px', color: '#ff4d4f' }}>
+                  {actError.response?.data?.message || actError.response?.data?.error?.message || actError.message || 'Thiếu tiêu chí đánh giá hoặc chưa phân công giám khảo'}
+                </div>
+                <p style={{ marginTop: 8, fontSize: '13px' }}>Vòng thi đã được lưu thành công ở trạng thái "Ngưng hoạt động". Bạn hãy cấu hình đầy đủ tiêu chí trước khi bật kích hoạt nhé.</p>
+              </div>
+            )
+          });
         }
       } else {
         message.success(editingRound ? 'Đã cập nhật vòng thi thành công' : 'Đã tạo vòng thi mới thành công');
@@ -281,6 +292,7 @@ const RoundManagementPage = ({ hackathonId }) => {
           title={editingRound ? 'Sửa vòng thi' : 'Thêm vòng thi'}
           initialValues={editingRound}
           existingRounds={rounds}
+          hackathon={hackathon}
           onCancel={() => setIsModalVisible(false)}
           onFinish={handleModalFinish}
         />

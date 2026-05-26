@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 
 const { Option } = Select;
 
-const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, existingRounds = [] }) => {
+const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, existingRounds = [], hackathon }) => {
   const [form] = Form.useForm();
   const isFinal = Form.useWatch('is_final', form);
   const hasPrelimRound = existingRounds.some((r) => !r.is_final);
@@ -24,6 +24,59 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
       }
     }
   }, [visible, initialValues, form]);
+
+  const prelimRound = existingRounds.find(r => !r.is_final && r.id !== initialValues?.id);
+  const finalRound = existingRounds.find(r => r.is_final && r.id !== initialValues?.id);
+
+  const getDisabledDate = (current) => {
+    if (!current) return false;
+    
+    // Quy tắc: Ít nhất 4 ngày sau ngày kết thúc đăng ký
+    let minDate = dayjs().startOf('day');
+    if (hackathon && hackathon.registration_end) {
+      const regEndPlus4 = dayjs(hackathon.registration_end).add(4, 'day').startOf('day');
+      if (regEndPlus4.isAfter(minDate)) {
+        minDate = regEndPlus4;
+      }
+    }
+    if (current.isBefore(minDate)) return true;
+
+    // Khoá chéo: Vòng Chung kết phải diễn ra sau Sơ loại
+    if (isFinal && prelimRound?.exam_at) {
+      if (current.isBefore(dayjs(prelimRound.exam_at).startOf('day'))) return true;
+    }
+
+    // Khoá chéo: Vòng Sơ loại phải kết thúc trước Chung kết
+    if (!isFinal && finalRound?.submission_open) {
+      if (current.isAfter(dayjs(finalRound.submission_open).endOf('day'))) return true;
+    }
+
+    return false;
+  };
+
+  const getDisabledTime = (current) => {
+    if (!current) return {};
+    const now = dayjs();
+    
+    if (current.isSame(now, 'day')) {
+      return {
+        disabledHours: () => Array.from({ length: 24 }, (_, i) => i).filter(h => h < now.hour()),
+        disabledMinutes: (selectedHour) => {
+          if (selectedHour === now.hour()) {
+            return Array.from({ length: 60 }, (_, i) => i).filter(m => m < now.minute());
+          }
+          return [];
+        },
+        disabledSeconds: (selectedHour, selectedMinute) => {
+          if (selectedHour === now.hour() && selectedMinute === now.minute()) {
+            return Array.from({ length: 60 }, (_, i) => i).filter(s => s < now.second());
+          }
+          return [];
+        }
+      };
+    }
+    return {};
+  };
 
   const handleSubmit = () => {
     form.validateFields()
@@ -61,6 +114,20 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
           wildcard_enabled: false,
           is_final: false,
           round_type: 'PRELIMINARY'
+        }}
+        onValuesChange={(changedValues, allValues) => {
+          if (changedValues.exam_at !== undefined || changedValues.coding_duration_hours !== undefined) {
+            const examAt = allValues.exam_at;
+            const duration = allValues.coding_duration_hours;
+            if (examAt && duration) {
+              const submissionOpen = dayjs(examAt).add(duration * 2/3, 'hour');
+              const submissionDeadline = dayjs(examAt).add(duration, 'hour');
+              form.setFieldsValue({
+                submission_open: submissionOpen,
+                submission_deadline: submissionDeadline,
+              });
+            }
+          }
         }}
       >
         <Form.Item
@@ -147,10 +214,33 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
               <DatePicker 
                 showTime 
                 style={{ width: '100%' }} 
-                disabledDate={(current) => current && current < dayjs().startOf('day')}
+                disabledDate={getDisabledDate}
+                disabledTime={getDisabledTime}
               />
             </Form.Item>
           </Col>
+          <Col span={12}>
+            <Form.Item
+              name="coding_duration_hours"
+              label="Thời gian thi (Giờ)"
+              validateTrigger={['onChange', 'onBlur']}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (value === undefined || value === null || value > 0) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error('Thời lượng phải > 0'));
+                  },
+                }),
+              ]}
+            >
+              <InputNumber min={0.5} step={0.5} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={24}>
           <Col span={12}>
             <Form.Item
               name="submission_open"
@@ -174,13 +264,11 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
               <DatePicker
                 showTime
                 style={{ width: '100%' }}
-                disabledDate={(current) => current && current < dayjs().startOf('day')}
+                disabledDate={getDisabledDate}
+                disabledTime={getDisabledTime}
               />
             </Form.Item>
           </Col>
-        </Row>
-
-        <Row gutter={24}>
           <Col span={12}>
             <Form.Item
               name="submission_deadline"
@@ -203,27 +291,9 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
               <DatePicker
                 showTime
                 style={{ width: '100%' }}
-                disabledDate={(current) => current && current < dayjs().startOf('day')}
+                disabledDate={getDisabledDate}
+                disabledTime={getDisabledTime}
               />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="coding_duration_hours"
-              label="Thời gian thi (Giờ)"
-              validateTrigger={['onChange', 'onBlur']}
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (value === undefined || value === null || value > 0) {
-                      return Promise.resolve();
-                    }
-                    return Promise.reject(new Error('Thời lượng phải > 0'));
-                  },
-                }),
-              ]}
-            >
-              <InputNumber min={0.5} step={0.5} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
         </Row>
