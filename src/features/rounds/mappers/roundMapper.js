@@ -45,7 +45,7 @@ export const mapRoundToBE = (feData) => {
     submissionOpen: formatDateTime(feData.submission_open),
     submissionDeadline: formatDateTime(feData.submission_deadline),
     codingDurationHours: feData.coding_duration_hours
-      ? parseInt(feData.coding_duration_hours, 10)
+      ? parseFloat(feData.coding_duration_hours)
       : null,
     problemStatementUrl: feData.problem_statement_url,
     problemReleasedAt: formatDateTime(feData.exam_at), // Tạm mượn trường này để lưu Ngày giờ thi
