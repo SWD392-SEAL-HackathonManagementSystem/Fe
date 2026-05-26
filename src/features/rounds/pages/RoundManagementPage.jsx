@@ -3,6 +3,8 @@ import { Table, Button, Space, Popconfirm, message, Timeline, Tag, Card, Spin, T
 import { Plus, Edit, Trash2, Calendar, List } from 'lucide-react';
 import RoundFormModal from '../components/RoundFormModal';
 import { roundService } from '../services/roundService';
+import { trackService } from '../../tracks/services/trackService';
+import { criteriaService } from '../../criteria/services/criteriaService';
 import { mapRoundToFE, mapRoundToBE, sortRoundsByExamAt } from '../mappers/roundMapper';
 import { getRoundErrorMessage } from '../../../shared/constants/roundErrors';
 import { formatDate } from '../../../shared/utils/date';
@@ -70,6 +72,80 @@ const RoundManagementPage = ({ hackathonId, hackathon }) => {
   const handleModalFinish = async (values) => {
     try {
       setLoading(true);
+
+      const isActivating = values.is_active && (!editingRound || !editingRound.is_active);
+
+      // Validate activation readiness before saving or activating
+      if (isActivating) {
+        if (!editingRound) {
+          Modal.error({
+            title: 'Không thể kích hoạt vòng thi mới',
+            content: 'Vòng thi mới tạo chưa có bảng đấu và tiêu chí đánh giá. Vui lòng lưu vòng thi ở trạng thái "Ngưng hoạt động" trước, sau đó cấu hình các bảng đấu và tiêu chí đánh giá bên trong rồi mới kích hoạt.',
+          });
+          setLoading(false);
+          return;
+        }
+
+        const roundId = editingRound.id;
+        const isFinal = values.is_final;
+
+        if (isFinal) {
+          const summary = await criteriaService.getWeightSummaryByRound(roundId);
+          const items = summary?.items || [];
+          if (items.length === 0) {
+            Modal.error({
+              title: 'Không thể kích hoạt vòng thi',
+              content: 'Vòng Chung kết chưa có tiêu chí đánh giá nào. Vui lòng tạo tiêu chí đánh giá cho vòng thi này trước.',
+            });
+            setLoading(false);
+            return;
+          }
+          const totalWeight = summary?.total || 0;
+          if (Math.abs(totalWeight - 1) > 0.001) {
+            Modal.error({
+              title: 'Không thể kích hoạt vòng thi',
+              content: `Tổng trọng số các tiêu chí của vòng Chung kết phải bằng 1.0 (100%). Hiện tại đang là: ${(totalWeight * 100).toFixed(1)}%.`,
+            });
+            setLoading(false);
+            return;
+          }
+        } else {
+          const tracks = await trackService.listByRound(roundId);
+          if (!tracks || tracks.length === 0) {
+            Modal.error({
+              title: 'Không thể kích hoạt vòng thi',
+              content: 'Vòng thi chưa có bảng đấu (track) nào. Vui lòng tạo ít nhất một bảng đấu trước.',
+            });
+            setLoading(false);
+            return;
+          }
+
+          for (const track of tracks) {
+            if (track.status === 'CANCELLED') continue;
+
+            const summary = await criteriaService.getWeightSummaryByTrack(track.id);
+            const items = summary?.items || [];
+            if (items.length === 0) {
+              Modal.error({
+                title: 'Không thể kích hoạt vòng thi',
+                content: `Bảng đấu "${track.name}" chưa có tiêu chí đánh giá nào. Vui lòng cấu hình tiêu chí cho bảng đấu này trước.`,
+              });
+              setLoading(false);
+              return;
+            }
+
+            const totalWeight = summary?.total || 0;
+            if (Math.abs(totalWeight - 1) > 0.001) {
+              Modal.error({
+                title: 'Không thể kích hoạt vòng thi',
+                content: `Tổng trọng số các tiêu chí của bảng đấu "${track.name}" phải bằng 1.0 (100%). Hiện tại đang là: ${(totalWeight * 100).toFixed(1)}%.`,
+              });
+              setLoading(false);
+              return;
+            }
+          }
+        }
+      }
 
       if (editingRound) {
         values.sequenceOrder = editingRound.sequenceOrder || editingRound.sequence_order || 1;
