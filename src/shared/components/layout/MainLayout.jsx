@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { Layout, Menu, Button, theme, Input, Badge, Avatar, Space, Popover, List, Typography, Drawer, Grid } from 'antd';
 import { 
   MenuFoldOutlined, 
@@ -53,6 +54,24 @@ const MainLayout = ({ children }) => {
   const handleMenuClick = ({ key }) => {
     if (isMobile) setDrawerVisible(false);
     if (key === ROUTES.DASHBOARD || key === ROUTES.HACKATHONS) navigate(key);
+  };
+
+  const handleBottomMenuClick = async ({ key }) => {
+    if (isMobile) setDrawerVisible(false);
+    if (key === 'logout') {
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (refreshToken) {
+          await axios.post('/api/v1/auth/logout', { refreshToken });
+        }
+      } catch (error) {
+        console.error('Logout error:', error);
+      } finally {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        navigate(ROUTES.LOGIN);
+      }
+    }
   };
 
   // UI Helpers cho Notification
@@ -139,7 +158,7 @@ const MainLayout = ({ children }) => {
       )}
       <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 180px)', justifyContent: 'space-between' }}>
         <Menu mode="inline" selectedKeys={[location.pathname]} items={menuItems} onClick={handleMenuClick} style={{ borderRight: 0 }} />
-        <Menu mode="inline" items={bottomMenuItems} style={{ borderRight: 0, marginBottom: 24 }} onClick={() => { if(isMobile) setDrawerVisible(false); }} />
+        <Menu mode="inline" items={bottomMenuItems} style={{ borderRight: 0, marginBottom: 24 }} onClick={handleBottomMenuClick} />
       </div>
     </>
   );
