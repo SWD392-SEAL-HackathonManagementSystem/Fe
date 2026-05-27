@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
-import { Layout, Menu, Button, theme, Input, Badge, Avatar, Space, Popover, List, Typography, Drawer, Grid } from 'antd';
+import { Layout, Menu, Button, theme, Input, Badge, Avatar, Space, Popover, Typography, Drawer, Grid, Modal } from 'antd';
 import { 
   MenuFoldOutlined, 
   MenuUnfoldOutlined, 
@@ -11,7 +11,8 @@ import {
   LogoutOutlined,
   PlusOutlined,
   SunOutlined,
-  MoonOutlined
+  MoonOutlined,
+  LinkOutlined
 } from '@ant-design/icons';
 import {
   LayoutDashboard, Trophy, Users, Activity, BarChart3, Settings, HelpCircle,
@@ -20,6 +21,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
 import { useAppContext } from '../../../app/AppContext';
+import SocialLinkManager from '../../../features/auth/components/SocialLinkManager';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -28,6 +30,7 @@ const { useBreakpoint } = Grid;
 const MainLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [socialLinkModalOpen, setSocialLinkModalOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
@@ -201,6 +204,12 @@ const MainLayout = ({ children }) => {
               onClick={toggleDarkMode}
               title={darkMode ? "Chuyển sang chế độ sáng" : "Chuyển sang chế độ tối"}
             />
+            <Button
+              type="text"
+              icon={<LinkOutlined style={{ fontSize: 20 }} />}
+              title="Liên kết tài khoản mạng xã hội"
+              onClick={() => setSocialLinkModalOpen(true)}
+            />
             {!isMobile && <Button type="text" icon={<SettingOutlined style={{ fontSize: 20 }} />} />}
             {!isMobile && <Button type="text" icon={<QuestionCircleOutlined style={{ fontSize: 20 }} />} />}
             <Avatar src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" style={{ cursor: 'pointer', border: `2px solid ${token.colorBorder}` }} />
@@ -211,6 +220,15 @@ const MainLayout = ({ children }) => {
           {children}
         </Content>
       </Layout>
+
+      <Modal
+        title="Liên kết tài khoản mạng xã hội"
+        open={socialLinkModalOpen}
+        onCancel={() => setSocialLinkModalOpen(false)}
+        footer={null}
+      >
+        <SocialLinkManager />
+      </Modal>
     </Layout>
   );
 };

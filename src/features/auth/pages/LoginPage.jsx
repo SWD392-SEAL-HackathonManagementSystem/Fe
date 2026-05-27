@@ -1,72 +1,100 @@
-import React, { useState } from 'react';
-import { Form, Input, Button, Typography, message } from 'antd';
-import { MailOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, ArrowRightOutlined, GithubOutlined, GoogleOutlined } from '@ant-design/icons';
+import { useMemo, useState } from 'react';
+import { Form, Input, Button, message, Modal } from 'antd';
+import { MailOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone, ArrowRightOutlined, GithubOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { GoogleSocialButton } from '../components/GoogleSocialButton';
 import { ROUTES } from '../../../shared/constants/routes';
-import { useGoogleLogin } from '@react-oauth/google';
-
-const { Title, Text } = Typography;
+import { authService, persistAuthTokens } from '../services/authService';
+import { resolveOAuthError } from '../constants/oauthErrors';
+import { startGithubOAuth } from '../utils/githubOAuth';
 
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [pendingOAuthAction, setPendingOAuthAction] = useState(null);
+  const [passwordConfirmLoading, setPasswordConfirmLoading] = useState(false);
+  const [passwordForm] = Form.useForm();
   const navigate = useNavigate();
 
-  const loginWithGoogle = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      try {
-        const response = await axios.post('/api/v1/auth/google', {
-          token: tokenResponse.access_token,
-        });
+  const runGoogleOAuthLogin = async (tokenValue, existingAccountPassword) => {
+    if (!tokenValue) {
+      message.error('Không nhận được token từ nhà cung cấp OAuth.');
+      return;
+    }
 
-        const { data } = response;
-        if (data.status === 200 || data.code === 200 || response.status === 200) {
-          message.success('Đăng nhập Google thành công!');
-          const accessToken = data.data?.accessToken || data.accessToken;
-          const refreshToken = data.data?.refreshToken || data.refreshToken;
-          
-          if (accessToken) localStorage.setItem('accessToken', accessToken);
-          if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
-          
-          navigate(ROUTES.DASHBOARD);
-        } else {
-          message.error(data.message || 'Đăng nhập thất bại!');
-        }
-      } catch (error) {
-        console.error('Google login error:', error);
-        message.error('Có lỗi xảy ra khi đăng nhập bằng Google!');
-      } finally {
-        setLoading(false);
+    setLoading(true);
+    try {
+      const authData = await authService.loginWithGoogle(tokenValue, existingAccountPassword);
+
+      persistAuthTokens(authData);
+      message.success('Đăng nhập Google thành công!');
+      navigate(ROUTES.DASHBOARD);
+    } catch (error) {
+      const resolved = resolveOAuthError(error, 'Đăng nhập Google thất bại.');
+      if (resolved.requiresPassword) {
+        setPendingOAuthAction({ provider: 'GOOGLE', tokenValue });
+        setPasswordModalOpen(true);
+        passwordForm.resetFields();
+      } else {
+        message.error(resolved.message);
       }
-    },
-    onError: (error) => {
-      console.error('Google login error:', error);
-      message.error('Đăng nhập Google thất bại!');
-    },
-  });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGithubLogin = () => {
+    try {
+      startGithubOAuth();
+    } catch (error) {
+      message.error(error.message || 'Không thể bắt đầu đăng nhập GitHub.');
+    }
+  };
+
+  const handlePasswordConfirm = async () => {
+    try {
+      const values = await passwordForm.validateFields();
+      if (!pendingOAuthAction) {
+        setPasswordModalOpen(false);
+        return;
+      }
+
+      setPasswordConfirmLoading(true);
+      await runGoogleOAuthLogin(pendingOAuthAction.tokenValue, values.existingAccountPassword);
+      setPasswordModalOpen(false);
+      setPendingOAuthAction(null);
+    } finally {
+      setPasswordConfirmLoading(false);
+    }
+  };
+
+  const socialRowItemStyle = useMemo(
+    () => ({
+      flex: '1 1 0',
+      minWidth: 0,
+    }),
+    []
+  );
+
+  const socialButtonStyle = useMemo(
+    () => ({
+      height: '40px',
+      backgroundColor: '#ffffff',
+      border: '1px solid #d1d5db',
+      color: '#374151',
+      borderRadius: '16px',
+      fontWeight: '600',
+    }),
+    []
+  );
 
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      const response = await axios.post('/api/v1/auth/login', {
-        email: values.email,
-        password: values.password,
-      });
-
-      const { data } = response;
-      if (data.status === 200 || data.code === 200 || response.status === 200) {
-        message.success('Đăng nhập thành công!');
-        const accessToken = data.data?.accessToken || data.accessToken;
-        const refreshToken = data.data?.refreshToken || data.refreshToken;
-        
-        if (accessToken) localStorage.setItem('accessToken', accessToken);
-        if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
-        
-        navigate(ROUTES.DASHBOARD);
-      } else {
-        message.error(data.message || 'Đăng nhập thất bại!');
-      }
+      const authData = await authService.login(values.email, values.password);
+      persistAuthTokens(authData);
+      message.success('Đăng nhập thành công!');
+      navigate(ROUTES.DASHBOARD);
     } catch (error) {
       console.error('Login error:', error);
       const errorMsg = error.response?.data?.error?.message || error.response?.data?.message || 'Có lỗi xảy ra khi đăng nhập. Vui lòng kiểm tra lại thông tin!';
@@ -260,35 +288,26 @@ const LoginPage = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-              <Button
-                icon={<GithubOutlined />}
-                style={{
-                  flex: 1,
-                  height: '40px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #d1d5db',
-                  color: '#374151',
-                  borderRadius: '16px',
-                  fontWeight: '600',
+              <div style={socialRowItemStyle}>
+                <Button
+                  block
+                  icon={<GithubOutlined />}
+                  style={socialButtonStyle}
+                  onClick={handleGithubLogin}
+                  loading={loading}
+                >
+                  GitHub
+                </Button>
+              </div>
+              <GoogleSocialButton
+                wrapperStyle={socialRowItemStyle}
+                buttonStyle={socialButtonStyle}
+                loading={loading}
+                onSuccess={async (credentialResponse) => {
+                  await runGoogleOAuthLogin(credentialResponse?.credential);
                 }}
-              >
-                GitHub
-              </Button>
-              <Button
-                icon={<GoogleOutlined />}
-                onClick={() => loginWithGoogle()}
-                style={{
-                  flex: 1,
-                  height: '40px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #d1d5db',
-                  color: '#374151',
-                  borderRadius: '16px',
-                  fontWeight: '600',
-                }}
-              >
-                Google
-              </Button>
+                onError={() => message.error('Đăng nhập Google thất bại!')}
+              />
             </div>
 
             <div style={{ textAlign: 'center', fontSize: '14px' }}>
@@ -324,6 +343,29 @@ const LoginPage = () => {
           <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>GitHub</a>
         </div>
       </footer>
+
+      <Modal
+        open={passwordModalOpen}
+        title="Xác nhận mật khẩu để liên kết tự động"
+        onCancel={() => {
+          setPasswordModalOpen(false);
+          setPendingOAuthAction(null);
+        }}
+        onOk={handlePasswordConfirm}
+        okText="Xác nhận"
+        cancelText="Hủy"
+        confirmLoading={passwordConfirmLoading}
+      >
+        <Form form={passwordForm} layout="vertical">
+          <Form.Item
+            label="Mật khẩu tài khoản hiện tại"
+            name="existingAccountPassword"
+            rules={[{ required: true, message: 'Vui lòng nhập mật khẩu hiện tại' }]}
+          >
+            <Input.Password placeholder="Nhập mật khẩu để tiếp tục auto-link" />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <style>{`
         .custom-input {

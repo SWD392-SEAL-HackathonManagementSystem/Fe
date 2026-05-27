@@ -14,6 +14,7 @@ import CriteriaManagementPage from '../features/criteria/pages/CriteriaManagemen
 import ReviewValidatePage from '../features/review/pages/ReviewValidatePage';
 import LoginPage from '../features/auth/pages/LoginPage';
 import RegisterPage from '../features/auth/pages/RegisterPage';
+import GithubCallbackPage from '../features/auth/pages/GithubCallbackPage';
 
 const TrackWrapper = () => {
   const { hackathonId } = useParams();
@@ -77,6 +78,7 @@ const AppRouter = () => {
       {/* Public Route */}
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
+      <Route path={ROUTES.GITHUB_CALLBACK} element={<GithubCallbackPage />} />
 
       {/* Protected Routes inside MainLayout */}
       <Route element={<MainLayoutWrapper />}>
