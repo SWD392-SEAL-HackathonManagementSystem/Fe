@@ -8,7 +8,6 @@ export const approvalService = {
     const params = { hackathonId, status };
     const res = await axiosClient.get(ENDPOINTS.TEAMS.BASE, { params });
     
-    // Chặn luồng data, đưa qua Mapper xử lý trước khi trả về cho UI
     if (res && Array.isArray(res)) {
       return res.map(mapTeamForCoordinator);
     } else if (res && Array.isArray(res.data)) {

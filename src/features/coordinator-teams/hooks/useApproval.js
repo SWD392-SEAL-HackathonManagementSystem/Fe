@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { message, notification } from 'antd'; 
+import { message, notification } from 'antd';
 import { approvalService } from '../services/approval.service';
 import { TEAM_ERROR_MESSAGES } from '../constants/team.constants';
 
@@ -78,8 +78,7 @@ export const useApproval = (hackathonId) => {
     setIsActionLoading(true);
     try {
       await approvalService.bulkApproveTeams(hackathonId, teamIds);
-      message.success(`Đã duyệt thành công ${teamIds.length} đội!`);
-      setTeams((prev) => prev.filter((team) => !teamIds.includes(team.id)));
+      await fetchTeams('PENDING');
       return true;
     } catch (error) {
       message.error('Có lỗi xảy ra khi duyệt hàng loạt.');
