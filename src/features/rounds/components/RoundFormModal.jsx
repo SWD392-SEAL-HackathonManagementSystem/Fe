@@ -10,6 +10,14 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
   const isFinal = Form.useWatch('is_final', form);
   const hasPrelimRound = existingRounds.some((r) => !r.is_final);
 
+  // Tập hợp round_type đã dùng (loại trừ round đang edit)
+  const usedRoundTypes = new Set(
+    existingRounds
+      .filter((r) => r.id !== initialValues?.id)
+      .map((r) => r.round_type)
+      .filter(Boolean)
+  );
+
   useEffect(() => {
     if (visible) {
       if (initialValues) {
@@ -31,10 +39,9 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
   const getDisabledDate = (current) => {
     if (!current) return false;
     
-    // Quy tắc: Ít nhất 4 ngày sau ngày kết thúc đăng ký
     let minDate = dayjs().startOf('day');
     if (hackathon && hackathon.registration_end) {
-      const regEndPlus4 = dayjs(hackathon.registration_end).add(4, 'day').startOf('day');
+      const regEndPlus4 = dayjs(hackathon.registration_end).add(5, 'day').startOf('day');
       if (regEndPlus4.isAfter(minDate)) {
         minDate = regEndPlus4;
       }
@@ -120,7 +127,10 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
             const examAt = allValues.exam_at;
             const duration = allValues.coding_duration_hours;
             if (examAt && duration) {
-              const submissionOpen = dayjs(examAt).add(duration * 2/3, 'hour');
+              // Dùng integer arithmetic (minutes) để khớp chính xác với BE:
+              // openOffsetMinutes = Math.floor((duration * 60 * 2) / 3) — giống long division của Java
+              const openOffsetMinutes = Math.floor((duration * 60 * 2) / 3);
+              const submissionOpen = dayjs(examAt).add(openOffsetMinutes, 'minute');
               const submissionDeadline = dayjs(examAt).add(duration, 'hour');
               form.setFieldsValue({
                 submission_open: submissionOpen,
@@ -152,9 +162,15 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
                   });
                 }}
               >
-                <Option value="PRELIMINARY">Sơ loại (Preliminary)</Option>
-                <Option value="SEMIFINAL">Bán kết (Semifinal)</Option>
-                <Option value="FINAL">Chung kết (Final)</Option>
+                <Option value="PRELIMINARY" disabled={usedRoundTypes.has('PRELIMINARY')}>
+                  Sơ loại (Preliminary){usedRoundTypes.has('PRELIMINARY') ? ' — đã tạo' : ''}
+                </Option>
+                <Option value="SEMIFINAL" disabled={usedRoundTypes.has('SEMIFINAL')}>
+                  Bán kết (Semifinal){usedRoundTypes.has('SEMIFINAL') ? ' — đã tạo' : ''}
+                </Option>
+                <Option value="FINAL" disabled={usedRoundTypes.has('FINAL')}>
+                  Chung kết (Final){usedRoundTypes.has('FINAL') ? ' — đã tạo' : ''}
+                </Option>
               </Select>
             </Form.Item>
           </Col>
@@ -235,7 +251,7 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
                 }),
               ]}
             >
-              <InputNumber min={0.5} step={0.5} style={{ width: '100%' }} />
+              <InputNumber min={1} step={1} precision={0} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
         </Row>
