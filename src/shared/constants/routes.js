@@ -10,4 +10,5 @@ export const ROUTES = {
   REVIEW_VALIDATE: '/hackathons/:hackathonId/review',
   LOGIN: '/login',
   REGISTER: '/register',
+  GITHUB_CALLBACK: '/auth/github/callback',
 };
