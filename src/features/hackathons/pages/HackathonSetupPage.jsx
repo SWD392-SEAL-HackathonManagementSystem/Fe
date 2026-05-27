@@ -114,7 +114,7 @@ const HackathonSetupPage = () => {
       />
 
       <Card style={{ borderRadius: 12 }}>
-        <Tabs destroyInactiveTabPane={true} defaultActiveKey="tracks" items={items} onChange={setActiveTab}/>
+        <Tabs destroyInactiveTabPane={true} defaultActiveKey="rounds" items={items} onChange={setActiveTab}/>
       </Card>
     </div>
   );
