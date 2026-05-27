@@ -154,7 +154,7 @@ const CriteriaManagementPage = ({ hackathonId }) => {
       {!currentRound || (!currentRound.is_final && !selectedTrackId) ? (
         <Card style={{ textAlign: "center", padding: "80px 0" }}>
           <Inbox size={40} color="#ccc" />
-          <Typography.Text type="secondary">
+          <Typography.Text type="secondary" style={{ display: "block", marginTop: 16 }}>
             Vui lòng chọn Vòng/Bảng để thiết lập.
           </Typography.Text>
         </Card>
