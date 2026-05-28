@@ -1,15 +1,17 @@
-import React from "react";
 import { useParams } from "react-router-dom";
-import { Card, Typography, Select, Spin, Space, Alert } from "antd";
-import { SearchOutlined, RocketOutlined } from "@ant-design/icons";
+import { Alert, Card, Grid, Select, Space, Spin, Typography, theme } from "antd";
+import { SearchOutlined, TeamOutlined } from "@ant-design/icons";
 import { motion } from "framer-motion";
 import { useHackathonSelect } from "../hooks/useHackathonSelect";
 import ApprovalTable from "../components/ApprovalTable";
-import { TAB_KEYS } from "../constants/team.constants";
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 const CoordinatorTeamPage = () => {
+  const screens = useBreakpoint();
+  const { token } = theme.useToken();
+  const isMobile = !screens.md;
   const { hackathonId } = useParams();
 
   const {
@@ -21,132 +23,172 @@ const CoordinatorTeamPage = () => {
 
   const activeHackathonId = hackathonId || selectedHackathonId;
 
+  const pageStyle = {
+    background: token.colorBgLayout,
+    minHeight: "100%",
+    padding: isMobile ? 12 : 24,
+  };
+
+  const shellStyle = {
+    margin: "0 auto",
+    maxWidth: 1400,
+  };
+
   if (!activeHackathonId && isLoadingHackathons) {
     return (
-      <div style={{ textAlign: "center", padding: 50 }}>
-        <Spin tip="Đang tải sự kiện..." />
+      <div style={pageStyle}>
+        <div style={{ ...shellStyle, padding: 50, textAlign: "center" }}>
+          <Spin tip="Đang tải sự kiện..." />
+        </div>
       </div>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
-      style={{ padding: "24px", maxWidth: "1400px", margin: "0 auto" }}
-    >
-      <div
-        style={{
-          marginBottom: 32,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          background: "linear-gradient(135deg, #1890ff 0%, #1d39c4 100%)",
-          padding: "24px 32px",
-          borderRadius: "16px",
-          boxShadow: "0 10px 30px rgba(24, 144, 255, 0.2)",
-          color: "white",
-        }}
+    <div style={pageStyle}>
+      <motion.div
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.42, ease: "easeOut" }}
+        style={shellStyle}
       >
-        <div>
-          <Title
-            level={2}
-            style={{
-              margin: 0,
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-            }}
-          >
-            <RocketOutlined /> Quản lý Đội thi
-          </Title>
-          <Text
-            style={{
-              color: "rgba(255, 255, 255, 0.8)",
-              fontSize: "16px",
-              marginTop: 8,
-              display: "block",
-            }}
-          >
-            Hệ thống điều phối: Phê duyệt và quản lý hồ sơ đội thi nhanh chóng.
-          </Text>
-        </div>
-
-        {!hackathonId && (
-          <Space
-            direction="vertical"
-            size={4}
-            style={{ alignItems: "flex-end" }}
-          >
-            <Text style={{ color: "white", fontWeight: 500, opacity: 0.9 }}>
-              Sự kiện đang quản lý
+        <section
+          style={{
+            alignItems: isMobile ? "stretch" : "center",
+            background: token.colorBgContainer,
+            border: `1px solid ${token.colorBorderSecondary}`,
+            borderRadius: token.borderRadius,
+            boxShadow: token.boxShadowTertiary,
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            gap: isMobile ? 18 : 24,
+            justifyContent: "space-between",
+            marginBottom: isMobile ? 16 : 20,
+            padding: isMobile ? 18 : "22px 24px",
+          }}
+        >
+          <div>
+            <Title
+              level={2}
+              style={{
+                alignItems: "center",
+                color: token.colorText,
+                display: "flex",
+                gap: 12,
+                letterSpacing: 0,
+                lineHeight: 1.2,
+                margin: 0,
+              }}
+            >
+              <span
+                style={{
+                  alignItems: "center",
+                  background: token.colorSuccessBg,
+                  borderRadius: token.borderRadius,
+                  color: token.colorSuccessText,
+                  display: "inline-flex",
+                  height: 40,
+                  justifyContent: "center",
+                  width: 40,
+                }}
+              >
+                <TeamOutlined />
+              </span>
+              Quản lý đội thi
+            </Title>
+            <Text
+              style={{
+                color: token.colorTextSecondary,
+                display: "block",
+                fontSize: isMobile ? 14 : 15,
+                lineHeight: 1.55,
+                marginTop: 8,
+                maxWidth: 680,
+              }}
+            >
+              Phê duyệt đội nhanh, rõ điều kiện, và kiểm soát các trường hợp cần
+              xem lại trước khi đội bước vào vòng thi.
             </Text>
-            <Select
-              showSearch
-              placeholder="Chọn sự kiện Hackathon"
-              loading={isLoadingHackathons}
-              value={selectedHackathonId}
-              onChange={(value) => setSelectedHackathonId(value)}
-              style={{ width: 320 }}
-              size="large"
-              suffixIcon={<SearchOutlined style={{ color: "#1890ff" }} />}
-              filterOption={(input, option) =>
-                (option?.label ?? "")
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
-              }
-              options={hackathons.map((h) => ({
-                value: h.id,
-                label: h.hackathonName || h.name || `Hackathon #${h.id}`,
-              }))}
-              dropdownStyle={{ borderRadius: 12, padding: 8 }}
-            />
-          </Space>
-        )}
-      </div>
+          </div>
 
-      {!activeHackathonId && !isLoadingHackathons && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Alert
-            message="Chưa chọn sự kiện Hackathon"
-            description="Vui lòng chọn một sự kiện ở phía trên để bắt đầu quản lý danh sách đội thi."
-            type="info"
-            showIcon
-            style={{
-              borderRadius: 12,
-              border: "none",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-            }}
-          />
-        </motion.div>
-      )}
+          {!hackathonId && (
+            <Space
+              direction="vertical"
+              size={6}
+              style={{
+                minWidth: isMobile ? 0 : 320,
+                width: isMobile ? "100%" : "auto",
+              }}
+            >
+              <Text style={{ color: token.colorText, fontWeight: 600 }}>
+                Sự kiện đang quản lý
+              </Text>
+              <Select
+                showSearch
+                placeholder="Chọn sự kiện Hackathon"
+                loading={isLoadingHackathons}
+                value={selectedHackathonId}
+                onChange={(value) => setSelectedHackathonId(value)}
+                style={{ width: "100%" }}
+                size="large"
+                suffixIcon={<SearchOutlined style={{ color: token.colorSuccess }} />}
+                filterOption={(input, option) =>
+                  (option?.label ?? "")
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
+                }
+                options={hackathons.map((hackathon) => ({
+                  value: hackathon.id,
+                  label:
+                    hackathon.hackathonName ||
+                    hackathon.name ||
+                    `Hackathon #${hackathon.id}`,
+                }))}
+                dropdownStyle={{ borderRadius: token.borderRadius, padding: 8 }}
+              />
+            </Space>
+          )}
+        </section>
 
-      {activeHackathonId && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.4 }}
-        >
-          <Card
-            bordered={false}
-            style={{
-              borderRadius: 16,
-              boxShadow: "0 12px 32px rgba(0, 0, 0, 0.04)",
-              overflow: "hidden",
-            }}
-            bodyStyle={{ padding: "24px" }}
+        {!activeHackathonId && !isLoadingHackathons && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.12 }}
           >
-            <ApprovalTable hackathonId={activeHackathonId} />
-          </Card>
-        </motion.div>
-      )}
-    </motion.div>
+            <Alert
+              message="Chưa chọn sự kiện Hackathon"
+              description="Vui lòng chọn một sự kiện ở phía trên để bắt đầu quản lý danh sách đội thi."
+              type="info"
+              showIcon
+              style={{ border: "none", borderRadius: 8 }}
+            />
+          </motion.div>
+        )}
+
+        {activeHackathonId && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.32 }}
+          >
+            <Card
+              bordered={false}
+              style={{
+                background: token.colorBgContainer,
+                border: `1px solid ${token.colorBorderSecondary}`,
+                borderRadius: token.borderRadius,
+                boxShadow: token.boxShadowTertiary,
+                overflow: "hidden",
+              }}
+              bodyStyle={{ padding: isMobile ? 12 : 24 }}
+            >
+              <ApprovalTable hackathonId={activeHackathonId} />
+            </Card>
+          </motion.div>
+        )}
+      </motion.div>
+    </div>
   );
 };
 

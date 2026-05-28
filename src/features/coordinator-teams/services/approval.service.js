@@ -2,40 +2,43 @@ import axiosClient from '../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
 import { mapTeamForCoordinator } from '../mapper/coordinatorTeam.mapper';
 
+const unwrapList = (res) => {
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res?.items)) return res.items;
+  if (Array.isArray(res?.data?.items)) return res.data.items;
+  return [];
+};
+
+const unwrapItem = (res) => res?.data || res || null;
+
 export const approvalService = {
-  // 1. GET danh sách đội chờ duyệt (Status mặc định là PENDING)
   getTeamsForApproval: async (hackathonId, status = 'PENDING') => {
     const params = { hackathonId, status };
     const res = await axiosClient.get(ENDPOINTS.TEAMS.BASE, { params });
-    
-    if (res && Array.isArray(res)) {
-      return res.map(mapTeamForCoordinator);
-    } else if (res && Array.isArray(res.data)) {
-      return res.data.map(mapTeamForCoordinator);
-    }
-    return [];
+    return unwrapList(res).map(mapTeamForCoordinator);
   },
 
-  // 2. PATCH Duyệt nhanh (Shortcut -> ACTIVE)
+  getTeamDetail: async (teamId) => {
+    const res = await axiosClient.get(ENDPOINTS.TEAMS.DETAIL(teamId));
+    return mapTeamForCoordinator(unwrapItem(res));
+  },
+
   approveTeam: async (teamId) => {
-    // API Shortcut theo FR-13
     return axiosClient.patch(ENDPOINTS.TEAMS.APPROVE(teamId));
   },
 
-  // 3. PATCH Từ chối đội (Status -> REJECTED, kèm lý do)
   rejectTeam: async (teamId, rejectionReason) => {
     const payload = { status: 'REJECTED', rejectionReason };
     return axiosClient.patch(ENDPOINTS.TEAMS.STATUS(teamId), payload);
   },
 
-  // 4. POST Duyệt hàng loạt (Bulk Approve)
   bulkApproveTeams: async (hackathonId, teamIds) => {
     const payload = { hackathonId, teamIds };
     return axiosClient.post(ENDPOINTS.TEAMS.BULK_APPROVE, payload);
   },
 
-  // 5. DELETE Giải tán đội (Coordinator có quyền ép giải tán - FR-11D)
   disbandTeam: async (teamId) => {
     return axiosClient.delete(ENDPOINTS.TEAMS.DETAIL(teamId));
-  }
+  },
 };
