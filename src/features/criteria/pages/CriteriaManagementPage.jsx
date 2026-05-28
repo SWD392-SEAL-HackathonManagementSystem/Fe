@@ -25,6 +25,7 @@ import {
 import { useCriteriaManagement } from "../hooks/useCriteriaManagement";
 import {
   CRITERIA_TYPES,
+  CRITERIA_TYPE_OPTIONS,
   CRITERIA_COLORS,
 } from "../constants/criteria.constants";
 import { CriteriaHeader } from "../components/CriteriaHeader";
@@ -96,7 +97,12 @@ const CriteriaManagementPage = ({ hackathonId }) => {
       key: "weight",
       width: 120,
       align: "right",
-      render: (w, r) => (r.type === "PENALTY" ? "-" : w?.toFixed(2)),
+      render: (w, r) =>
+        r.type === CRITERIA_TYPES.PENALTY ? (
+          <Tag color="red">Không tính</Tag>
+        ) : (
+          w?.toFixed(2)
+        ),
     },
     {
       title: "Điểm max",
@@ -191,7 +197,7 @@ const CriteriaManagementPage = ({ hackathonId }) => {
               onChange={setFilterType}
               style={{ width: 150 }}
             >
-              {CRITERIA_TYPES.map((t) => (
+              {CRITERIA_TYPE_OPTIONS.map((t) => (
                 <Select.Option key={t} value={t}>
                   {t}
                 </Select.Option>

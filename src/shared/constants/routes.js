@@ -6,6 +6,7 @@ export const ROUTES = {
   TRACKS: '/hackathons/:hackathonId/tracks',
   ROUNDS: '/hackathons/:hackathonId/rounds',
   CRITERIA: '/hackathons/:hackathonId/criteria/:roundId',
+  GLOBAL_TEAMS: '/teams',
   REVIEW_VALIDATE: '/hackathons/:hackathonId/review',
   LOGIN: '/login',
   REGISTER: '/register',

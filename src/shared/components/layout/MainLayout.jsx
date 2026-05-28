@@ -38,12 +38,13 @@ const MainLayout = ({ children }) => {
   const isMobile = !screens.md;
   
   // Lấy dữ liệu global từ AppContext
+  const match = location.pathname.match(/\/hackathons\/(\d+)/);
   const { notifications, markAsRead, darkMode, toggleDarkMode } = useAppContext();
 
   const menuItems = [
     { key: ROUTES.DASHBOARD, icon: <LayoutDashboard size={18} />, label: 'Tổng quan' },
     { key: ROUTES.HACKATHONS, icon: <Trophy size={18} />, label: 'Cấu hình Sự kiện' },
-    { key: 'teams', icon: <Users size={18} />, label: 'Quản lý Đội thi' },
+    { key: ROUTES.GLOBAL_TEAMS, icon: <Users size={18} />, label: 'Quản lý Đội thi' },
     { key: 'monitor', icon: <Activity size={18} />, label: 'Giám sát Real-time' },
     { key: 'analytics', icon: <BarChart3 size={18} />, label: 'Phân tích dữ liệu' },
     { key: 'settings', icon: <Settings size={18} />, label: 'Cài đặt Hệ thống' },
@@ -56,7 +57,7 @@ const MainLayout = ({ children }) => {
 
   const handleMenuClick = ({ key }) => {
     if (isMobile) setDrawerVisible(false);
-    if (key === ROUTES.DASHBOARD || key === ROUTES.HACKATHONS) navigate(key);
+    if (key === ROUTES.DASHBOARD || key === ROUTES.HACKATHONS || key === ROUTES.GLOBAL_TEAMS) navigate(key);
   };
 
   const handleBottomMenuClick = async ({ key }) => {

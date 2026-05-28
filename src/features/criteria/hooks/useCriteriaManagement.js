@@ -17,6 +17,7 @@ export const useCriteriaManagement = (hackathonId) => {
   const [selectedRoundId, setSelectedRoundId] = useState(null);
   const [selectedTrackId, setSelectedTrackId] = useState(null);
   const [criteriaList, setCriteriaList] = useState([]);
+  const [weightSummary, setWeightSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchBaseData = useCallback(async () => {
@@ -68,16 +69,22 @@ export const useCriteriaManagement = (hackathonId) => {
   }, [selectedRoundId]);
 
   const fetchCriteria = useCallback(async () => {
-    if (!currentRound || (!currentRound.is_final && !selectedTrackId)) return;
+    if (!currentRound || (!currentRound.is_final && !selectedTrackId)) {
+      setCriteriaList([]);
+      setWeightSummary(null);
+      return;
+    }
     setIsLoading(true);
     try {
-      let items = currentRound.is_final
-        ? await criteriaService.listByFinalRound(selectedRoundId)
-        : await criteriaService.listByTrack(selectedTrackId);
-      setCriteriaList(Array.isArray(items) ? items : []);
+      const payload = currentRound.is_final
+        ? await criteriaService.listPayloadByFinalRound(selectedRoundId)
+        : await criteriaService.listPayloadByTrack(selectedTrackId);
+      setCriteriaList(Array.isArray(payload.items) ? payload.items : []);
+      setWeightSummary(payload.weightSummary || null);
     } catch (error) {
       message.error("Không thể tải danh sách tiêu chí");
       setCriteriaList([]);
+      setWeightSummary(null);
     } finally {
       setIsLoading(false);
     }
@@ -93,10 +100,13 @@ export const useCriteriaManagement = (hackathonId) => {
   );
 
   const totalWeight = useMemo(() => {
+    if (weightSummary?.total !== undefined && weightSummary?.total !== null) {
+      return Number(weightSummary.total) || 0;
+    }
     return currentCriteria
       .filter((c) => c.type !== CRITERIA_TYPES.PENALTY)
       .reduce((sum, c) => sum + (c.weight || 0), 0);
-  }, [currentCriteria]);
+  }, [currentCriteria, weightSummary]);
 
   const isWeightValid = Math.abs(totalWeight - MAX_WEIGHT_TOTAL) < 0.001;
 
@@ -228,6 +238,7 @@ export const useCriteriaManagement = (hackathonId) => {
     currentRound,
     roundTracks,
     currentCriteria,
+    weightSummary,
     totalWeight,
     isWeightValid,
     selectedRoundId,

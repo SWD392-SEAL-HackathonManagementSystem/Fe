@@ -14,6 +14,7 @@ import CriteriaManagementPage from '../features/criteria/pages/CriteriaManagemen
 import ReviewValidatePage from '../features/review/pages/ReviewValidatePage';
 import LoginPage from '../features/auth/pages/LoginPage';
 import RegisterPage from '../features/auth/pages/RegisterPage';
+import CoordinatorTeamPage from '../features/coordinator-teams/pages/CoordinatorTeamPage';
 import GithubCallbackPage from '../features/auth/pages/GithubCallbackPage';
 
 const TrackWrapper = () => {
@@ -86,6 +87,7 @@ const AppRouter = () => {
         <Route path={ROUTES.HACKATHONS} element={<HackathonListPage />} />
         <Route path={ROUTES.HACKATHON_CREATE} element={<CreateHackathonPage />} />
         <Route path={ROUTES.HACKATHON_SETUP} element={<HackathonSetupPage />} />
+        <Route path={ROUTES.GLOBAL_TEAMS} element={<CoordinatorTeamPage />} />
         
         {/* Explicit routes for tracks and rounds */}
         <Route path={ROUTES.TRACKS} element={<TrackWrapper />} />

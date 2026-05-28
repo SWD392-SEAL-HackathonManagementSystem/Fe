@@ -3,22 +3,34 @@ import { ENDPOINTS } from '../../../shared/api/endpoints';
 import { mapCriterionToFE, mapCriterionToBE } from '../mappers/criteriaMapper';
 
 export const criteriaService = {
+  listPayloadByTrack: async (trackId) => {
+    const res = await axiosClient.get(ENDPOINTS.TRACKS.CRITERIA(trackId));
+    const items = Array.isArray(res?.items) ? res.items.map(mapCriterionToFE) : [];
+    return {
+      items,
+      weightSummary: res?.weightSummary || null,
+    };
+  },
+
   // 1. GET danh sách criteria theo Track (Vòng Sơ loại/Bảng đấu)
   listByTrack: async (trackId) => {
-    const res = await axiosClient.get(ENDPOINTS.TRACKS.CRITERIA(trackId));
-    if (res && Array.isArray(res.items)) {
-      return res.items.map(mapCriterionToFE);
-    }
-    return [];
+    const payload = await criteriaService.listPayloadByTrack(trackId);
+    return payload.items;
+  },
+
+  listPayloadByFinalRound: async (roundId) => {
+    const res = await axiosClient.get(ENDPOINTS.ROUNDS.CRITERIA(roundId));
+    const items = Array.isArray(res?.items) ? res.items.map(mapCriterionToFE) : [];
+    return {
+      items,
+      weightSummary: res?.weightSummary || null,
+    };
   },
 
   // 2. GET danh sách criteria theo Round (Vòng Chung kết)
   listByFinalRound: async (roundId) => {
-    const res = await axiosClient.get(ENDPOINTS.ROUNDS.CRITERIA(roundId));
-    if (res && Array.isArray(res.items)) {
-      return res.items.map(mapCriterionToFE);
-    }
-    return [];
+    const payload = await criteriaService.listPayloadByFinalRound(roundId);
+    return payload.items;
   },
 
   // 3. POST tạo mới 1 tiêu chí cho Track
