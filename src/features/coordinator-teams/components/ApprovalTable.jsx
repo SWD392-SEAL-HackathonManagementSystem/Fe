@@ -43,6 +43,7 @@ const ApprovalTable = ({ hackathonId }) => {
   useEffect(() => {
     if (hackathonId) {
       fetchTeams(TEAM_STATUS.PENDING);
+      setSelectedRowKeys([]);
     }
   }, [hackathonId, fetchTeams]);
 
@@ -106,7 +107,7 @@ const ApprovalTable = ({ hackathonId }) => {
             <Popconfirm
               title="Duyệt đội thi này?"
               description="Đội sẽ được chuyển sang trạng thái ACTIVE."
-              onConfirm={() => handleApprove(record.id)}
+              onConfirm={() => onSingleApprove(record.id)}
               okText="Duyệt"
               cancelText="Hủy"
               disabled={record.isInvalidMemberCount}
@@ -132,7 +133,7 @@ const ApprovalTable = ({ hackathonId }) => {
           <Popconfirm
             title="CẢNH BÁO: Xóa đội thi?"
             description="Hành động này không thể hoàn tác!"
-            onConfirm={() => handleDisband(record.id)}
+            onConfirm={() => onSingleDisband(record.id)}
             okText="Xóa luôn"
             cancelText="Hủy"
             okButtonProps={{ danger: true }}
@@ -162,10 +163,27 @@ const ApprovalTable = ({ hackathonId }) => {
     if (success) setSelectedRowKeys([]);
   };
 
+  const onSingleApprove = async (teamId) => {
+    const success = await handleApprove(teamId);
+    if (success) {
+      setSelectedRowKeys((prev) => prev.filter((id) => id !== teamId));
+    }
+  };
+
+  const onSingleDisband = async (teamId) => {
+    const success = await handleDisband(teamId);
+    if (success) {
+      setSelectedRowKeys((prev) => prev.filter((id) => id !== teamId));
+    }
+  };
+
   const onConfirmReject = async () => {
     if (!rejectModal.reason.trim()) return;
     const success = await handleReject(rejectModal.teamId, rejectModal.reason);
-    if (success) setRejectModal({ open: false, teamId: null, reason: "" });
+    if (success) {
+      setSelectedRowKeys((prev) => prev.filter((id) => id !== rejectModal.teamId));
+      setRejectModal({ open: false, teamId: null, reason: "" });
+    }
   };
 
   return (

@@ -1,6 +1,7 @@
 import React from "react";
 import {
   Modal,
+  Alert,
   Form,
   Input,
   InputNumber,
@@ -12,11 +13,21 @@ import {
   theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
-import { CRITERIA_TYPES } from "../constants/criteria.constants";
+import {
+  CRITERIA_TYPES,
+  CRITERIA_TYPE_OPTIONS,
+  MAX_WEIGHT_TOTAL,
+} from "../constants/criteria.constants";
 
 export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
   const [form] = Form.useForm();
   const { token } = theme.useToken();
+  const watchedItems = Form.useWatch("items", form) || [];
+  const draftTotalWeight = watchedItems
+    .filter((item) => item?.type !== CRITERIA_TYPES.PENALTY)
+    .reduce((sum, item) => sum + (Number(item?.weight) || 0), 0);
+  const isDraftWeightValid =
+    Math.abs(draftTotalWeight - MAX_WEIGHT_TOTAL) < 0.001;
 
   const handleOk = async () => {
     try {
@@ -55,6 +66,14 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
           ],
         }}
       >
+        {watchedItems.length > 0 && (
+          <Alert
+            type={isDraftWeightValid ? "success" : "warning"}
+            style={{ marginBottom: 16 }}
+            message={`Tổng trọng số hiện tại: ${draftTotalWeight.toFixed(2)}`}
+            description="PENALTY không được tính vào tổng weight 1.0."
+          />
+        )}
         <Row
           gutter={16}
           style={{
@@ -66,11 +85,13 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
             textTransform: "uppercase",
           }}
         >
-          <Col span={5}>Tên tiêu chí *</Col>
-          <Col span={4}>Phân loại *</Col>
+          <Col span={2}>Thứ tự *</Col>
+          <Col span={4}>Tên tiêu chí *</Col>
+          <Col span={3}>Phân loại *</Col>
           <Col span={3}>Trọng số *</Col>
           <Col span={3}>Điểm tối đa *</Col>
-          <Col span={8}>Mô tả *</Col>
+          <Col span={4}>Rubric URL</Col>
+          <Col span={4}>Mô tả *</Col>
           <Col span={1}></Col>
         </Row>
         <Form.List name="items">
@@ -83,7 +104,20 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
                   style={{ marginBottom: 12 }}
                   align="top"
                 >
-                  <Col span={5}>
+                  <Col span={2}>
+                    <Form.Item
+                      {...restField}
+                      name={[name, "display_order"]}
+                      rules={[{ required: true }]}
+                    >
+                      <InputNumber
+                        style={{ width: "100%" }}
+                        min={1}
+                        onKeyDown={preventNegative}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
                     <Form.Item
                       {...restField}
                       name={[name, "name"]}
@@ -92,14 +126,14 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
                       <Input placeholder="Tên tiêu chí..." />
                     </Form.Item>
                   </Col>
-                  <Col span={4}>
+                  <Col span={3}>
                     <Form.Item
                       {...restField}
                       name={[name, "type"]}
                       rules={[{ required: true }]}
                     >
                       <Select placeholder="Phân loại">
-                        {CRITERIA_TYPES.map((t) => (
+                        {CRITERIA_TYPE_OPTIONS.map((t) => (
                           <Select.Option key={t} value={t}>
                             {t}
                           </Select.Option>
@@ -136,7 +170,16 @@ export const CriteriaBatchModal = ({ visible, onCancel, onFinish }) => {
                       />
                     </Form.Item>
                   </Col>
-                  <Col span={8}>
+                  <Col span={4}>
+                    <Form.Item
+                      {...restField}
+                      name={[name, "rubric_url"]}
+                      rules={[{ type: "url", message: "URL không hợp lệ", warningOnly: true }]}
+                    >
+                      <Input placeholder="https://..." />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
                     <Form.Item
                       {...restField}
                       name={[name, "description"]}

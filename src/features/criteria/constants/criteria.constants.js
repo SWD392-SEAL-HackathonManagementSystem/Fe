@@ -1,4 +1,8 @@
-export const CRITERIA_TYPES = ['TECHNICAL', 'SOFT_SKILL', 'PENALTY'];
+export const CRITERIA_TYPES = {
+  TECHNICAL: 'TECHNICAL',
+  SOFT_SKILL: 'SOFT_SKILL',
+  PENALTY: 'PENALTY',
+};
 
 export const CRITERIA_COLORS = {
   TECHNICAL: 'blue',
@@ -8,3 +12,4 @@ export const CRITERIA_COLORS = {
 };
 
 export const MAX_WEIGHT_TOTAL = 1.0;
+export const CRITERIA_TYPE_OPTIONS = Object.values(CRITERIA_TYPES);
