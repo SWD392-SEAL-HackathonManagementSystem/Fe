@@ -165,7 +165,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
           <Tabs.TabPane tab="Phân công giám khảo" key="3">
              <Card type="inner" style={{ marginBottom: 24, background: '#fafafa' }}>
                <Form layout="inline" onFinish={(vals) => handleAssign(vals, 'JUDGE', judgeForm)} form={judgeForm} initialValues={{ assignment_type: 'NORMAL' }}>
-                  <Form.Item name="person_id" rules={[{ required: true, message: 'Chọn GK' }]}>
+                  <Form.Item name="person_id" rules={[{ required: true, message: 'Chọn Giám Khảo' }]}>
                     <Select placeholder="Chọn giám khảo" style={{ width: 220 }}>
                         {people.map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
                     </Select>
