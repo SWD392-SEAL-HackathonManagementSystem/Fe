@@ -24,6 +24,7 @@ const HackathonSetupPage = () => {
   const [rounds, setRounds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoundId, setSelectedRoundId] = useState(null);
+  const [activeTab, setActiveTab] = useState('tracks');
   
   React.useEffect(() => {
     const fetchData = async () => {
@@ -75,7 +76,7 @@ const HackathonSetupPage = () => {
     {
       key: 'rounds',
       label: 'Vòng thi (Rounds)',
-      children: <RoundManagementPage hackathonId={hackathon.id} />,
+      children: <RoundManagementPage hackathonId={hackathon.id} hackathon={hackathon} />,
     },
     {
       key: 'tracks',
@@ -100,7 +101,7 @@ const HackathonSetupPage = () => {
     {
       key: 'review',
       label: 'Đánh giá & Kiểm tra',
-      children: <ReviewValidatePage hackathonId={hackathon.id} />, 
+      children: activeTab === 'review' ? <ReviewValidatePage hackathonId={hackathon.id} /> : null, 
     }
   ];
 
@@ -113,7 +114,7 @@ const HackathonSetupPage = () => {
       />
 
       <Card style={{ borderRadius: 12 }}>
-        <Tabs defaultActiveKey="tracks" items={items} />
+        <Tabs destroyInactiveTabPane={true} defaultActiveKey="rounds" items={items} onChange={setActiveTab}/>
       </Card>
     </div>
   );

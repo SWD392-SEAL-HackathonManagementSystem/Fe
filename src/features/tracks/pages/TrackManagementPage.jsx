@@ -47,7 +47,8 @@ const TrackManagementPage = ({ hackathonId }) => {
     fetchData();
   }, [hackathonId]);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
+    await fetchData();
     setEditingTrack(null);
     setIsModalVisible(true);
   };
@@ -89,7 +90,7 @@ const TrackManagementPage = ({ hackathonId }) => {
         message.success('Đã tạo track mới thành công');
       }
       setIsModalVisible(false);
-      fetchData();
+      await fetchData();
     } catch (error) {
       message.error(error.message || 'Lỗi khi lưu track');
       setLoading(false);

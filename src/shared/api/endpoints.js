@@ -1,4 +1,15 @@
 export const ENDPOINTS = {
+  AUTH: {
+    LOGIN: '/api/v1/auth/login',
+    REGISTER: '/api/v1/auth/register',
+    LOGOUT: '/api/v1/auth/logout',
+    OAUTH_GOOGLE_LOGIN: '/api/v1/auth/oauth/google',
+    OAUTH_GITHUB_LOGIN_CODE: '/api/v1/auth/oauth/github/code',
+    OAUTH_GOOGLE_LINK: '/api/v1/auth/oauth/google/link',
+    OAUTH_GITHUB_LINK_CODE: '/api/v1/auth/oauth/github/link/code',
+    OAUTH_GOOGLE_UNLINK: '/api/v1/auth/oauth/google/unlink',
+    OAUTH_GITHUB_UNLINK: '/api/v1/auth/oauth/github/unlink',
+  },
   HACKATHONS: {
     BASE: '/api/v1/hackathons',
     DETAIL: (id) => `/api/v1/hackathons/${id}`,

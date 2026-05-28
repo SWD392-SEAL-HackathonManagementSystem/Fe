@@ -21,5 +21,6 @@ export const mapTrackToBE = (feData) => {
     maxTeamsPerGroup: feData.max_teams_per_group ? parseInt(feData.max_teams_per_group) : null,
     minTeamSize: feData.min_team_size ? parseInt(feData.min_team_size) : 1,
     maxTeamSize: feData.max_team_size ? parseInt(feData.max_team_size) : 5,
+    status: feData.status,
   };
 };

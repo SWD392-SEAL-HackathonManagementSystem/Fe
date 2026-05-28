@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 
+// === LOGIC CUỘN MÀN HÌNH THEO HASH URL TẠI TRANG SETUP ===
 const SetupPage = () => {
   const { hash } = useLocation();
 

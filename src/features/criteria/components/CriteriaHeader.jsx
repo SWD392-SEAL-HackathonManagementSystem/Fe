@@ -1,8 +1,9 @@
 import React from "react";
-import { Space, Select, Typography, Switch, Card } from "antd";
+import { Space, Select, Typography, Switch, Card, theme } from "antd";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
+const { useToken } = theme;
 
 export const CriteriaHeader = ({
   hackathonRounds = [],
@@ -14,20 +15,43 @@ export const CriteriaHeader = ({
   setSelectedTrackId,
   updateRound,
 }) => {
+  const { token } = useToken();
+
   return (
-    <>
-      <Card style={{ marginBottom: 24, borderRadius: 12 }}>
+    <div style={{ animation: "fadeInUp 0.4s ease-out both" }}>
+      <Card
+        style={{
+          marginBottom: 24,
+          borderRadius: 16,
+          boxShadow: token.boxShadowTertiary,
+          border: `1px solid ${token.colorBorderSecondary}`,
+        }}
+        styles={{ body: { padding: "24px" } }}
+      >
         <Space
           size="large"
-          style={{ display: "flex", width: "100%", alignItems: "flex-start" }}
+          style={{
+            display: "flex",
+            width: "100%",
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+          }}
         >
-          <div style={{ minWidth: 300 }}>
-            <Text strong style={{ display: "block", marginBottom: 8 }}>
-              Vòng thi (Round):
+          <div style={{ minWidth: 300, flex: 1 }}>
+            <Text
+              strong
+              style={{
+                display: "block",
+                marginBottom: 8,
+                color: token.colorTextSecondary,
+              }}
+            >
+              Vòng thi (Round)
             </Text>
             <Select
               style={{ width: "100%" }}
-              placeholder="Chọn vòng thi"
+              size="large"
+              placeholder="Chọn vòng thi..."
               value={selectedRoundId}
               onChange={setSelectedRoundId}
             >
@@ -38,14 +62,23 @@ export const CriteriaHeader = ({
               ))}
             </Select>
           </div>
+
           {currentRound && !currentRound.is_final && (
-            <div style={{ minWidth: 300 }}>
-              <Text strong style={{ display: "block", marginBottom: 8 }}>
-                Bảng đấu (Track):
+            <div style={{ minWidth: 300, flex: 1 }}>
+              <Text
+                strong
+                style={{
+                  display: "block",
+                  marginBottom: 8,
+                  color: token.colorTextSecondary,
+                }}
+              >
+                Bảng đấu (Track)
               </Text>
               <Select
                 style={{ width: "100%" }}
-                placeholder="Chọn bảng đấu"
+                size="large"
+                placeholder="Chọn bảng đấu..."
                 value={selectedTrackId}
                 onChange={setSelectedTrackId}
               >
@@ -67,24 +100,20 @@ export const CriteriaHeader = ({
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            padding: "16px 24px",
+            backgroundColor: token.colorBgContainer,
+            borderRadius: 12,
+            border: `1px solid ${token.colorBorderSecondary}`,
+            boxShadow: token.boxShadowTertiary,
           }}
         >
-          <Title level={4} style={{ margin: 0 }}>
+          <Title level={4} style={{ margin: 0, fontWeight: 600 }}>
             {currentRound.is_final
               ? currentRound.name
-              : `${currentRound.name} - Bảng: ${roundTracks?.find((t) => t.id === selectedTrackId)?.name}`}
+              : `${currentRound.name} — Bảng: ${roundTracks?.find((t) => t.id === selectedTrackId)?.name}`}
           </Title>
-          <Space>
-            <Text>Kích hoạt vòng thi:</Text>
-            <Switch
-              checked={currentRound?.is_active}
-              onChange={(checked) =>
-                updateRound(currentRound.id, { is_active: checked })
-              }
-            />
-          </Space>
         </div>
       )}
-    </>
+    </div>
   );
 };

@@ -7,4 +7,7 @@ export const ROUTES = {
   ROUNDS: '/hackathons/:hackathonId/rounds',
   CRITERIA: '/hackathons/:hackathonId/criteria/:roundId',
   REVIEW_VALIDATE: '/hackathons/:hackathonId/review',
+  LOGIN: '/login',
+  REGISTER: '/register',
+  GITHUB_CALLBACK: '/auth/github/callback',
 };

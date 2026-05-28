@@ -5,6 +5,9 @@ const axiosClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
   },
 });
 
@@ -12,7 +15,7 @@ const axiosClient = axios.create({
 axiosClient.interceptors.request.use(
   function (config) {
     // Inject token if needed later
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }

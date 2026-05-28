@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useParams, useNavigate } from 'react-router-dom';
 import MainLayout from '../shared/components/layout/MainLayout';
 import { ROUTES } from '../shared/constants/routes';
 
@@ -12,7 +12,9 @@ import TrackManagementPage from '../features/tracks/pages/TrackManagementPage';
 import RoundManagementPage from '../features/rounds/pages/RoundManagementPage';
 import CriteriaManagementPage from '../features/criteria/pages/CriteriaManagementPage';
 import ReviewValidatePage from '../features/review/pages/ReviewValidatePage';
-import { useParams, useNavigate } from 'react-router-dom';
+import LoginPage from '../features/auth/pages/LoginPage';
+import RegisterPage from '../features/auth/pages/RegisterPage';
+import GithubCallbackPage from '../features/auth/pages/GithubCallbackPage';
 
 const TrackWrapper = () => {
   const { hackathonId } = useParams();
@@ -54,10 +56,32 @@ const ReviewWrapper = () => {
   );
 };
 
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem('accessToken');
+  if (!token) {
+    return <Navigate to={ROUTES.LOGIN} replace />;
+  }
+  return children;
+};
+
+const MainLayoutWrapper = () => (
+  <ProtectedRoute>
+    <MainLayout>
+      <Outlet />
+    </MainLayout>
+  </ProtectedRoute>
+);
+
 const AppRouter = () => {
   return (
-    <MainLayout>
-      <Routes>
+    <Routes>
+      {/* Public Route */}
+      <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+      <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
+      <Route path={ROUTES.GITHUB_CALLBACK} element={<GithubCallbackPage />} />
+
+      {/* Protected Routes inside MainLayout */}
+      <Route element={<MainLayoutWrapper />}>
         <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
         <Route path={ROUTES.HACKATHONS} element={<HackathonListPage />} />
         <Route path={ROUTES.HACKATHON_CREATE} element={<CreateHackathonPage />} />
@@ -68,10 +92,11 @@ const AppRouter = () => {
         <Route path={ROUTES.ROUNDS} element={<RoundWrapper />} />
         <Route path={ROUTES.CRITERIA} element={<CriteriaWrapper />} />
         <Route path={ROUTES.REVIEW_VALIDATE} element={<ReviewWrapper />} />
-        
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </MainLayout>
+      </Route>
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 };
 

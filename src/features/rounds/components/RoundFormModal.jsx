@@ -5,10 +5,18 @@ import dayjs from 'dayjs';
 
 const { Option } = Select;
 
-const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, existingRounds = [] }) => {
+const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, existingRounds = [], hackathon }) => {
   const [form] = Form.useForm();
   const isFinal = Form.useWatch('is_final', form);
   const hasPrelimRound = existingRounds.some((r) => !r.is_final);
+
+  // Tập hợp round_type đã dùng (loại trừ round đang edit)
+  const usedRoundTypes = new Set(
+    existingRounds
+      .filter((r) => r.id !== initialValues?.id)
+      .map((r) => r.round_type)
+      .filter(Boolean)
+  );
 
   useEffect(() => {
     if (visible) {
@@ -24,6 +32,58 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
       }
     }
   }, [visible, initialValues, form]);
+
+  const prelimRound = existingRounds.find(r => !r.is_final && r.id !== initialValues?.id);
+  const finalRound = existingRounds.find(r => r.is_final && r.id !== initialValues?.id);
+
+  const getDisabledDate = (current) => {
+    if (!current) return false;
+    
+    let minDate = dayjs().startOf('day');
+    if (hackathon && hackathon.registration_end) {
+      const regEndPlus4 = dayjs(hackathon.registration_end).add(5, 'day').startOf('day');
+      if (regEndPlus4.isAfter(minDate)) {
+        minDate = regEndPlus4;
+      }
+    }
+    if (current.isBefore(minDate)) return true;
+
+    // Khoá chéo: Vòng Chung kết phải diễn ra sau Sơ loại
+    if (isFinal && prelimRound?.exam_at) {
+      if (current.isBefore(dayjs(prelimRound.exam_at).startOf('day'))) return true;
+    }
+
+    // Khoá chéo: Vòng Sơ loại phải kết thúc trước Chung kết
+    if (!isFinal && finalRound?.submission_open) {
+      if (current.isAfter(dayjs(finalRound.submission_open).endOf('day'))) return true;
+    }
+
+    return false;
+  };
+
+  const getDisabledTime = (current) => {
+    if (!current) return {};
+    const now = dayjs();
+    
+    if (current.isSame(now, 'day')) {
+      return {
+        disabledHours: () => Array.from({ length: 24 }, (_, i) => i).filter(h => h < now.hour()),
+        disabledMinutes: (selectedHour) => {
+          if (selectedHour === now.hour()) {
+            return Array.from({ length: 60 }, (_, i) => i).filter(m => m < now.minute());
+          }
+          return [];
+        },
+        disabledSeconds: (selectedHour, selectedMinute) => {
+          if (selectedHour === now.hour() && selectedMinute === now.minute()) {
+            return Array.from({ length: 60 }, (_, i) => i).filter(s => s < now.second());
+          }
+          return [];
+        }
+      };
+    }
+    return {};
+  };
 
   const handleSubmit = () => {
     form.validateFields()
@@ -62,6 +122,23 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
           is_final: false,
           round_type: 'PRELIMINARY'
         }}
+        onValuesChange={(changedValues, allValues) => {
+          if (changedValues.exam_at !== undefined || changedValues.coding_duration_hours !== undefined) {
+            const examAt = allValues.exam_at;
+            const duration = allValues.coding_duration_hours;
+            if (examAt && duration) {
+              // Dùng integer arithmetic (minutes) để khớp chính xác với BE:
+              // openOffsetMinutes = Math.floor((duration * 60 * 2) / 3) — giống long division của Java
+              const openOffsetMinutes = Math.floor((duration * 60 * 2) / 3);
+              const submissionOpen = dayjs(examAt).add(openOffsetMinutes, 'minute');
+              const submissionDeadline = dayjs(examAt).add(duration, 'hour');
+              form.setFieldsValue({
+                submission_open: submissionOpen,
+                submission_deadline: submissionDeadline,
+              });
+            }
+          }
+        }}
       >
         <Form.Item
           name="name"
@@ -85,9 +162,15 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
                   });
                 }}
               >
-                <Option value="PRELIMINARY">Sơ loại (Preliminary)</Option>
-                <Option value="SEMIFINAL">Bán kết (Semifinal)</Option>
-                <Option value="FINAL">Chung kết (Final)</Option>
+                <Option value="PRELIMINARY" disabled={usedRoundTypes.has('PRELIMINARY')}>
+                  Sơ loại (Preliminary){usedRoundTypes.has('PRELIMINARY') ? ' — đã tạo' : ''}
+                </Option>
+                <Option value="SEMIFINAL" disabled={usedRoundTypes.has('SEMIFINAL')}>
+                  Bán kết (Semifinal){usedRoundTypes.has('SEMIFINAL') ? ' — đã tạo' : ''}
+                </Option>
+                <Option value="FINAL" disabled={usedRoundTypes.has('FINAL')}>
+                  Chung kết (Final){usedRoundTypes.has('FINAL') ? ' — đã tạo' : ''}
+                </Option>
               </Select>
             </Form.Item>
           </Col>
@@ -128,40 +211,80 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
                 </span>
               }
               dependencies={['submission_open']}
+              validateTrigger={['onChange', 'onBlur']}
               rules={[
                 { required: true, message: 'Vui lòng chọn ngày giờ thi' },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
                     const open = getFieldValue('submission_open');
-                    if (!value || !open || !dayjs(value).isBefore(dayjs(open))) {
+                    if (!value || !open || dayjs(value).isBefore(dayjs(open))) {
                       return Promise.resolve();
                     }
                     return Promise.reject(
-                      new Error('Ngày thi phải sau thời điểm mở nộp bài')
+                      new Error('Ngày giờ thi phải trước thời điểm mở nộp bài')
                     );
                   },
                 }),
               ]}
             >
-              <DatePicker showTime style={{ width: '100%' }} />
+              <DatePicker 
+                showTime 
+                style={{ width: '100%' }} 
+                disabledDate={getDisabledDate}
+                disabledTime={getDisabledTime}
+              />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item
-              name="submission_open"
-              label="Mở nộp bài"
-              dependencies={['exam_at', 'submission_deadline']}
+              name="coding_duration_hours"
+              label="Thời gian thi (Giờ)"
+              validateTrigger={['onChange', 'onBlur']}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (value === undefined || value === null || value > 0) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error('Thời lượng phải > 0'));
+                  },
+                }),
+              ]}
             >
-              <DatePicker
-                showTime
-                style={{ width: '100%' }}
-                disabledDate={(current) => current && current < dayjs().startOf('day')}
-              />
+              <InputNumber min={1} step={1} precision={0} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
         </Row>
 
         <Row gutter={24}>
+          <Col span={12}>
+            <Form.Item
+              name="submission_open"
+              label="Mở nộp bài"
+              dependencies={['exam_at', 'submission_deadline']}
+              validateTrigger={['onChange', 'onBlur']}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const examAt = getFieldValue('exam_at');
+                    if (!value || !examAt || dayjs(value).isAfter(dayjs(examAt))) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(
+                      new Error('Thời điểm mở nộp bài phải sau ngày giờ thi')
+                    );
+                  },
+                }),
+              ]}
+            >
+              <DatePicker
+                showTime
+                style={{ width: '100%' }}
+                disabledDate={getDisabledDate}
+                disabledTime={getDisabledTime}
+              />
+            </Form.Item>
+          </Col>
           <Col span={12}>
             <Form.Item
               name="submission_deadline"
@@ -184,27 +307,9 @@ const RoundFormModal = ({ visible, onCancel, onFinish, initialValues, title, exi
               <DatePicker
                 showTime
                 style={{ width: '100%' }}
-                disabledDate={(current) => current && current < dayjs().startOf('day')}
+                disabledDate={getDisabledDate}
+                disabledTime={getDisabledTime}
               />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="coding_duration_hours"
-              label="Thời gian thi (Giờ)"
-              validateTrigger={['onChange', 'onBlur']}
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator(_, value) {
-                    if (value === undefined || value === null || value > 0) {
-                      return Promise.resolve();
-                    }
-                    return Promise.reject(new Error('Thời lượng phải > 0'));
-                  },
-                }),
-              ]}
-            >
-              <InputNumber min={0.5} step={0.5} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
         </Row>

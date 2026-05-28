@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Layout, Menu, Button, theme, Input, Badge, Avatar, Space, Popover, List, Typography, Drawer, Grid } from 'antd';
+import { useState } from 'react';
+import axios from 'axios';
+import { Layout, Menu, Button, theme, Input, Badge, Avatar, Space, Popover, Typography, Drawer, Grid, Modal } from 'antd';
 import { 
   MenuFoldOutlined, 
   MenuUnfoldOutlined, 
@@ -10,7 +11,8 @@ import {
   LogoutOutlined,
   PlusOutlined,
   SunOutlined,
-  MoonOutlined
+  MoonOutlined,
+  LinkOutlined
 } from '@ant-design/icons';
 import {
   LayoutDashboard, Trophy, Users, Activity, BarChart3, Settings, HelpCircle,
@@ -19,6 +21,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
 import { useAppContext } from '../../../app/AppContext';
+import SocialLinkManager from '../../../features/auth/components/SocialLinkManager';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -27,6 +30,7 @@ const { useBreakpoint } = Grid;
 const MainLayout = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [socialLinkModalOpen, setSocialLinkModalOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
@@ -53,6 +57,24 @@ const MainLayout = ({ children }) => {
   const handleMenuClick = ({ key }) => {
     if (isMobile) setDrawerVisible(false);
     if (key === ROUTES.DASHBOARD || key === ROUTES.HACKATHONS) navigate(key);
+  };
+
+  const handleBottomMenuClick = async ({ key }) => {
+    if (isMobile) setDrawerVisible(false);
+    if (key === 'logout') {
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (refreshToken) {
+          await axios.post('/api/v1/auth/logout', { refreshToken });
+        }
+      } catch (error) {
+        console.error('Logout error:', error);
+      } finally {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        navigate(ROUTES.LOGIN);
+      }
+    }
   };
 
   // UI Helpers cho Notification
@@ -139,7 +161,7 @@ const MainLayout = ({ children }) => {
       )}
       <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100% - 180px)', justifyContent: 'space-between' }}>
         <Menu mode="inline" selectedKeys={[location.pathname]} items={menuItems} onClick={handleMenuClick} style={{ borderRight: 0 }} />
-        <Menu mode="inline" items={bottomMenuItems} style={{ borderRight: 0, marginBottom: 24 }} onClick={() => { if(isMobile) setDrawerVisible(false); }} />
+        <Menu mode="inline" items={bottomMenuItems} style={{ borderRight: 0, marginBottom: 24 }} onClick={handleBottomMenuClick} />
       </div>
     </>
   );
@@ -182,6 +204,12 @@ const MainLayout = ({ children }) => {
               onClick={toggleDarkMode}
               title={darkMode ? "Chuyển sang chế độ sáng" : "Chuyển sang chế độ tối"}
             />
+            <Button
+              type="text"
+              icon={<LinkOutlined style={{ fontSize: 20 }} />}
+              title="Liên kết tài khoản mạng xã hội"
+              onClick={() => setSocialLinkModalOpen(true)}
+            />
             {!isMobile && <Button type="text" icon={<SettingOutlined style={{ fontSize: 20 }} />} />}
             {!isMobile && <Button type="text" icon={<QuestionCircleOutlined style={{ fontSize: 20 }} />} />}
             <Avatar src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" style={{ cursor: 'pointer', border: `2px solid ${token.colorBorder}` }} />
@@ -192,6 +220,15 @@ const MainLayout = ({ children }) => {
           {children}
         </Content>
       </Layout>
+
+      <Modal
+        title="Liên kết tài khoản mạng xã hội"
+        open={socialLinkModalOpen}
+        onCancel={() => setSocialLinkModalOpen(false)}
+        footer={null}
+      >
+        <SocialLinkManager />
+      </Modal>
     </Layout>
   );
 };
