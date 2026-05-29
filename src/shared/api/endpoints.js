@@ -54,5 +54,11 @@ export const ENDPOINTS = {
     TRACK: (teamId, roundId) => `/api/v1/teams/${teamId}/rounds/${roundId}/track`,
     MENTOR: (teamId, roundId) => `/api/v1/teams/${teamId}/rounds/${roundId}/mentor`,
     MENTOR_HISTORY: (teamId) => `/api/v1/teams/${teamId}/mentors`,
-  }
+  },
+
+  USERS: {
+    ME: '/api/v1/users/me',
+    ME_STUDENT_CARD: '/api/v1/users/me/student-card',
+    STATUS: (userId) => `/api/v1/users/${userId}/status`,
+  },
 };

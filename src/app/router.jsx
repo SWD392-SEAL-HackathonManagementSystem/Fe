@@ -14,6 +14,7 @@ import CriteriaManagementPage from '../features/criteria/pages/CriteriaManagemen
 import ReviewValidatePage from '../features/review/pages/ReviewValidatePage';
 import LoginPage from '../features/auth/pages/LoginPage';
 import RegisterPage from '../features/auth/pages/RegisterPage';
+import OnboardingPage from '../features/auth/pages/OnboardingPage';
 import CoordinatorTeamPage from '../features/coordinator-teams/pages/CoordinatorTeamPage';
 import GithubCallbackPage from '../features/auth/pages/GithubCallbackPage';
 
@@ -76,10 +77,12 @@ const MainLayoutWrapper = () => (
 const AppRouter = () => {
   return (
     <Routes>
-      {/* Public Route */}
+      {/* Public Routes */}
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
       <Route path={ROUTES.GITHUB_CALLBACK} element={<GithubCallbackPage />} />
+      {/* Onboarding: accessible with accessToken but PENDING status */}
+      <Route path={ROUTES.ONBOARDING} element={<OnboardingPage />} />
 
       {/* Protected Routes inside MainLayout */}
       <Route element={<MainLayoutWrapper />}>

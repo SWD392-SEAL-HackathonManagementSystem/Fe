@@ -11,4 +11,5 @@ export const ROUTES = {
   LOGIN: '/login',
   REGISTER: '/register',
   GITHUB_CALLBACK: '/auth/github/callback',
+  ONBOARDING: '/onboarding',
 };
