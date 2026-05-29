@@ -45,8 +45,23 @@ const GithubCallbackPage = () => {
       markGithubCodeExchangeSuccess(code);
     }
     persistAuthTokens(data);
-    message.success('Đăng nhập GitHub thành công!');
-    navigate(ROUTES.DASHBOARD, { replace: true });
+
+    // Persist minimal userInfo for onboarding detection
+    try {
+      const userInfo = { email: data?.email, status: data?.status, role: data?.role, userId: data?.userId };
+      localStorage.setItem('userInfo', JSON.stringify(userInfo));
+    } catch { /* no-op */ }
+
+    // STUDENT + PENDING → onboarding flow
+    const role = data?.role;
+    const status = data?.status;
+    if (role === 'STUDENT' && status === 'PENDING') {
+      message.success('Đăng nhập GitHub thành công! Hãy hoàn thiện hồ sơ.');
+      navigate(ROUTES.ONBOARDING, { replace: true });
+    } else {
+      message.success('Đăng nhập GitHub thành công!');
+      navigate(ROUTES.DASHBOARD, { replace: true });
+    }
   };
 
   const finishLinkSuccess = (returnTo) => {
