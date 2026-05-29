@@ -1,6 +1,8 @@
 export const ROUTES = {
   LANDING: '/',
   DASHBOARD: '/dashboard',
+  STUDENT_TEAM: '/student/team',
+  STUDENT_INVITATIONS: '/student/invitations',
   HACKATHONS: '/hackathons',
   HACKATHON_CREATE: '/hackathons/create',
   HACKATHON_SETUP: '/hackathons/:hackathonId/setup',
