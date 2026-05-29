@@ -9,6 +9,7 @@ export const ENDPOINTS = {
     OAUTH_GITHUB_LINK_CODE: '/api/v1/auth/oauth/github/link/code',
     OAUTH_GOOGLE_UNLINK: '/api/v1/auth/oauth/google/unlink',
     OAUTH_GITHUB_UNLINK: '/api/v1/auth/oauth/github/unlink',
+    CHANGE_PASSWORD: '/api/v1/auth/change-password',
   },
   HACKATHONS: {
     BASE: '/api/v1/hackathons',
@@ -60,5 +61,9 @@ export const ENDPOINTS = {
     ME: '/api/v1/users/me',
     ME_STUDENT_CARD: '/api/v1/users/me/student-card',
     STATUS: (userId) => `/api/v1/users/${userId}/status`,
+    LIST: '/api/v1/users',
+    DETAIL: (userId) => `/api/v1/users/${userId}`,
+    TEMP_JUDGES: '/api/v1/users/temp-judges',
+    RESEND_INVITATION: (invitationId) => `/api/v1/invitations/${invitationId}/resend`,
   },
 };

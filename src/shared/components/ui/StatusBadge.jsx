@@ -20,6 +20,14 @@ const StatusBadge = ({ status }) => {
         return { color: 'green', text: 'Đang hoạt động' };
       case 'INACTIVE':
         return { color: 'default', text: 'Ngưng hoạt động' };
+      case 'PENDING':
+        return { color: 'gold', text: 'Chờ duyệt' };
+      case 'APPROVED':
+        return { color: 'green', text: 'Đã duyệt' };
+      case 'REJECTED':
+        return { color: 'red', text: 'Đã từ chối' };
+      case 'ELIMINATED':
+        return { color: 'red', text: 'Đã bị loại' };
       default:
         return { color: 'default', text: status };
     }
