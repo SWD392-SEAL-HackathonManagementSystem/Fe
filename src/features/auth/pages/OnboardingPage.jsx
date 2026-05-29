@@ -89,6 +89,7 @@ const OnboardingPage = () => {
       // Persist progress locally
       const updated = { ...getUserInfo(), profileCompleted: true };
       localStorage.setItem('userInfo', JSON.stringify(updated));
+      window.dispatchEvent(new Event('userInfoUpdated'));
 
       message.success('Thông tin hồ sơ đã được cập nhật!');
       setCurrentStep(1);
@@ -115,6 +116,7 @@ const OnboardingPage = () => {
 
       const updated = { ...getUserInfo(), studentCardUploaded: true };
       localStorage.setItem('userInfo', JSON.stringify(updated));
+      window.dispatchEvent(new Event('userInfoUpdated'));
 
       setHasCard(true);
       message.success('Tải lên thẻ sinh viên thành công!');
