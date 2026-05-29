@@ -1,4 +1,3 @@
-import React from 'react';
 import { Routes, Route, Navigate, Outlet, useParams, useNavigate } from 'react-router-dom';
 import MainLayout from '../shared/components/layout/MainLayout';
 import { ROUTES } from '../shared/constants/routes';
@@ -16,6 +15,7 @@ import LoginPage from '../features/auth/pages/LoginPage';
 import RegisterPage from '../features/auth/pages/RegisterPage';
 import CoordinatorTeamPage from '../features/coordinator-teams/pages/CoordinatorTeamPage';
 import GithubCallbackPage from '../features/auth/pages/GithubCallbackPage';
+import LandingPage from '../landing/pages/LandingPage';
 
 const TrackWrapper = () => {
   const { hackathonId } = useParams();
@@ -77,6 +77,7 @@ const AppRouter = () => {
   return (
     <Routes>
       {/* Public Route */}
+      <Route path={ROUTES.LANDING} element={<LandingPage />} />
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
       <Route path={ROUTES.GITHUB_CALLBACK} element={<GithubCallbackPage />} />
@@ -97,7 +98,7 @@ const AppRouter = () => {
       </Route>
 
       {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
     </Routes>
   );
 };

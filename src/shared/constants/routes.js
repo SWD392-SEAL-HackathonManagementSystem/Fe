@@ -1,5 +1,6 @@
 export const ROUTES = {
-  DASHBOARD: '/',
+  LANDING: '/',
+  DASHBOARD: '/dashboard',
   HACKATHONS: '/hackathons',
   HACKATHON_CREATE: '/hackathons/create',
   HACKATHON_SETUP: '/hackathons/:hackathonId/setup',
