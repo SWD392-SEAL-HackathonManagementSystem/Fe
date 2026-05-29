@@ -12,4 +12,9 @@ export const ROUTES = {
   LOGIN: '/login',
   REGISTER: '/register',
   GITHUB_CALLBACK: '/auth/github/callback',
+  ONBOARDING: '/onboarding',
+  CHANGE_PASSWORD: '/change-password',
+  USER_APPROVAL: '/admin/users',
+  TEMP_JUDGES: '/admin/temp-judges',
+  PROFILE: '/profile',
 };

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Layout, Menu, Button, theme, Input, Badge, Avatar, Space, Popover, Typography, Drawer, Grid, Modal } from 'antd';
 import { 
@@ -16,7 +16,7 @@ import {
 } from '@ant-design/icons';
 import {
   LayoutDashboard, Trophy, Users, Activity, BarChart3, Settings, HelpCircle,
-  Mail, CalendarClock, AlertTriangle, CheckCheck
+  Mail, CalendarClock, AlertTriangle, CheckCheck, UserCheck, UserPlus, User
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
@@ -41,10 +41,65 @@ const MainLayout = ({ children }) => {
   const match = location.pathname.match(/\/hackathons\/(\d+)/);
   const { notifications, markAsRead, darkMode, toggleDarkMode } = useAppContext();
 
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('userInfo') || '{}');
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    const accessToken = localStorage.getItem('accessToken');
+    if (accessToken && !currentUser.role) {
+      import('../../../features/auth/services/userService')
+        .then(({ userService }) => userService.getMe())
+        .then((res) => {
+          const info = {
+            email: res?.email || res?.data?.email,
+            status: res?.status || res?.data?.status,
+            role: res?.role || res?.data?.role,
+            userId: res?.userId || res?.id || res?.data?.userId || res?.data?.id,
+          };
+          localStorage.setItem('userInfo', JSON.stringify(info));
+          setCurrentUser(info);
+
+          // Force redirect if temporary judge must change password
+          if (res?.mustChangePassword || res?.data?.mustChangePassword || res?.mustChangePassword === true) {
+            window.location.replace('/change-password');
+            return;
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to auto-fetch user profile:', err);
+        });
+    }
+  }, [currentUser.role]);
+
+  useEffect(() => {
+    const handleUserInfoUpdated = () => {
+      try {
+        const info = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        setCurrentUser(info);
+      } catch (e) {
+        // no-op
+      }
+    };
+    window.addEventListener('userInfoUpdated', handleUserInfoUpdated);
+    return () => window.removeEventListener('userInfoUpdated', handleUserInfoUpdated);
+  }, []);
+
+  const isCoordinatorOrAdmin = currentUser.role === 'COORDINATOR' || currentUser.role === 'ADMIN';
+
   const menuItems = [
     { key: ROUTES.DASHBOARD, icon: <LayoutDashboard size={18} />, label: 'Tổng quan' },
+    { key: ROUTES.PROFILE, icon: <User size={18} />, label: 'Trang cá nhân' },
     { key: ROUTES.HACKATHONS, icon: <Trophy size={18} />, label: 'Cấu hình Sự kiện' },
     { key: ROUTES.GLOBAL_TEAMS, icon: <Users size={18} />, label: 'Quản lý Đội thi' },
+    ...(isCoordinatorOrAdmin ? [
+      { key: ROUTES.USER_APPROVAL, icon: <UserCheck size={18} />, label: 'Duyệt tài khoản' },
+      { key: ROUTES.TEMP_JUDGES, icon: <UserPlus size={18} />, label: 'Giám khảo khách' }
+    ] : []),
     { key: 'monitor', icon: <Activity size={18} />, label: 'Giám sát Real-time' },
     { key: 'analytics', icon: <BarChart3 size={18} />, label: 'Phân tích dữ liệu' },
     { key: 'settings', icon: <Settings size={18} />, label: 'Cài đặt Hệ thống' },
@@ -57,7 +112,15 @@ const MainLayout = ({ children }) => {
 
   const handleMenuClick = ({ key }) => {
     if (isMobile) setDrawerVisible(false);
-    if (key === ROUTES.DASHBOARD || key === ROUTES.HACKATHONS || key === ROUTES.GLOBAL_TEAMS) navigate(key);
+    if (
+      key === ROUTES.DASHBOARD ||
+      key === ROUTES.HACKATHONS ||
+      key === ROUTES.GLOBAL_TEAMS ||
+      key === ROUTES.USER_APPROVAL ||
+      key === ROUTES.TEMP_JUDGES
+    ) {
+      navigate(key);
+    }
   };
 
   const handleBottomMenuClick = async ({ key }) => {
@@ -213,7 +276,11 @@ const MainLayout = ({ children }) => {
             />
             {!isMobile && <Button type="text" icon={<SettingOutlined style={{ fontSize: 20 }} />} />}
             {!isMobile && <Button type="text" icon={<QuestionCircleOutlined style={{ fontSize: 20 }} />} />}
-            <Avatar src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" style={{ cursor: 'pointer', border: `2px solid ${token.colorBorder}` }} />
+            <Avatar 
+              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" 
+              style={{ cursor: 'pointer', border: `2px solid ${token.colorBorder}` }} 
+              onClick={() => navigate(ROUTES.PROFILE)}
+            />
           </Space>
         </Header>
         

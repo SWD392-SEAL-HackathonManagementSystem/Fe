@@ -36,7 +36,10 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
           <Form.Item
             name="slug"
             label="Đường dẫn (Slug)"
-            rules={[{ required: true, message: 'Vui lòng nhập slug' }]}
+            rules={[
+              { required: true, message: 'Vui lòng nhập slug' },
+              { pattern: /^[a-z0-9-]+$/, message: 'Slug chỉ chứa ký tự thường a-z, số 0-9 và dấu gạch ngang (-)' }
+            ]}
           >
             <Input placeholder="Ví dụ: seal-xuan-2026" />
           </Form.Item>
@@ -86,6 +89,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
           <Form.Item
             name="registration_start"
             label="Bắt đầu Đăng ký"
+            rules={[{ required: true, message: 'Vui lòng chọn ngày bắt đầu đăng ký' }]}
           >
             <DatePicker 
               showTime 
@@ -100,6 +104,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
             label="Kết thúc Đăng ký"
             dependencies={['registration_start']}
             rules={[
+              { required: true, message: 'Vui lòng chọn ngày kết thúc đăng ký' },
               ({ getFieldValue }) => ({
                 validator(_, value) {
                   const start = getFieldValue('registration_start');
@@ -114,7 +119,10 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
             <DatePicker 
               showTime 
               style={{ width: '100%' }} 
-              disabledDate={(current) => current && current < dayjs().startOf('day')}
+              disabledDate={(current) => {
+                const regStart = form.getFieldValue('registration_start');
+                return current && (current < dayjs().startOf('day') || (regStart && current < dayjs(regStart).startOf('day')));
+              }}
             />
           </Form.Item>
         </Col>
@@ -127,6 +135,7 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
             label="Bắt đầu Sự kiện"
             dependencies={['registration_end']}
             rules={[
+              { required: true, message: 'Vui lòng chọn ngày bắt đầu sự kiện' },
               ({ getFieldValue }) => ({
                 validator(_, value) {
                   const regEnd = getFieldValue('registration_end');
@@ -141,7 +150,10 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
             <DatePicker 
               showTime 
               style={{ width: '100%' }} 
-              disabledDate={(current) => current && current < dayjs().startOf('day')}
+              disabledDate={(current) => {
+                const regEnd = form.getFieldValue('registration_end');
+                return current && (current < dayjs().startOf('day') || (regEnd && current < dayjs(regEnd).startOf('day')));
+              }}
             />
           </Form.Item>
         </Col>
@@ -149,15 +161,23 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
           <Form.Item
             name="event_end"
             label="Kết thúc Sự kiện"
-            dependencies={['event_start']}
+            dependencies={['event_start', 'registration_end']}
             rules={[
+              { required: true, message: 'Vui lòng chọn ngày kết thúc sự kiện' },
               ({ getFieldValue }) => ({
                 validator(_, value) {
                   const start = getFieldValue('event_start');
-                  if (!value || !start || dayjs(value).isAfter(dayjs(start)) || dayjs(value).isSame(dayjs(start))) {
-                    return Promise.resolve();
+                  const regEnd = getFieldValue('registration_end');
+                  if (value && start && dayjs(value).isBefore(dayjs(start))) {
+                    return Promise.reject(new Error('Ngày kết thúc sự kiện phải sau hoặc bằng ngày bắt đầu'));
                   }
-                  return Promise.reject(new Error('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu'));
+                  if (value && regEnd) {
+                    const minAllowed = dayjs(regEnd).add(5, 'day').startOf('day');
+                    if (dayjs(value).startOf('day').isBefore(minAllowed)) {
+                      return Promise.reject(new Error('Ngày kết thúc sự kiện phải cách ngày hạn đăng ký ít nhất 5 ngày (để thiết lập vòng thi)'));
+                    }
+                  }
+                  return Promise.resolve();
                 },
               }),
             ]}
@@ -165,7 +185,21 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
             <DatePicker 
               showTime 
               style={{ width: '100%' }} 
-              disabledDate={(current) => current && current < dayjs().startOf('day')}
+              disabledDate={(current) => {
+                const eventStart = form.getFieldValue('event_start');
+                const regEnd = form.getFieldValue('registration_end');
+                let minDate = dayjs().startOf('day');
+                if (eventStart && dayjs(eventStart).startOf('day').isAfter(minDate)) {
+                  minDate = dayjs(eventStart).startOf('day');
+                }
+                if (regEnd) {
+                  const regEndPlus5 = dayjs(regEnd).add(5, 'day').startOf('day');
+                  if (regEndPlus5.isAfter(minDate)) {
+                    minDate = regEndPlus5;
+                  }
+                }
+                return current && current < minDate;
+              }}
             />
           </Form.Item>
         </Col>

@@ -8,6 +8,46 @@ import { authService, persistAuthTokens } from '../services/authService';
 import { resolveOAuthError } from '../constants/oauthErrors';
 import { startGithubOAuth } from '../utils/githubOAuth';
 
+// ---------------------------------------------------------------------------
+// Error code mapping theo BE contract mới
+// ---------------------------------------------------------------------------
+const LOGIN_ERROR_MESSAGES = {
+  INVALID_CREDENTIALS: 'Email hoặc mật khẩu không đúng.',
+  ACCOUNT_PENDING: 'Tài khoản của bạn đang chờ xét duyệt. Sinh viên có thể đăng nhập và hoàn thiện hồ sơ.',
+  ACCOUNT_PENDING_NOT_ALLOWED_LOGIN: 'Tài khoản của bạn chưa được phê duyệt. Vui lòng đợi Coordinator duyệt hồ sơ.',
+  REJECTED_NOT_ALLOWED_LOGIN: 'Tài khoản đã bị từ chối. Vui lòng liên hệ Coordinator để được hỗ trợ.',
+  INVITATION_EXPIRED: 'Lời mời tham gia của bạn đã hết hạn.',
+  TEMP_JUDGE_HACKATHON_ENDED: 'Sự kiện Hackathon đã kết thúc. Tài khoản giám khảo tạm thời không còn hiệu lực.',
+};
+
+const resolveLoginError = (error) => {
+  const code = error?.code || error?.data?.error?.code;
+  return LOGIN_ERROR_MESSAGES[code] || error?.message || 'Có lỗi xảy ra khi đăng nhập. Vui lòng kiểm tra lại thông tin!';
+};
+
+/**
+ * After login, determine where to send the user:
+ *  - STUDENT + PENDING  → /onboarding  (hoàn thiện hồ sơ)
+ *  - everyone else      → /  (dashboard)
+ */
+const resolvePostLoginRoute = (authData) => {
+  return ROUTES.DASHBOARD;
+};
+
+const persistUserInfo = (authData) => {
+  try {
+    const userInfo = {
+      email: authData?.email || authData?.user?.email,
+      status: authData?.status || authData?.user?.status,
+      role: authData?.role || authData?.user?.role,
+      userId: authData?.userId || authData?.user?.userId || authData?.user?.id,
+    };
+    localStorage.setItem('userInfo', JSON.stringify(userInfo));
+  } catch {
+    // no-op
+  }
+};
+
 const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -27,8 +67,21 @@ const LoginPage = () => {
       const authData = await authService.loginWithGoogle(tokenValue, existingAccountPassword);
 
       persistAuthTokens(authData);
-      message.success('Đăng nhập Google thành công!');
-      navigate(ROUTES.DASHBOARD);
+      persistUserInfo(authData);
+
+      if (authData?.mustChangePassword || authData?.user?.mustChangePassword) {
+        message.warning('Tài khoản yêu cầu đổi mật khẩu trước khi sử dụng!');
+        navigate(ROUTES.CHANGE_PASSWORD);
+        return;
+      }
+
+      const destination = resolvePostLoginRoute(authData);
+      if (destination === ROUTES.ONBOARDING) {
+        message.success('Đăng nhập thành công! Hãy hoàn thiện hồ sơ để được duyệt.');
+      } else {
+        message.success('Đăng nhập Google thành công!');
+      }
+      window.location.replace(destination);
     } catch (error) {
       const resolved = resolveOAuthError(error, 'Đăng nhập Google thất bại.');
       if (resolved.requiresPassword) {
@@ -93,12 +146,24 @@ const LoginPage = () => {
     try {
       const authData = await authService.login(values.email, values.password);
       persistAuthTokens(authData);
-      message.success('Đăng nhập thành công!');
-      navigate(ROUTES.DASHBOARD);
+      persistUserInfo(authData);
+      
+      if (authData?.mustChangePassword || authData?.user?.mustChangePassword) {
+        message.warning('Tài khoản yêu cầu đổi mật khẩu trước khi sử dụng!');
+        navigate(ROUTES.CHANGE_PASSWORD);
+        return;
+      }
+
+      const destination = resolvePostLoginRoute(authData);
+      if (destination === ROUTES.ONBOARDING) {
+        message.success('Đăng nhập thành công! Hãy hoàn thiện hồ sơ để được Coordinator duyệt.');
+      } else {
+        message.success('Đăng nhập thành công!');
+      }
+      navigate(destination);
     } catch (error) {
       console.error('Login error:', error);
-      const errorMsg = error.response?.data?.error?.message || error.response?.data?.message || 'Có lỗi xảy ra khi đăng nhập. Vui lòng kiểm tra lại thông tin!';
-      message.error(errorMsg);
+      message.error(resolveLoginError(error));
     } finally {
       setLoading(false);
     }
