@@ -51,9 +51,6 @@ const TeamDesktopTable = ({
           </Text>
           <Space size={[6, 6]} wrap>
             {record.isLocked && <Tag color="default">Đã khóa</Tag>}
-            {record.hasPendingInvites && (
-              <Tag color="orange">{record.pendingInviteCount} pending</Tag>
-            )}
           </Space>
         </Space>
       ),
@@ -123,9 +120,9 @@ const TeamDesktopTable = ({
       size="middle"
       style={{
         background: token.colorBgContainer,
-        border: `1px solid ${token.colorBorderSecondary}`,
-        borderRadius: token.borderRadius,
-        boxShadow: token.boxShadowTertiary,
+        borderRadius: token.borderRadiusLG * 1.5,
+        boxShadow: "0 12px 32px rgba(0, 0, 0, 0.05), 0 2px 6px rgba(0, 0, 0, 0.02)",
+        overflow: "hidden",
       }}
       expandable={{
         expandedRowRender: renderExpandedRow,
