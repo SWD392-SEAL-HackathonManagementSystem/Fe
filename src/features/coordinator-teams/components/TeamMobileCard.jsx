@@ -35,12 +35,13 @@ const TeamMobileCard = ({
       exit={{ opacity: 0, y: 8 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
       style={{
-        background: token.colorBgContainer,
+        background: `linear-gradient(180deg, ${token.colorBgContainer}, ${token.colorBgLayout})`,
         border: `1px solid ${token.colorBorderSecondary}`,
-        borderRadius: token.borderRadius,
-        boxShadow: token.boxShadowTertiary,
-        padding: 14,
+        borderRadius: token.borderRadiusLG * 1.5,
+        boxShadow: "0 6px 16px rgba(0,0,0,0.04)",
+        padding: 16,
       }}
+      whileHover={{ y: -2, boxShadow: "0 12px 24px rgba(0,0,0,0.08)" }}
     >
       <div
         style={{
@@ -78,9 +79,6 @@ const TeamMobileCard = ({
             <Tag color={team.isInvalidMemberCount ? "error" : "green"}>
               {team.memberStats}
             </Tag>
-            {team.hasPendingInvites && (
-              <Tag color="orange">{team.pendingInviteCount} pending</Tag>
-            )}
             {team.isLocked && (
               <Tag icon={<LockOutlined />} color="default">
                 Đã khóa

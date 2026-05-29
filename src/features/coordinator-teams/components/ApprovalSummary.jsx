@@ -1,4 +1,5 @@
 import { Grid, Typography, theme } from "antd";
+import { motion } from "framer-motion";
 
 const { Title, Text } = Typography;
 const { useBreakpoint } = Grid;
@@ -34,32 +35,37 @@ const ApprovalSummary = ({ title, description, metrics }) => {
             : "repeat(3, 124px)",
         }}
       >
-        {metrics.map((metric) => (
-          <div
+        {metrics.map((metric, index) => (
+          <motion.div
             key={metric.label}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1, duration: 0.4, type: "spring" }}
+            whileHover={{ y: -4, boxShadow: "0 12px 24px rgba(0,0,0,0.08)" }}
             style={{
-              background: token.colorBgContainer,
+              background: `linear-gradient(145deg, ${token.colorBgContainer}, ${token.colorBgLayout})`,
               border: `1px solid ${token.colorBorderSecondary}`,
-              borderRadius: token.borderRadius,
-              boxShadow: token.boxShadowTertiary,
+              borderRadius: token.borderRadiusLG * 1.5,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
               minWidth: 0,
-              padding: "12px 14px",
+              padding: "16px 20px",
+              cursor: "pointer",
             }}
           >
             <div
               style={{
-                color: token.colorText,
-                fontSize: 22,
-                fontWeight: 750,
+                color: token.colorPrimary,
+                fontSize: 26,
+                fontWeight: 800,
                 lineHeight: 1,
               }}
             >
               {metric.value}
             </div>
-            <div style={{ color: token.colorTextSecondary, fontSize: 12, marginTop: 6 }}>
+            <div style={{ color: token.colorTextSecondary, fontSize: 13, marginTop: 8, fontWeight: 500 }}>
               {metric.label}
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
     </div>
