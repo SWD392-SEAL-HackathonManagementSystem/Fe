@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { Modal, Form, Input, InputNumber, Select, theme } from "antd";
-import { CRITERIA_TYPES } from "../constants/criteria.constants";
+import { CRITERIA_TYPE_OPTIONS } from "../constants/criteria.constants";
 
 const { TextArea } = Input;
 
@@ -64,7 +64,7 @@ export const CriteriaFormModal = ({
         </Form.Item>
         <Form.Item name="type" label="Phân loại" rules={[{ required: true }]}>
           <Select size="large">
-            {CRITERIA_TYPES.map((t) => (
+            {CRITERIA_TYPE_OPTIONS.map((t) => (
               <Select.Option key={t} value={t}>
                 {t}
               </Select.Option>
@@ -79,6 +79,7 @@ export const CriteriaFormModal = ({
             label="Trọng số"
             rules={[{ required: true }]}
             style={{ flex: 1 }}
+            help="PENALTY không tính vào tổng"
           >
             <InputNumber
               size="large"
@@ -124,6 +125,13 @@ export const CriteriaFormModal = ({
           rules={[{ required: true }]}
         >
           <TextArea rows={4} maxLength={500} />
+        </Form.Item>
+        <Form.Item
+          name="rubric_url"
+          label="Rubric URL"
+          rules={[{ type: "url", message: "URL không hợp lệ", warningOnly: true }]}
+        >
+          <Input size="large" placeholder="https://..." />
         </Form.Item>
       </Form>
     </Modal>

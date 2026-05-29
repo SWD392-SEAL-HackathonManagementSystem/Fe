@@ -45,8 +45,15 @@ const GithubCallbackPage = () => {
       markGithubCodeExchangeSuccess(code);
     }
     persistAuthTokens(data);
+
+    // Persist minimal userInfo for onboarding detection
+    try {
+      const userInfo = { email: data?.email, status: data?.status, role: data?.role, userId: data?.userId };
+      localStorage.setItem('userInfo', JSON.stringify(userInfo));
+    } catch { /* no-op */ }
+
     message.success('Đăng nhập GitHub thành công!');
-    navigate(ROUTES.DASHBOARD, { replace: true });
+    window.location.replace(ROUTES.DASHBOARD);
   };
 
   const finishLinkSuccess = (returnTo) => {
@@ -67,7 +74,7 @@ const GithubCallbackPage = () => {
       // no-op
     }
     message.success('Liên kết GitHub thành công!');
-    navigate(returnTo || ROUTES.DASHBOARD, { replace: true });
+    window.location.replace(returnTo || ROUTES.DASHBOARD);
   };
 
   useEffect(() => {
