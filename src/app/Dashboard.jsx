@@ -380,12 +380,24 @@ const Dashboard = () => {
           };
           localStorage.setItem('userInfo', JSON.stringify(info));
           setUserProfile(info);
-
         })
         .catch((err) => {
           console.error('Failed to sync profile in dashboard:', err);
         });
     }
+  }, []);
+
+  useEffect(() => {
+    const handleUserInfoUpdated = () => {
+      try {
+        const info = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        setUserProfile(info);
+      } catch (e) {
+        // no-op
+      }
+    };
+    window.addEventListener('userInfoUpdated', handleUserInfoUpdated);
+    return () => window.removeEventListener('userInfoUpdated', handleUserInfoUpdated);
   }, []);
 
   if (userProfile.role === 'STUDENT') {

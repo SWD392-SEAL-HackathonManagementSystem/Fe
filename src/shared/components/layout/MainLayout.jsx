@@ -76,6 +76,19 @@ const MainLayout = ({ children }) => {
     }
   }, [currentUser.role]);
 
+  useEffect(() => {
+    const handleUserInfoUpdated = () => {
+      try {
+        const info = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        setCurrentUser(info);
+      } catch (e) {
+        // no-op
+      }
+    };
+    window.addEventListener('userInfoUpdated', handleUserInfoUpdated);
+    return () => window.removeEventListener('userInfoUpdated', handleUserInfoUpdated);
+  }, []);
+
   const isCoordinatorOrAdmin = currentUser.role === 'COORDINATOR' || currentUser.role === 'ADMIN';
 
   const menuItems = [
