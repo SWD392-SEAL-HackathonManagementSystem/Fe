@@ -19,6 +19,16 @@ export const ENDPOINTS = {
     ROUNDS: (hackathonId) => `/api/v1/hackathons/${hackathonId}/rounds`,
     TRACKS: (hackathonId) => `/api/v1/hackathons/${hackathonId}/tracks`,
     EVENTS: (hackathonId) => `/api/v1/hackathons/${hackathonId}/events`,
+    LOTTERY: (hackathonId) => `/api/v1/hackathons/${hackathonId}/lottery`,
+  },
+  TEAMS: {
+    BASE: '/api/v1/teams',
+    DETAIL: (teamId) => `/api/v1/teams/${teamId}`,
+    // FR-13B-R: Đổi track
+    UPDATE_TRACK: (teamId, roundId) => `/api/v1/teams/${teamId}/rounds/${roundId}/track`,
+    // FR-13C: Quản lý Mentor theo vòng
+    MENTOR: (teamId, roundId) => `/api/v1/teams/${teamId}/rounds/${roundId}/mentor`,
+    MENTOR_HISTORY: (teamId) => `/api/v1/teams/${teamId}/mentors`,
   },
   ROUNDS: {
     BASE: '/api/v1/rounds',

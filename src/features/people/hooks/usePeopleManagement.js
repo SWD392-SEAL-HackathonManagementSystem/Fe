@@ -1,30 +1,110 @@
+// src/features/people/hooks/usePeopleManagement.js
 import { useState, useEffect, useCallback } from 'react';
 import { message } from 'antd';
-import { roundService } from '../../rounds/services/roundService';
+import { peopleService } from '../services/peopleService';
+import { teamService } from '../../teams/services/teamService';
 import { trackService } from '../../tracks/services/trackService';
-// GIẢ ĐỊNH: Bạn cần có một file peopleService.js chứa các hàm gọi Axios (POST temp-judge, POST mentor-assignment,...)
-// import { peopleService } from '../services/peopleService'; 
-import { useAppContext } from '../../../app/AppContext';
+import { roundService } from '../../rounds/services/roundService';
+import { getTeamErrorMessage } from '../../../shared/constants/teamErrors';
 
 export const usePeopleManagement = (hackathonId) => {
-  const { people, assignments, addPerson, assignRole, removeAssignment } = useAppContext();
+  const [mentors, setMentors] = useState([]);
+  const [judges, setJudges] = useState([]);
+  const [tempJudges, setTempJudges] = useState([]);
   
   const [tracks, setTracks] = useState([]);
   const [rounds, setRounds] = useState([]);
+  const [activeTeams, setActiveTeams] = useState([]);
+  
+  const [teamMentors, setTeamMentors] = useState([]);
+  const [judgeAssignments, setJudgeAssignments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Fetch Tracks & Rounds từ BE
   const fetchBaseData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [tRes, rRes] = await Promise.all([
+      // 1. Tải cấu trúc giải đấu và các Đội thi (Active)
+      const [rRes, tRes, teamsRes] = await Promise.all([
+        roundService.listByHackathon(hackathonId),
         trackService.listByHackathon(hackathonId),
-        roundService.listByHackathon(hackathonId)
+        teamService.listByHackathon(hackathonId, { status: 'ACTIVE', size: 300 })
       ]);
-      setTracks(Array.isArray(tRes) ? tRes : tRes?.items || []);
-      setRounds(Array.isArray(rRes) ? rRes : rRes?.items || []);
+      const roundList = Array.isArray(rRes) ? rRes : rRes?.items || [];
+      const trackList = Array.isArray(tRes) ? tRes : tRes?.items || [];
+      const teamList = Array.isArray(teamsRes) ? teamsRes : teamsRes?.items || [];
+
+      setRounds(roundList);
+      setTracks(trackList);
+      setActiveTeams(teamList);
+
+      // 2. Tải danh sách Users
+      const [mRes, jRes, tempRes] = await Promise.all([
+        peopleService.getUsersByRole('MENTOR').catch(() => []),
+        peopleService.getUsersByRole('JUDGE').catch(() => []),
+        peopleService.getTempJudges().catch(() => [])
+      ]);
+      setMentors(Array.isArray(mRes) ? mRes : mRes?.items || []);
+      setJudges(Array.isArray(jRes) ? jRes : jRes?.items || []);
+      setTempJudges(Array.isArray(tempRes) ? tempRes : tempRes?.items || []);
+
+      // 3. Tải Lịch sử Phân công MENTOR (Cho từng Đội thi)
+      const mentorPromises = teamList.map(team => 
+        peopleService.getTeamMentors(team.id)
+          .then(res => ({ team, data: Array.isArray(res) ? res : res?.items || [] }))
+          .catch(() => ({ team, data: [] }))
+      );
+      const mentorResults = await Promise.all(mentorPromises);
+      let allMentors = [];
+      mentorResults.forEach(({ team, data }) => {
+        data.forEach(m => {
+          allMentors.push({
+            id: `${team.id}_${m.roundId || m.round_id}`,
+            team_id: team.id,
+            team_name: team.teamName || team.team_name,
+            round_id: m.roundId || m.round_id,
+            mentor_id: m.mentorId || m.mentor_id || m.id,
+            mentor_name: m.mentorName || m.name || m.fullName || m.full_name
+          });
+        });
+      });
+      setTeamMentors(allMentors);
+
+      // 4. Tải Lịch sử Phân công GIÁM KHẢO (Theo Track & Vòng Chung kết)
+      const trackJudgePromises = trackList.map(track => 
+        peopleService.getTrackJudges(track.id)
+          .then(res => ({ targetName: `Bảng: ${track.name}`, judges: Array.isArray(res) ? res : res?.items || [] }))
+          .catch(() => ({ targetName: `Bảng: ${track.name}`, judges: [] }))
+      );
+      const finalRounds = roundList.filter(r => r.is_final || r.isFinal);
+      const roundJudgePromises = finalRounds.map(round => 
+        peopleService.getRoundJudges(round.id)
+          .then(res => ({ targetName: `Vòng: ${round.name}`, judges: Array.isArray(res) ? res : res?.items || [] }))
+          .catch(() => ({ targetName: `Vòng: ${round.name}`, judges: [] }))
+      );
+      
+      const [trackJResults, roundJResults] = await Promise.all([
+        Promise.all(trackJudgePromises), 
+        Promise.all(roundJudgePromises)
+      ]);
+      
+      let allJudges = [];
+      [...trackJResults, ...roundJResults].forEach(({ targetName, judges }) => {
+        judges.forEach(j => {
+          allJudges.push({
+            id: j.id || j.assignmentId,
+            target_name: targetName,
+            // Hỗ trợ đọc object lồng nhau từ BE (vd: j.judge.fullName)
+            judge_name: j.judge?.fullName || j.judge?.name || j.user?.fullName || j.judgeName || j.fullName || j.name,
+            // Lấy thêm person_id để UI quét chéo danh sách
+            person_id: j.judge?.id || j.user?.id || j.judgeId || j.userId,
+            assignment_type: j.assignmentType || j.assignment_type || 'NORMAL'
+          });
+        });
+      });
+      setJudgeAssignments(allJudges);
+
     } catch (err) {
-      message.error('Lỗi khi tải dữ liệu Vòng thi/Bảng đấu từ Server');
+      message.error('Lỗi khi đồng bộ dữ liệu nhân sự.');
     } finally {
       setIsLoading(false);
     }
@@ -34,98 +114,88 @@ export const usePeopleManagement = (hackathonId) => {
     fetchBaseData();
   }, [fetchBaseData]);
 
-  const hackathonAssignments = assignments.filter(a => a.hackathon_id === hackathonId);
-
-  // Helper kiểm tra vòng chung kết
-  const checkIsFinalRound = (round) => {
-    if (!round) return false;
-    return round.isFinal || round.is_final || round.name?.toLowerCase().includes('chung kết') || round.name?.toLowerCase().includes('final');
-  };
-
-  // 2. Logic Mời Giám khảo (Call API POST /temp-judges)
+  // Hành động gọi API POST / DELETE
   const createTempJudge = async (values, onSuccess) => {
     setIsLoading(true);
     try {
-      // TODO: Thay bằng hàm call API thật khi bạn có peopleService
-      // await peopleService.createTempJudge(values);
-      
-      addPerson({ ...values, role: 'JUDGE', status: 'PENDING' }); // Tạm lưu Local để UI cập nhật
-      message.success('Đã tạo tài khoản và gửi lời mời Giám khảo thành công');
+      await peopleService.createTempJudge({ ...values, hackathonId });
+      message.success('Đã gửi lời mời Giám khảo khách mời thành công!');
+      await fetchBaseData();
       if (onSuccess) onSuccess();
     } catch (error) {
-      message.error(error.message || 'Lỗi khi mời giám khảo');
+      message.error(getTeamErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 3. Logic Phân công (Call API POST /judge-assignments hoặc /mentor-assignments)
-  const assignPerson = async (values, type, onSuccess) => {
-    // Logic 1: Kiểm tra trùng lặp
-    const isExist = hackathonAssignments.some(a => 
-      a.person_id === values.person_id && a.type === type && (a.track_id === values.track_id || a.round_id === values.round_id)
-    );
-    if (isExist) return message.error('Nhân sự này đã được phân công vào hạng mục này rồi!');
-
-    const isMentorAnywhere = hackathonAssignments.some(a => a.type === 'MENTOR' && a.person_id === values.person_id);
-    const isHeadJudge = hackathonAssignments.some(a => a.type === 'JUDGE' && a.assignment_type === 'HEAD' && a.person_id === values.person_id);
-
-    // Logic 2: Luật cho GIÁM KHẢO (JUDGE)
-    if (type === 'JUDGE') {
-      const targetRound = rounds.find(r => r.id === values.round_id);
-      const isFinalRound = checkIsFinalRound(targetRound);
-      
-      if (hackathonAssignments.some(a => a.type === 'MENTOR' && a.person_id === values.person_id && a.track_id === targetRound?.track_id)) {
-        return message.error('Lỗi: Mentor không được làm Giám khảo cho chính Bảng đấu mà mình hướng dẫn!');
-      }
-      if (values.assignment_type === 'HEAD' && isMentorAnywhere) {
-        return message.error('Lỗi: Người đã từng làm Mentor tuyệt đối không được giữ vai trò Trưởng ban!');
-      }
-      if (isFinalRound && isMentorAnywhere) {
-        return message.error('Lỗi: Người đã tham gia làm Mentor không được phép chấm thi tại Vòng Chung kết!');
-      }
-    }
-
-    // Logic 3: Luật cho MENTOR
-    if (type === 'MENTOR') {
-      if (isHeadJudge) {
-        return message.error('Lỗi: Người này đang giữ vai trò Trưởng ban, không thể phân công đi làm Mentor!');
-      }
-      const isJudgeFinalRound = hackathonAssignments.some(a => a.type === 'JUDGE' && checkIsFinalRound(rounds.find(r => r.id === a.round_id)) && a.person_id === values.person_id);
-      if (isJudgeFinalRound) {
-        return message.error('Lỗi: Người này đang là Giám khảo Vòng Chung kết, không thể phân công đi làm Mentor!');
-      }
-    }
-
+  const assignMentor = async (values, onSuccess) => {
     setIsLoading(true);
     try {
-      // TODO: Thay bằng hàm call API thật
-      // if (type === 'JUDGE') await peopleService.assignJudge(values);
-      // else await peopleService.assignMentor(values);
-
-      assignRole({ ...values, hackathon_id: hackathonId, type }); // Lưu tạm Local
-      message.success(`Đã phân công ${type === 'MENTOR' ? 'Mentor' : 'Giám khảo'} thành công!`);
+      await teamService.assignMentor(values.team_id, values.round_id, values.mentor_id);
+      message.success('Phân công Mentor thành công!');
+      await fetchBaseData();
       if (onSuccess) onSuccess();
     } catch (error) {
-      message.error(error.message || 'Lỗi khi phân công');
+      message.error(getTeamErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 4. Logic Xóa phân công
-  const deleteAssignment = async (assignmentId) => {
+  const removeMentor = async (teamId, roundId) => {
     setIsLoading(true);
     try {
-      // TODO: Call API DELETE /api/v1/judge-assignments/{id}
-      removeAssignment(assignmentId); // Xóa tạm Local
-      message.success('Đã gỡ phân công thành công');
+      await teamService.removeMentor(teamId, roundId);
+      message.success('Đã gỡ Mentor thành công!');
+      await fetchBaseData();
     } catch (error) {
-      message.error(error.message || 'Lỗi khi gỡ phân công');
+      message.error(getTeamErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
   };
 
-  return { tracks, rounds, people, hackathonAssignments, isLoading, createTempJudge, assignPerson, deleteAssignment };
+  const assignJudge = async (values, onSuccess) => {
+    setIsLoading(true);
+    try {
+      let trackId = null;
+      let roundId = null;
+      const [targetType, targetId] = values.assignment_target.split('_');
+      if (targetType === 'TRACK') trackId = parseInt(targetId);
+      if (targetType === 'ROUND') roundId = parseInt(targetId);
+
+      await peopleService.assignJudge({
+        judgeId: values.person_id,
+        trackId,
+        roundId,
+        assignmentType: values.assignment_type
+      });
+      message.success('Phân công Giám khảo thành công!');
+      await fetchBaseData();
+      if (onSuccess) onSuccess();
+    } catch (error) {
+      message.error(getTeamErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removeJudge = async (assignmentId) => {
+    setIsLoading(true);
+    try {
+      await peopleService.removeJudgeAssignment(assignmentId);
+      message.success('Đã gỡ Giám khảo thành công!');
+      await fetchBaseData();
+    } catch (error) {
+      message.error(getTeamErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return { 
+    mentors, judges, tempJudges, tracks, rounds, activeTeams, teamMentors, judgeAssignments, isLoading, 
+    createTempJudge, assignMentor, removeMentor, assignJudge, removeJudge 
+  };
 };
