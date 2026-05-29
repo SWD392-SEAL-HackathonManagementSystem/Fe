@@ -52,16 +52,8 @@ const GithubCallbackPage = () => {
       localStorage.setItem('userInfo', JSON.stringify(userInfo));
     } catch { /* no-op */ }
 
-    // STUDENT + PENDING → onboarding flow
-    const role = data?.role;
-    const status = data?.status;
-    if (role === 'STUDENT' && status === 'PENDING') {
-      message.success('Đăng nhập GitHub thành công! Hãy hoàn thiện hồ sơ.');
-      navigate(ROUTES.ONBOARDING, { replace: true });
-    } else {
-      message.success('Đăng nhập GitHub thành công!');
-      navigate(ROUTES.DASHBOARD, { replace: true });
-    }
+    message.success('Đăng nhập GitHub thành công!');
+    window.location.replace(ROUTES.DASHBOARD);
   };
 
   const finishLinkSuccess = (returnTo) => {
@@ -82,7 +74,7 @@ const GithubCallbackPage = () => {
       // no-op
     }
     message.success('Liên kết GitHub thành công!');
-    navigate(returnTo || ROUTES.DASHBOARD, { replace: true });
+    window.location.replace(returnTo || ROUTES.DASHBOARD);
   };
 
   useEffect(() => {

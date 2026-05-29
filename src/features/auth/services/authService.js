@@ -87,4 +87,8 @@ export const authService = {
   unlinkGithub: async () => {
     return axiosClient.post(ENDPOINTS.AUTH.OAUTH_GITHUB_UNLINK);
   },
+
+  changePassword: async (currentPassword, newPassword) => {
+    return axiosClient.post(ENDPOINTS.AUTH.CHANGE_PASSWORD, { currentPassword, newPassword });
+  },
 };

@@ -62,19 +62,17 @@ const RegisterPage = () => {
   };
 
   const handlePostLoginRedirect = (authData) => {
-    // If user is STUDENT + PENDING, go to onboarding
-    const role = authData?.role;
-    const status = authData?.status;
-    if (role === 'STUDENT' && status === 'PENDING') {
-      // Persist minimal userInfo for onboarding page
-      const userInfo = { email: authData?.email, status, role };
-      localStorage.setItem('userInfo', JSON.stringify(userInfo));
-      message.success('Tài khoản đã tạo! Hãy hoàn thiện hồ sơ của bạn.');
-      navigate(ROUTES.ONBOARDING);
-    } else {
-      message.success('Đăng nhập thành công!');
-      navigate(ROUTES.DASHBOARD);
-    }
+    const role = authData?.role || authData?.user?.role;
+    const status = authData?.status || authData?.user?.status;
+    const userInfo = {
+      email: authData?.email || authData?.user?.email,
+      status,
+      role,
+      userId: authData?.userId || authData?.user?.userId || authData?.user?.id
+    };
+    localStorage.setItem('userInfo', JSON.stringify(userInfo));
+    message.success('Đăng ký tài khoản thành công!');
+    window.location.replace(ROUTES.DASHBOARD);
   };
 
   const handleGithubLogin = () => {

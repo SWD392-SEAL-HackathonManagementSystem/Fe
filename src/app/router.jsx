@@ -15,6 +15,9 @@ import ReviewValidatePage from '../features/review/pages/ReviewValidatePage';
 import LoginPage from '../features/auth/pages/LoginPage';
 import RegisterPage from '../features/auth/pages/RegisterPage';
 import OnboardingPage from '../features/auth/pages/OnboardingPage';
+import ChangePasswordPage from '../features/auth/pages/ChangePasswordPage';
+import UserApprovalPage from '../features/auth/pages/UserApprovalPage';
+import TempJudgesPage from '../features/auth/pages/TempJudgesPage';
 import CoordinatorTeamPage from '../features/coordinator-teams/pages/CoordinatorTeamPage';
 import GithubCallbackPage from '../features/auth/pages/GithubCallbackPage';
 
@@ -58,11 +61,33 @@ const ReviewWrapper = () => {
   );
 };
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const token = localStorage.getItem('accessToken');
   if (!token) {
     return <Navigate to={ROUTES.LOGIN} replace />;
   }
+
+  try {
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    
+    // Check must change password (for guest judges)
+    if (userInfo.mustChangePassword) {
+      return <Navigate to={ROUTES.CHANGE_PASSWORD} replace />;
+    }
+
+    if (userInfo.status === 'REJECTED') {
+      localStorage.clear();
+      return <Navigate to={ROUTES.LOGIN} state={{ rejected: true }} replace />;
+    }
+
+    // Check allowed roles
+    if (allowedRoles && !allowedRoles.includes(userInfo.role)) {
+      return <Navigate to={ROUTES.DASHBOARD} replace />;
+    }
+  } catch (e) {
+    // no-op
+  }
+
   return children;
 };
 
@@ -81,16 +106,27 @@ const AppRouter = () => {
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
       <Route path={ROUTES.GITHUB_CALLBACK} element={<GithubCallbackPage />} />
-      {/* Onboarding: accessible with accessToken but PENDING status */}
-      <Route path={ROUTES.ONBOARDING} element={<OnboardingPage />} />
+      <Route path={ROUTES.CHANGE_PASSWORD} element={<ChangePasswordPage />} />
 
       {/* Protected Routes inside MainLayout */}
       <Route element={<MainLayoutWrapper />}>
         <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
+        <Route path={ROUTES.ONBOARDING} element={<OnboardingPage />} />
+        <Route path={ROUTES.PROFILE} element={<OnboardingPage />} />
         <Route path={ROUTES.HACKATHONS} element={<HackathonListPage />} />
         <Route path={ROUTES.HACKATHON_CREATE} element={<CreateHackathonPage />} />
         <Route path={ROUTES.HACKATHON_SETUP} element={<HackathonSetupPage />} />
         <Route path={ROUTES.GLOBAL_TEAMS} element={<CoordinatorTeamPage />} />
+        <Route path={ROUTES.USER_APPROVAL} element={
+          <ProtectedRoute allowedRoles={['COORDINATOR', 'ADMIN']}>
+            <UserApprovalPage />
+          </ProtectedRoute>
+        } />
+        <Route path={ROUTES.TEMP_JUDGES} element={
+          <ProtectedRoute allowedRoles={['COORDINATOR', 'ADMIN']}>
+            <TempJudgesPage />
+          </ProtectedRoute>
+        } />
         
         {/* Explicit routes for tracks and rounds */}
         <Route path={ROUTES.TRACKS} element={<TrackWrapper />} />

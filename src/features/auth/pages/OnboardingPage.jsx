@@ -315,13 +315,16 @@ const OnboardingPage = () => {
       title="Hồ sơ đã được gửi!"
       subTitle={
         <span style={{ color: '#4b5563' }}>
-          Coordinator đang xem xét hồ sơ của bạn. Khi được duyệt, bạn sẽ có thể
-          đăng nhập và sử dụng đầy đủ tính năng.
+          Coordinator đang xem xét hồ sơ của bạn. Khi được duyệt, tài khoản của bạn sẽ
+          chuyển sang trạng thái Đã phê duyệt.
         </span>
       }
       extra={[
+        <Button key="dashboard" type="primary" onClick={() => navigate(ROUTES.DASHBOARD)} style={{ borderRadius: 12, backgroundColor: '#0072ff', borderColor: '#0072ff' }}>
+          Quay lại Trang chủ
+        </Button>,
         <Button key="logout" onClick={handleLogout} style={{ borderRadius: 12 }}>
-          Đăng xuất & chờ duyệt
+          Đăng xuất
         </Button>,
       ]}
     />
@@ -409,30 +412,21 @@ const Label = ({ children }) => (
 );
 
 const pageStyle = {
-  minHeight: '100vh',
+  padding: '24px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  padding: '40px 20px',
-  backgroundColor: '#f3f4f6',
-  backgroundImage: `url('https://daihoc.fpt.edu.vn/wp-content/uploads/2022/08/dai-hoc-fpt-tp-hcm-1.jpeg')`,
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  backgroundRepeat: 'no-repeat',
-  backgroundAttachment: 'fixed',
   fontFamily: "'Inter', sans-serif",
 };
 
 const cardContainerStyle = {
   width: '100%',
-  maxWidth: 520,
-  backgroundColor: 'rgba(255, 255, 255, 0.92)',
-  backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
+  maxWidth: 600,
+  backgroundColor: '#ffffff',
   borderRadius: 24,
   padding: 40,
-  boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15), 0 10px 10px -5px rgba(0,0,0,0.04)',
-  border: '1px solid rgba(255,255,255,0.3)',
+  boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+  border: '1px solid #e5e7eb',
   position: 'relative',
   overflow: 'hidden',
 };
