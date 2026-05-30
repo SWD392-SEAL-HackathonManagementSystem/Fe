@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
+import { Spin } from 'antd';
 import { Routes, Route, Navigate, Outlet, useParams, useNavigate } from 'react-router-dom';
 import MainLayout from '../shared/components/layout/MainLayout';
+import StudentLayout from '../student/layout/StudentLayout';
 import { ROUTES } from '../shared/constants/routes';
 
 // Pages
@@ -20,6 +23,8 @@ import TempJudgesPage from '../features/auth/pages/TempJudgesPage';
 import CoordinatorTeamPage from '../features/coordinator-teams/pages/CoordinatorTeamPage';
 import GithubCallbackPage from '../features/auth/pages/GithubCallbackPage';
 import LandingPage from '../landing/pages/LandingPage';
+import StudentTeamPage from '../student/features/team/pages/StudentTeamPage';
+import StudentInvitationsPage from '../student/features/invitations/pages/StudentInvitationsPage';
 
 const TrackWrapper = () => {
   const { hackathonId } = useParams();
@@ -61,58 +66,131 @@ const ReviewWrapper = () => {
   );
 };
 
+const getStoredUserInfo = () => {
+  try {
+    return JSON.parse(localStorage.getItem('userInfo') || '{}');
+  } catch {
+    return {};
+  }
+};
+
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const token = localStorage.getItem('accessToken');
   if (!token) {
     return <Navigate to={ROUTES.LOGIN} replace />;
   }
 
-  try {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-    
-    // Check must change password (for guest judges)
-    if (userInfo.mustChangePassword) {
-      return <Navigate to={ROUTES.CHANGE_PASSWORD} replace />;
-    }
+  const userInfo = getStoredUserInfo();
 
-    if (userInfo.status === 'REJECTED') {
-      localStorage.clear();
-      return <Navigate to={ROUTES.LOGIN} state={{ rejected: true }} replace />;
-    }
+  // Check must change password (for guest judges)
+  if (userInfo.mustChangePassword) {
+    return <Navigate to={ROUTES.CHANGE_PASSWORD} replace />;
+  }
 
-    // Check allowed roles
-    if (allowedRoles && !allowedRoles.includes(userInfo.role)) {
-      return <Navigate to={ROUTES.DASHBOARD} replace />;
-    }
-  } catch (e) {
-    // no-op
+  if (userInfo.status === 'REJECTED') {
+    localStorage.clear();
+    return <Navigate to={ROUTES.LOGIN} state={{ rejected: true }} replace />;
+  }
+
+  // Check allowed roles
+  if (allowedRoles && !allowedRoles.includes(userInfo.role)) {
+    return <Navigate to={ROUTES.DASHBOARD} replace />;
   }
 
   return children;
 };
 
-const MainLayoutWrapper = () => (
-  <ProtectedRoute>
-    <MainLayout>
-      <Outlet />
-    </MainLayout>
-  </ProtectedRoute>
-);
+const AppLayoutWrapper = () => {
+  const [userInfo, setUserInfo] = useState(getStoredUserInfo);
+  const [loadingRole, setLoadingRole] = useState(() => {
+    const token = localStorage.getItem('accessToken');
+    return Boolean(token && !getStoredUserInfo().role);
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    const token = localStorage.getItem('accessToken');
+
+    if (!token || userInfo.role) {
+      return undefined;
+    }
+
+    import('../features/auth/services/userService')
+      .then(({ userService }) => userService.getMe())
+      .then((res) => {
+        if (!mounted) return;
+        const profile = res?.data || res || {};
+        const nextUserInfo = {
+          ...getStoredUserInfo(),
+          email: profile.email,
+          status: profile.status,
+          role: profile.role,
+          userId: profile.userId || profile.id,
+          fullName: profile.fullName,
+          mustChangePassword: profile.mustChangePassword,
+        };
+        localStorage.setItem('userInfo', JSON.stringify(nextUserInfo));
+        window.dispatchEvent(new Event('userInfoUpdated'));
+        setUserInfo(nextUserInfo);
+      })
+      .catch(() => {
+        if (mounted) {
+          setUserInfo(getStoredUserInfo());
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoadingRole(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [userInfo.role]);
+
+  useEffect(() => {
+    const handleUserInfoUpdated = () => setUserInfo(getStoredUserInfo());
+    window.addEventListener('userInfoUpdated', handleUserInfoUpdated);
+    return () => window.removeEventListener('userInfoUpdated', handleUserInfoUpdated);
+  }, []);
+
+  if (loadingRole) {
+    return (
+      <ProtectedRoute>
+        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+          <Spin size="large" />
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
+  const LayoutComponent = userInfo.role === 'STUDENT' ? StudentLayout : MainLayout;
+
+  return (
+    <ProtectedRoute>
+      <LayoutComponent>
+        <Outlet />
+      </LayoutComponent>
+    </ProtectedRoute>
+  );
+};
 
 const AppRouter = () => {
   return (
     <Routes>
       {/* Public Route */}
       <Route path={ROUTES.LANDING} element={<LandingPage />} />
-      {/* Public Routes */}
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
       <Route path={ROUTES.GITHUB_CALLBACK} element={<GithubCallbackPage />} />
       <Route path={ROUTES.CHANGE_PASSWORD} element={<ChangePasswordPage />} />
 
-      {/* Protected Routes inside MainLayout */}
-      <Route element={<MainLayoutWrapper />}>
+      {/* Protected Routes inside role-aware layout */}
+      <Route element={<AppLayoutWrapper />}>
         <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
+        <Route path={ROUTES.STUDENT_TEAM} element={<StudentTeamPage />} />
+        <Route path={ROUTES.STUDENT_INVITATIONS} element={<StudentInvitationsPage />} />
         <Route path={ROUTES.ONBOARDING} element={<OnboardingPage />} />
         <Route path={ROUTES.PROFILE} element={<OnboardingPage />} />
         <Route path={ROUTES.HACKATHONS} element={<HackathonListPage />} />
