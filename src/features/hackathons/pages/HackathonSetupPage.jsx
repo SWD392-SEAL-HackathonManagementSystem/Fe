@@ -13,6 +13,7 @@ import { hackathonService } from '../services/hackathonService';
 import { roundService } from '../../rounds/services/roundService';
 import { mapHackathonToFE } from '../mappers/hackathonMapper';
 import { mapRoundToFE } from '../../rounds/mappers/roundMapper';
+import LotteryManagementPage from '../../teams/pages/LotteryManagementPage';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -82,6 +83,11 @@ const HackathonSetupPage = () => {
       key: 'tracks',
       label: 'Bảng đấu (Tracks)',
       children: <TrackManagementPage hackathonId={hackathon.id} />,
+    },
+    {
+      key: 'lottery',
+      label: 'Bốc thăm & Khai mạc',
+      children: <LotteryManagementPage hackathonId={hackathon.id} />,
     },
     {
       key: 'criteria',
