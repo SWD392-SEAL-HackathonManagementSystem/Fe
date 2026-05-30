@@ -37,6 +37,10 @@ export const studentTeamService = {
     return axiosClient.delete(ENDPOINTS.TEAMS.MEMBER_DETAIL(teamId, userId));
   },
 
+  leaveTeam: async (teamId, userId) => {
+    return axiosClient.patch(ENDPOINTS.TEAMS.MEMBER_DETAIL(teamId, userId), { action: 'LEFT' });
+  },
+
   transferLeader: async (teamId, newLeaderId) => {
     const res = await axiosClient.patch(ENDPOINTS.TEAMS.TRANSFER_LEADER(teamId), { newLeaderId });
     return mapStudentTeam(unwrapItem(res));

@@ -1,40 +1,57 @@
-import { Button, Card, Form, Input, Modal, Select, Space, Tag, Typography, theme } from 'antd';
-import { DeleteOutlined, MailOutlined, SwapOutlined, UserOutlined } from '@ant-design/icons';
+import { useMemo, useState } from 'react';
+import { Button, Card, Empty, Form, Input, Space, Typography, theme } from 'antd';
+import { MailOutlined } from '@ant-design/icons';
+import { MEMBER_STATUS } from '../constants/studentTeam.constants';
+import LeaveTeamPanel from './LeaveTeamPanel';
+import MemberStatusFilter, { MEMBER_FILTERS } from './MemberStatusFilter';
+import TeamMemberCard from './TeamMemberCard';
+import TransferLeaderForm from './TransferLeaderForm';
 
 const { Text, Title } = Typography;
 
-const TeamMemberManager = ({ team, onInviteMember, onCancelInvite, onTransferLeader, loading }) => {
+const TeamMemberManager = ({ team, onInviteMember, onCancelInvite, onLeaveTeam, onTransferLeader, loading }) => {
   const [inviteForm] = Form.useForm();
   const [transferForm] = Form.useForm();
+  const [memberFilter, setMemberFilter] = useState(MEMBER_STATUS.ACCEPTED);
   const { token } = theme.useToken();
+  const members = useMemo(() => team?.members || [], [team?.members]);
+
+  const memberCounts = useMemo(
+    () =>
+      members.reduce(
+        (result, member) => ({
+          ...result,
+          [member.status]: (result[member.status] || 0) + 1,
+        }),
+        { ALL: members.length }
+      ),
+    [members]
+  );
+
+  const filteredMembers = useMemo(
+    () =>
+      memberFilter === 'ALL'
+        ? members
+        : members.filter((member) => member.status === memberFilter),
+    [memberFilter, members]
+  );
+
+  const selectedFilterLabel =
+    MEMBER_FILTERS.find((filter) => filter.value === memberFilter)?.label.toLowerCase() || 'phù hợp';
 
   if (!team) return null;
+
+  const inviteDisabledReason = (() => {
+    if (team.canInvite) return '';
+    if (!team.isCurrentUserLeader) return 'Chỉ trưởng nhóm mới có thể mời thành viên.';
+    if (team.isLocked) return 'Đội đã khóa, không thể thay đổi thành viên.';
+    if (team.isFull) return 'Đội đã đủ 5 thành viên.';
+    return 'Trạng thái đội hiện tại chưa cho phép mời thêm thành viên.';
+  })();
 
   const handleInvite = async (values) => {
     const success = await onInviteMember(team.id, values.email?.trim());
     if (success) inviteForm.resetFields();
-  };
-
-  const handleTransfer = (values) => {
-    const nextLeader = team.transferCandidates.find((member) => member.userId === values.newLeaderId);
-    Modal.confirm({
-      title: 'Chuyển quyền trưởng nhóm?',
-      content: `Người nhận quyền: ${nextLeader?.fullName || 'thành viên đã chọn'}. Sau khi chuyển, bạn sẽ không còn là trưởng nhóm.`,
-      okText: 'Chuyển quyền',
-      cancelText: 'Hủy',
-      onOk: async () => {
-        await onTransferLeader(team.id, values.newLeaderId);
-        transferForm.resetFields();
-      },
-    });
-  };
-
-  const memberCardStyle = {
-    padding: 14,
-    borderRadius: 16,
-    border: `1px solid ${token.colorBorderSecondary}`,
-    background: token.colorBgContainer,
-    transition: 'transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
   };
 
   return (
@@ -66,8 +83,8 @@ const TeamMemberManager = ({ team, onInviteMember, onCancelInvite, onTransferLea
           >
             <Input
               prefix={<MailOutlined />}
-              placeholder={team.canInvite ? 'email@student.com' : 'Đội đã đầy hoặc đã khóa'}
-              disabled={!team.canInvite || !team.isCurrentUserLeader}
+              placeholder={team.canInvite ? 'email@student.com' : inviteDisabledReason}
+              disabled={!team.canInvite}
               style={{ height: 44 }}
             />
           </Form.Item>
@@ -75,7 +92,7 @@ const TeamMemberManager = ({ team, onInviteMember, onCancelInvite, onTransferLea
             type="primary"
             htmlType="submit"
             loading={loading}
-            disabled={!team.canInvite || !team.isCurrentUserLeader}
+            disabled={!team.canInvite}
             style={{ height: 44, fontWeight: 800 }}
           >
             Mời
@@ -83,11 +100,13 @@ const TeamMemberManager = ({ team, onInviteMember, onCancelInvite, onTransferLea
         </Space.Compact>
       </Form>
 
-      {!team.isCurrentUserLeader && (
+      {inviteDisabledReason && (
         <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-          Chỉ trưởng nhóm mới có thể mời thành viên hoặc chuyển quyền.
+          {inviteDisabledReason}
         </Text>
       )}
+
+      <MemberStatusFilter counts={memberCounts} value={memberFilter} onChange={setMemberFilter} />
 
       <div
         style={{
@@ -97,101 +116,35 @@ const TeamMemberManager = ({ team, onInviteMember, onCancelInvite, onTransferLea
           marginTop: 20,
         }}
       >
-        {team.members.map((member) => (
-          <div
+        {filteredMembers.map((member) => (
+          <TeamMemberCard
             key={`${team.id}-${member.userId}`}
-            style={memberCardStyle}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.transform = 'translateY(-2px)';
-              event.currentTarget.style.boxShadow = '0 14px 28px rgba(15, 23, 42, 0.08)';
-              event.currentTarget.style.borderColor = token.colorPrimaryBorder;
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.transform = 'translateY(0)';
-              event.currentTarget.style.boxShadow = 'none';
-              event.currentTarget.style.borderColor = token.colorBorderSecondary;
-            }}
-          >
-            <Space align="start" size={12} style={{ width: '100%' }}>
-              <div
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 14,
-                  display: 'grid',
-                  placeItems: 'center',
-                  color: token.colorPrimary,
-                  background: token.colorPrimaryBg,
-                  flexShrink: 0,
-                }}
-              >
-                <UserOutlined />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <Text strong style={{ display: 'block' }}>
-                  {member.fullName}
-                </Text>
-                <Text type="secondary" style={{ display: 'block', wordBreak: 'break-all' }}>
-                  {member.email}
-                </Text>
-                <Space wrap size={6} style={{ marginTop: 10 }}>
-                  <Tag color={member.roleColor} style={{ margin: 0, borderRadius: 999 }}>
-                    {member.roleLabel}
-                  </Tag>
-                  <Tag color={member.statusColor} style={{ margin: 0, borderRadius: 999 }}>
-                    {member.statusLabel}
-                  </Tag>
-                </Space>
-              </div>
-            </Space>
-
-            {member.isPending && team.isCurrentUserLeader && (
-              <Button
-                danger
-                type="text"
-                icon={<DeleteOutlined />}
-                loading={loading}
-                onClick={() => onCancelInvite(team.id, member.userId)}
-                style={{ marginTop: 10, paddingInline: 0, fontWeight: 700 }}
-              >
-                Hủy lời mời
-              </Button>
-            )}
-          </div>
+            member={member}
+            teamId={team.id}
+            canCancelInvite={team.isCurrentUserLeader}
+            loading={loading}
+            onCancelInvite={onCancelInvite}
+          />
         ))}
       </div>
 
-      {team.canTransferLeader && team.transferCandidates.length > 0 && (
-        <Form
-          form={transferForm}
-          layout="vertical"
-          onFinish={handleTransfer}
-          requiredMark={false}
+      {filteredMembers.length === 0 && (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={`Không có thành viên nào ở trạng thái ${selectedFilterLabel}.`}
           style={{
-            marginTop: 20,
-            padding: 16,
+            marginTop: 12,
+            padding: 24,
             borderRadius: 16,
             background: token.colorFillQuaternary,
-            border: `1px solid ${token.colorBorderSecondary}`,
           }}
-        >
-          <Form.Item
-            label="Chuyển quyền trưởng nhóm"
-            name="newLeaderId"
-            rules={[{ required: true, message: 'Chọn thành viên nhận quyền.' }]}
-          >
-            <Select
-              placeholder="Chọn thành viên đã tham gia"
-              options={team.transferCandidates.map((member) => ({
-                value: member.userId,
-                label: `${member.fullName} - ${member.email}`,
-              }))}
-            />
-          </Form.Item>
-          <Button icon={<SwapOutlined />} htmlType="submit" loading={loading} style={{ borderRadius: 10, fontWeight: 700 }}>
-            Chuyển leader
-          </Button>
-        </Form>
+        />
+      )}
+
+      <TransferLeaderForm team={team} form={transferForm} loading={loading} onTransferLeader={onTransferLeader} />
+
+      {team.canLeaveTeam && (
+        <LeaveTeamPanel teamId={team.id} loading={loading} onLeaveTeam={onLeaveTeam} />
       )}
     </Card>
   );

@@ -31,6 +31,13 @@ const isKnownUnauthorizedCreator = (userInfo) => {
   return userInfo.role !== 'STUDENT' || userInfo.status !== 'APPROVED';
 };
 
+const normalizeEmail = (email) => email?.trim().toLowerCase();
+
+const getCurrentUserId = () => {
+  const userInfo = getCurrentUserInfo();
+  return userInfo.userId || userInfo.id || null;
+};
+
 export const useStudentTeam = (initialHackathonId) => {
   const [hackathonId, setHackathonId] = useState(initialHackathonId || '');
   const [teams, setTeams] = useState([]);
@@ -61,7 +68,9 @@ export const useStudentTeam = (initialHackathonId) => {
     try {
       const data = await studentTeamService.getMyTeams({ hackathonId });
       setTeams(data);
-      setSelectedTeamId((currentId) => currentId || data[0]?.id || null);
+      setSelectedTeamId((currentId) =>
+        data.some((team) => team.id === currentId) ? currentId : data[0]?.id || null
+      );
     } catch (error) {
       showLargeTeamNotice({
         message: 'Không thể tải đội của bạn',
@@ -117,14 +126,36 @@ export const useStudentTeam = (initialHackathonId) => {
   };
 
   const inviteMember = async (teamId, email) => {
+    const targetTeam = teams.find((team) => team.id === teamId);
+    const inviteEmail = email?.trim();
+    const existingMember = targetTeam?.members?.find((member) => {
+      const isClosedStatus = member.status === 'REJECTED' || member.status === 'LEFT';
+      return normalizeEmail(member.email) === normalizeEmail(inviteEmail) && !isClosedStatus;
+    });
+
+    if (existingMember) {
+      showLargeTeamNotice({
+        type: 'warning',
+        message: 'Chưa thể gửi lời mời',
+        description:
+          existingMember.status === 'PENDING'
+            ? 'Thành viên này đã có lời mời đang chờ phản hồi trong đội.'
+            : 'Thành viên này đã có trong đội hiện tại.',
+      });
+      return false;
+    }
+
     setIsActionLoading(true);
     try {
-      await studentTeamService.inviteMember(teamId, email);
+      await studentTeamService.inviteMember(teamId, inviteEmail);
       await refreshSelectedTeam(teamId);
       message.success('Đã gửi lời mời thành viên.');
       return true;
     } catch (error) {
-      message.error(getStudentTeamErrorMessage(error, 'Mời thành viên thất bại.'));
+      showLargeTeamNotice({
+        message: 'Mời thành viên không thành công',
+        description: getStudentTeamErrorMessage(error, 'Mời thành viên thất bại. Vui lòng kiểm tra lại email và trạng thái đội.'),
+      });
       return false;
     } finally {
       setIsActionLoading(false);
@@ -146,11 +177,41 @@ export const useStudentTeam = (initialHackathonId) => {
     }
   };
 
+  const leaveTeam = async (teamId) => {
+    const targetTeam = teams.find((team) => team.id === teamId);
+    const currentUserId = targetTeam?.currentMember?.userId || getCurrentUserId();
+
+    if (!currentUserId) {
+      showLargeTeamNotice({
+        type: 'warning',
+        message: 'Chưa thể rời đội',
+        description: 'Không xác định được tài khoản hiện tại. Vui lòng đăng nhập lại rồi thử lại.',
+      });
+      return false;
+    }
+
+    setIsActionLoading(true);
+    try {
+      await studentTeamService.leaveTeam(teamId, currentUserId);
+      await fetchTeams();
+      message.success('Đã rời đội thành công.');
+      return true;
+    } catch (error) {
+      showLargeTeamNotice({
+        message: 'Không thể rời đội',
+        description: getStudentTeamErrorMessage(error, 'Đội đã khóa hoặc bạn không có quyền rời đội này.'),
+      });
+      return false;
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const transferLeader = async (teamId, newLeaderId) => {
     setIsActionLoading(true);
     try {
-      const team = await studentTeamService.transferLeader(teamId, newLeaderId);
-      replaceTeam(team);
+      await studentTeamService.transferLeader(teamId, newLeaderId);
+      await refreshSelectedTeam(teamId);
       message.success('Đã chuyển quyền trưởng nhóm.');
       return true;
     } catch (error) {
@@ -192,6 +253,7 @@ export const useStudentTeam = (initialHackathonId) => {
     createTeam,
     inviteMember,
     cancelPendingInvite,
+    leaveTeam,
     transferLeader,
     disbandTeam,
   };

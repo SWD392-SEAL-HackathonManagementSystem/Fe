@@ -1,5 +1,5 @@
 import { Button, Card, Modal, Progress, Space, Tag, Typography, theme } from 'antd';
-import { CheckOutlined, CloseOutlined, LogoutOutlined, TeamOutlined } from '@ant-design/icons';
+import { CheckOutlined, CloseOutlined, TeamOutlined } from '@ant-design/icons';
 import { INVITATION_ACTION } from '../constants/studentInvitation.constants';
 
 const { Text, Title } = Typography;
@@ -110,17 +110,6 @@ const InvitationCard = ({ invitation, actionKey, onRespond }) => {
             style={{ borderRadius: 10, fontWeight: 700 }}
           >
             Từ chối
-          </Button>
-        )}
-        {invitation.canLeave && (
-          <Button
-            danger
-            icon={<LogoutOutlined />}
-            loading={loading(INVITATION_ACTION.LEFT)}
-            onClick={() => confirmAction(INVITATION_ACTION.LEFT, 'Rời đội này?')}
-            style={{ borderRadius: 10, fontWeight: 700 }}
-          >
-            Rời đội
           </Button>
         )}
       </Space>

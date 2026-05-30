@@ -1,7 +1,6 @@
 export const INVITATION_ACTION = {
   ACCEPT: 'ACCEPT',
   REJECT: 'REJECT',
-  LEFT: 'LEFT',
 };
 
 export const INVITATION_STATUS_META = {

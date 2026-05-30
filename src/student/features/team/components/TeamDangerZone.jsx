@@ -6,9 +6,9 @@ const { Text, Title } = Typography;
 const TeamDangerZone = ({ team, onDisbandTeam, loading }) => {
   const { token } = theme.useToken();
 
-  if (!team) return null;
+  if (!team || !team.canDisband) return null;
 
-  const disabled = !team.canDisband || team.status === 'ELIMINATED';
+  const disabled = team.status === 'ELIMINATED';
 
   const handleDisband = () => {
     Modal.confirm({

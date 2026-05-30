@@ -46,6 +46,5 @@ export const mapTeamToInvitation = (team) => {
     createdAt: team.createdAt,
     canAccept: currentMember.status === 'PENDING' && !team.isLocked,
     canReject: currentMember.status === 'PENDING' && !team.isLocked,
-    canLeave: currentMember.status === 'ACCEPTED' && currentMember.roleInTeam !== 'LEADER' && !team.isLocked,
   };
 };

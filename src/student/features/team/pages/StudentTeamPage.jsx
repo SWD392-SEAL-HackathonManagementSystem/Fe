@@ -1,4 +1,4 @@
-import { Alert, Col, Empty, Row, Select, Skeleton, Space, Typography, theme } from 'antd';
+import { Alert, Card, Col, Empty, Input, Row, Select, Skeleton, Space, Typography, theme } from 'antd';
 import { TeamOutlined } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
 import TeamCreateCard from '../components/TeamCreateCard';
@@ -15,6 +15,7 @@ const StudentTeamPage = () => {
   const initialHackathonId = searchParams.get('hackathonId') || '';
   const {
     hackathonId,
+    setHackathonId,
     teams,
     selectedTeam,
     selectedTeamId,
@@ -24,6 +25,7 @@ const StudentTeamPage = () => {
     createTeam,
     inviteMember,
     cancelPendingInvite,
+    leaveTeam,
     transferLeader,
     disbandTeam,
   } = useStudentTeam(initialHackathonId);
@@ -69,6 +71,26 @@ const StudentTeamPage = () => {
       <Row gutter={[24, 24]} align="start">
         <Col xs={24} lg={8}>
           <div style={{ position: 'sticky', top: 16 }}>
+            <Card 
+              style={{ marginBottom: 24, borderRadius: 20, border: `1px solid ${token.colorBorderSecondary}`, boxShadow: '0 16px 40px rgba(15, 23, 42, 0.05)' }} 
+              styles={{ body: { padding: 24 } }}
+            >
+              <Title level={5} style={{ marginTop: 0 }}>Xem đội đã tham gia</Title>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                Nhập Hackathon ID để tải thông tin đội thi của bạn.
+              </Text>
+              <Input.Search
+                placeholder="Nhập Hackathon ID..."
+                allowClear
+                enterButton="Tải đội"
+                size="large"
+                type="number"
+                onSearch={(value) => {
+                  if (value) setHackathonId(value);
+                }}
+              />
+            </Card>
+
             <TeamCreateCard
               hackathonId={hackathonId}
               onCreateTeam={createTeam}
@@ -118,6 +140,7 @@ const StudentTeamPage = () => {
                 loading={isActionLoading}
                 onInviteMember={inviteMember}
                 onCancelInvite={cancelPendingInvite}
+                onLeaveTeam={leaveTeam}
                 onTransferLeader={transferLeader}
               />
 

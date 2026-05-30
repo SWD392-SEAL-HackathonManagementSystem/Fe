@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Alert, Button, Card, Form, Input, InputNumber, Space, Typography, theme } from 'antd';
 import { PlusOutlined, TeamOutlined } from '@ant-design/icons';
 
@@ -6,6 +7,12 @@ const { Text, Title } = Typography;
 const TeamCreateCard = ({ hackathonId, onCreateTeam, loading }) => {
   const [form] = Form.useForm();
   const { token } = theme.useToken();
+
+  useEffect(() => {
+    if (hackathonId) {
+      form.setFieldsValue({ hackathonId: Number(hackathonId) });
+    }
+  }, [form, hackathonId]);
 
   const handleFinish = async (values) => {
     const success = await onCreateTeam({

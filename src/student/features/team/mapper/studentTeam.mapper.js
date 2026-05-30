@@ -3,6 +3,7 @@ import {
   MEMBER_STATUS,
   MEMBER_STATUS_META,
   TEAM_MEMBER_LIMITS,
+  TEAM_STATUS,
   TEAM_STATUS_META,
 } from '../constants/studentTeam.constants';
 
@@ -50,6 +51,17 @@ export const mapStudentTeam = (team) => {
   const pendingInviteCount = team.pendingInviteCount ?? members.filter((member) => member.isPending).length;
   const statusMeta = TEAM_STATUS_META[team.status] || { label: team.status || 'N/A', color: 'default' };
   const acceptedMembers = members.filter((member) => member.isAccepted);
+  const currentMember = members.find((member) => toNumber(member.userId) === toNumber(currentStudentId));
+  const isCurrentUserLeader = toNumber(team.leaderId) === toNumber(currentStudentId);
+  const canChangeMembership = [TEAM_STATUS.PENDING, TEAM_STATUS.ACTIVE].includes(team.status) && !team.isLocked;
+  const canTransferLeaderByStatus = team.status === TEAM_STATUS.PENDING && !team.isLocked;
+  const hasMentor = Boolean(
+    team.hasMentor ||
+      team.hasMentorAssignment ||
+      team.mentorAssigned ||
+      team.mentorCount > 0 ||
+      team.mentorAssignedCount > 0
+  );
 
   return {
     key: team.id,
@@ -74,10 +86,19 @@ export const mapStudentTeam = (team) => {
       acceptedMemberCount >= TEAM_MEMBER_LIMITS.MIN_ACCEPTED &&
       acceptedMemberCount <= TEAM_MEMBER_LIMITS.MAX_ACCEPTED,
     isFull: acceptedMemberCount >= TEAM_MEMBER_LIMITS.MAX_ACCEPTED,
-    canInvite: !team.isLocked && acceptedMemberCount < TEAM_MEMBER_LIMITS.MAX_ACCEPTED,
-    canTransferLeader: !team.isLocked && toNumber(team.leaderId) === toNumber(currentStudentId),
-    canDisband: toNumber(team.leaderId) === toNumber(currentStudentId) && team.status !== 'ELIMINATED',
-    isCurrentUserLeader: toNumber(team.leaderId) === toNumber(currentStudentId),
+    hasMentor,
+    canInvite:
+      canChangeMembership &&
+      isCurrentUserLeader &&
+      acceptedMemberCount < TEAM_MEMBER_LIMITS.MAX_ACCEPTED,
+    canTransferLeader: canTransferLeaderByStatus && isCurrentUserLeader,
+    canLeaveTeam: canChangeMembership && !isCurrentUserLeader && currentMember?.isAccepted,
+    canDisband:
+      isCurrentUserLeader &&
+      [TEAM_STATUS.PENDING, TEAM_STATUS.ACTIVE].includes(team.status) &&
+      !hasMentor,
+    isCurrentUserLeader,
+    currentMember,
     acceptedMembers,
     transferCandidates: acceptedMembers.filter((member) => toNumber(member.userId) !== toNumber(team.leaderId)),
     members,
