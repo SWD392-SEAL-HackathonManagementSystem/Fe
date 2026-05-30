@@ -156,4 +156,4 @@ export const useEventManagement = (hackathonId, addNotification) => {
   };
 
   return { events, currentHackathon, isLoading, createEvent, deleteEvent };
-};
+};  
