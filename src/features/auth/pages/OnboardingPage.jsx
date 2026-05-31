@@ -43,6 +43,14 @@ const getUserInfo = () => {
   }
 };
 
+const generateSHA1 = async (string) => {
+  const buffer = new TextEncoder().encode(string);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+};
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -56,18 +64,50 @@ const OnboardingPage = () => {
   const [cardLoading, setCardLoading] = useState(false);
   const [hasCard, setHasCard] = useState(false);
   const [fileList, setFileList] = useState([]);
-  const [userInfo] = useState(getUserInfo);
+  const [userInfo, setUserInfo] = useState(getUserInfo);
+  const [checkingStatus, setCheckingStatus] = useState(true);
 
-  // If user is already APPROVED, redirect to dashboard
+  // Sync state on load using real API response to avoid local storage inconsistencies
   useEffect(() => {
-    if (userInfo?.status === 'APPROVED') {
-      navigate(ROUTES.DASHBOARD, { replace: true });
-    }
-    // If user already completed submission, jump to waiting step
-    if (userInfo?.profileCompleted && userInfo?.studentCardUploaded) {
-      setCurrentStep(2);
-    }
-  }, [userInfo, navigate]);
+    let active = true;
+    const fetchFreshStatus = async () => {
+      try {
+        const freshUser = await userService.getMe();
+        if (!active) return;
+        
+        // Sync local storage userInfo with fresh info
+        const stored = getUserInfo() || {};
+        const merged = { ...stored, ...freshUser };
+        localStorage.setItem('userInfo', JSON.stringify(merged));
+        window.dispatchEvent(new Event('userInfoUpdated'));
+        setUserInfo(merged);
+
+        if (freshUser.status === 'APPROVED') {
+          navigate(ROUTES.DASHBOARD, { replace: true });
+          return;
+        }
+
+        // Determine step using fresh database fields
+        const hasCompletedProfile = Boolean(freshUser.fullName && freshUser.phone);
+        const hasUploadedCard = Boolean(freshUser.studentCardImagePath);
+
+        if (hasCompletedProfile && hasUploadedCard) {
+          setCurrentStep(2);
+        } else if (hasCompletedProfile) {
+          setCurrentStep(1);
+        } else {
+          setCurrentStep(0);
+        }
+      } catch (err) {
+        console.error('Failed to sync onboarding status:', err);
+      } finally {
+        if (active) setCheckingStatus(false);
+      }
+    };
+
+    fetchFreshStatus();
+    return () => { active = false; };
+  }, [navigate]);
 
   // -------------------------------------------------------------------------
   // Step 1 – Profile
@@ -90,6 +130,7 @@ const OnboardingPage = () => {
       const updated = { ...getUserInfo(), profileCompleted: true };
       localStorage.setItem('userInfo', JSON.stringify(updated));
       window.dispatchEvent(new Event('userInfoUpdated'));
+      setUserInfo(updated);
 
       message.success('Thông tin hồ sơ đã được cập nhật!');
       setCurrentStep(1);
@@ -112,17 +153,63 @@ const OnboardingPage = () => {
     setCardLoading(true);
     try {
       const file = fileList[0].originFileObj || fileList[0];
+      const userId = userInfo?.id || userInfo?.userId;
+
+      if (!userId) {
+        throw new Error('Không xác định được ID người dùng!');
+      }
+
+      // 1. Prepare Cloudinary parameters for signed upload
+      const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+      const apiKey = import.meta.env.VITE_CLOUDINARY_API_KEY;
+      const apiSecret = import.meta.env.VITE_CLOUDINARY_API_SECRET;
+
+      if (!cloudName || !apiKey || !apiSecret) {
+        throw new Error('Thiếu cấu hình Cloudinary trong environment!');
+      }
+
+      const publicId = `student-cards/student-card-${userId}`;
+      const timestamp = Math.round(new Date().getTime() / 1000);
+
+      // Alphabetical ordering: public_id, timestamp
+      const signatureString = `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+      const signature = await generateSHA1(signatureString);
+
+      // 2. Upload to Cloudinary via Fetch API (direct, bypasses global interceptors)
+      const cloudinaryFormData = new FormData();
+      cloudinaryFormData.append('file', file);
+      cloudinaryFormData.append('api_key', apiKey);
+      cloudinaryFormData.append('timestamp', timestamp);
+      cloudinaryFormData.append('public_id', publicId);
+      cloudinaryFormData.append('signature', signature);
+
+      const cloudinaryResponse = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: cloudinaryFormData
+      });
+
+      if (!cloudinaryResponse.ok) {
+        const errorData = await cloudinaryResponse.json();
+        throw new Error(errorData?.error?.message || 'Không thể upload ảnh lên Cloudinary');
+      }
+
+      const cloudinaryData = await cloudinaryResponse.json();
+      console.log('Uploaded to Cloudinary successfully. URL:', cloudinaryData.secure_url);
+
+      // 3. Register image upload on local backend to set studentCardImagePath
       await userService.uploadStudentCard(file);
 
       const updated = { ...getUserInfo(), studentCardUploaded: true };
       localStorage.setItem('userInfo', JSON.stringify(updated));
       window.dispatchEvent(new Event('userInfoUpdated'));
+      setUserInfo(updated);
 
       setHasCard(true);
       message.success('Tải lên thẻ sinh viên thành công!');
       setCurrentStep(2);
     } catch (error) {
-      message.error(resolveUserError(error));
+      console.error('Upload card error:', error);
+      message.error(error.message || resolveUserError(error));
     } finally {
       setCardLoading(false);
     }
@@ -335,6 +422,17 @@ const OnboardingPage = () => {
   // -------------------------------------------------------------------------
   // Main render
   // -------------------------------------------------------------------------
+  if (checkingStatus) {
+    return (
+      <div style={{ ...pageStyle, minHeight: '80vh', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Spin size="large" />
+        <span style={{ color: '#4b5563', fontSize: '14px', fontWeight: 500 }}>
+          Đang tải thông tin hồ sơ...
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div style={pageStyle}>
       <div style={cardContainerStyle}>
