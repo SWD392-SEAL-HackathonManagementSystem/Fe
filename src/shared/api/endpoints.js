@@ -23,9 +23,19 @@ export const ENDPOINTS = {
   },
   TEAMS: {
     BASE: '/api/v1/teams',
+    BULK_APPROVE: '/api/v1/teams/bulk-approve',
     DETAIL: (teamId) => `/api/v1/teams/${teamId}`,
-    // FR-13B-R: Đổi track
+    STATUS: (teamId) => `/api/v1/teams/${teamId}/status`,
+    APPROVE: (teamId) => `/api/v1/teams/${teamId}/approve`,
+    TRANSFER_LEADER: (teamId) => `/api/v1/teams/${teamId}/transfer-leader`,
+    
+    INVITE_MEMBER: (teamId) => `/api/v1/teams/${teamId}/members/invite`,
+    MEMBER_DETAIL: (teamId, userId) => `/api/v1/teams/${teamId}/members/${userId}`,
+    
+    // FR-13B-R: Đổi track (Đã gộp cả UPDATE_TRACK và TRACK để không bị lỗi)
     UPDATE_TRACK: (teamId, roundId) => `/api/v1/teams/${teamId}/rounds/${roundId}/track`,
+    TRACK: (teamId, roundId) => `/api/v1/teams/${teamId}/rounds/${roundId}/track`, 
+    
     // FR-13C: Quản lý Mentor theo vòng
     MENTOR: (teamId, roundId) => `/api/v1/teams/${teamId}/rounds/${roundId}/mentor`,
     MENTOR_HISTORY: (teamId) => `/api/v1/teams/${teamId}/mentors`,
@@ -50,23 +60,6 @@ export const ENDPOINTS = {
   EVENTS: {
     DETAIL: (id) => `/api/v1/events/${id}`,
   },
-
-  TEAMS: {
-    BASE: '/api/v1/teams',
-    BULK_APPROVE: '/api/v1/teams/bulk-approve',
-    DETAIL: (teamId) => `/api/v1/teams/${teamId}`,
-    STATUS: (teamId) => `/api/v1/teams/${teamId}/status`,
-    APPROVE: (teamId) => `/api/v1/teams/${teamId}/approve`,
-    TRANSFER_LEADER: (teamId) => `/api/v1/teams/${teamId}/transfer-leader`,
-    
-    INVITE_MEMBER: (teamId) => `/api/v1/teams/${teamId}/members/invite`,
-    MEMBER_DETAIL: (teamId, userId) => `/api/v1/teams/${teamId}/members/${userId}`,
-    
-    TRACK: (teamId, roundId) => `/api/v1/teams/${teamId}/rounds/${roundId}/track`,
-    MENTOR: (teamId, roundId) => `/api/v1/teams/${teamId}/rounds/${roundId}/mentor`,
-    MENTOR_HISTORY: (teamId) => `/api/v1/teams/${teamId}/mentors`,
-  },
-
   USERS: {
     ME: '/api/v1/users/me',
     ME_STUDENT_CARD: '/api/v1/users/me/student-card',

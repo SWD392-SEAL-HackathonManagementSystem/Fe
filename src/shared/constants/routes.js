@@ -18,4 +18,7 @@ export const ROUTES = {
   USER_APPROVAL: '/admin/users',
   TEMP_JUDGES: '/admin/temp-judges',
   PROFILE: '/profile',
+  JUDGE_DASHBOARD: '/judge/dashboard',               // Trang Dashboard tổng quan
+  JUDGE_SCORING: '/judging/:assignmentId/scoring',   // Phòng chấm thi trực tiếp
+  JUDGE_CRITERIA: '/judge/criteria',
 };

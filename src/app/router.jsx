@@ -24,6 +24,9 @@ import CoordinatorTeamPage from '../features/coordinator-teams/pages/Coordinator
 import GithubCallbackPage from '../features/auth/pages/GithubCallbackPage';
 import LandingPage from '../landing/pages/LandingPage';
 import StudentTeamPage from '../student/features/team/pages/StudentTeamPage';
+import JudgeDashboardPage from '../features/judging/pages/JudgeDashboardPage';
+import LiveScoringPage from '../features/judging/pages/LiveScoringPage';
+import JudgeCriteriaViewPage from '../features/judging/pages/JudgeCriteriaViewPage';
 
 const TrackWrapper = () => {
   const { hackathonId } = useParams();
@@ -203,6 +206,24 @@ const AppRouter = () => {
         <Route path={ROUTES.TEMP_JUDGES} element={
           <ProtectedRoute allowedRoles={['COORDINATOR', 'ADMIN']}>
             <TempJudgesPage />
+          </ProtectedRoute>
+        } />
+         {/* Routes inside JudgeDashboardPage */}
+        <Route path={ROUTES.JUDGE_DASHBOARD} element={
+          <ProtectedRoute allowedRoles={['JUDGE', 'TEMP_JUDGE', 'COORDINATOR', 'ADMIN']}>
+            <JudgeDashboardPage />
+          </ProtectedRoute>
+        } />
+          {/* Routes inside LiveScoringPage */}
+        <Route path={ROUTES.JUDGE_SCORING} element={
+          <ProtectedRoute allowedRoles={['JUDGE', 'TEMP_JUDGE', 'COORDINATOR', 'ADMIN']}>
+            <LiveScoringPage />
+          </ProtectedRoute>
+        } />
+        {/* Routes inside JudgeCriteriaViewPage */}
+        <Route path={ROUTES.JUDGE_CRITERIA} element={
+          <ProtectedRoute allowedRoles={['JUDGE', 'TEMP_JUDGE', 'COORDINATOR', 'ADMIN']}>
+            <JudgeCriteriaViewPage />
           </ProtectedRoute>
         } />
         
