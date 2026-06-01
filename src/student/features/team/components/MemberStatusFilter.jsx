@@ -19,19 +19,14 @@ const MemberStatusFilter = ({ counts, value, onChange }) => {
   }));
 
   return (
-    <div
-      style={{
-        marginTop: 18,
-        padding: 12,
-        borderRadius: 16,
-        background: token.colorFillQuaternary,
-        border: `1px solid ${token.colorBorderSecondary}`,
-      }}
-    >
-      <Space direction="vertical" size={10} style={{ width: '100%' }}>
-        <Text strong>Lọc thành viên</Text>
-        <Segmented block value={value} options={options} onChange={onChange} />
-      </Space>
+    <div style={{ marginBottom: 24, overflowX: 'auto', paddingBottom: 4 }}>
+      <Segmented 
+        value={value} 
+        options={options} 
+        onChange={onChange}
+        size="large"
+        style={{ padding: 6, borderRadius: 12 }}
+      />
     </div>
   );
 };

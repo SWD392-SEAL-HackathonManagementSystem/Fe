@@ -1,3 +1,7 @@
+﻿/**
+ * Component: LeaveTeamPanel
+ * Chức năng: Hiển thị giao diện và logic xác nhận cho phép thành viên rời khỏi đội thi hiện tại.
+ */
 import { Button, Modal, Space, Typography, theme } from 'antd';
 import { LogoutOutlined } from '@ant-design/icons';
 
@@ -43,3 +47,4 @@ const LeaveTeamPanel = ({ teamId, loading, onLeaveTeam }) => {
 };
 
 export default LeaveTeamPanel;
+

@@ -49,13 +49,9 @@ const StudentLayout = ({ children }) => {
       {
         key: ROUTES.STUDENT_TEAM,
         icon: <UsersRound size={18} />,
-        label: 'Đội của tôi',
+        label: 'Quản lý đội',
       },
-      {
-        key: ROUTES.STUDENT_INVITATIONS,
-        icon: <Mail size={18} />,
-        label: 'Lời mời đội',
-      },
+
       {
         key: 'student-schedule',
         icon: <CalendarDays size={18} />,
@@ -79,7 +75,6 @@ const StudentLayout = ({ children }) => {
     if (
       key === ROUTES.DASHBOARD ||
       key === ROUTES.STUDENT_TEAM ||
-      key === ROUTES.STUDENT_INVITATIONS ||
       key === ROUTES.PROFILE
     ) {
       navigate(key);
@@ -93,7 +88,6 @@ const StudentLayout = ({ children }) => {
         await authService.logout(refreshToken);
       }
     } catch {
-      // Client-side logout should still complete if the server call fails.
     } finally {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');

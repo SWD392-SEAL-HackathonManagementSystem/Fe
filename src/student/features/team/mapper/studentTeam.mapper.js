@@ -1,3 +1,7 @@
+﻿/**
+ * Mapper: Student Team
+ * Chức năng: Biến đổi dữ liệu (Data mapping) từ API Backend thành định dạng chuẩn hóa phù hợp để hiển thị trên UI.
+ */
 import {
   MEMBER_ROLE_META,
   MEMBER_STATUS,
@@ -104,3 +108,4 @@ export const mapStudentTeam = (team) => {
     members,
   };
 };
+

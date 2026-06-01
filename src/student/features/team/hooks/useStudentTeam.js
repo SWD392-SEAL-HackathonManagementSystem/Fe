@@ -1,15 +1,11 @@
+﻿/**
+ * Hook: useStudentTeam
+ * Chức năng: Quản lý trạng thái (State) và tự động gọi API (Fetch) để lấy danh sách đội thi của sinh viên.
+ */
 import { useCallback, useEffect, useState } from 'react';
-import { message, notification } from 'antd';
+import { notification } from 'antd';
 import { getStudentTeamErrorMessage } from '../constants/studentTeam.constants';
 import { studentTeamService } from '../services/studentTeam.service';
-
-const getCurrentUserInfo = () => {
-  try {
-    return JSON.parse(localStorage.getItem('userInfo') || '{}');
-  } catch {
-    return {};
-  }
-};
 
 const showLargeTeamNotice = ({ type = 'error', message: title, description }) => {
   notification[type]({
@@ -26,24 +22,11 @@ const showLargeTeamNotice = ({ type = 'error', message: title, description }) =>
   });
 };
 
-const isKnownUnauthorizedCreator = (userInfo) => {
-  if (!userInfo?.role && !userInfo?.status) return false;
-  return userInfo.role !== 'STUDENT' || userInfo.status !== 'APPROVED';
-};
-
-const normalizeEmail = (email) => email?.trim().toLowerCase();
-
-const getCurrentUserId = () => {
-  const userInfo = getCurrentUserInfo();
-  return userInfo.userId || userInfo.id || null;
-};
-
-export const useStudentTeam = (initialHackathonId) => {
-  const [hackathonId, setHackathonId] = useState(initialHackathonId || '');
+export const useStudentTeam = () => {
+  const [hackathonId, setHackathonId] = useState('');
   const [teams, setTeams] = useState([]);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isActionLoading, setIsActionLoading] = useState(false);
 
   const selectedTeam = teams.find((team) => team.id === selectedTeamId) || teams[0] || null;
 
@@ -58,15 +41,26 @@ export const useStudentTeam = (initialHackathonId) => {
   };
 
   const fetchTeams = useCallback(async () => {
-    if (!hackathonId) {
-      setTeams([]);
-      setSelectedTeamId(null);
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const data = await studentTeamService.getMyTeams({ hackathonId });
+      let currentHackathonId = hackathonId;
+      if (!currentHackathonId) {
+        const activeHackathon = await studentTeamService.getActiveHackathon();
+        if (activeHackathon && activeHackathon.id) {
+          currentHackathonId = activeHackathon.id;
+          setHackathonId(currentHackathonId);
+        }
+      }
+
+      if (!currentHackathonId) {
+        setTeams([]);
+        setSelectedTeamId(null);
+        setIsLoading(false);
+        return;
+      }
+
+      const rawData = await studentTeamService.getMyTeams({ hackathonId: currentHackathonId });
+      const data = rawData.filter(team => team.currentMember?.isAccepted);
       setTeams(data);
       setSelectedTeamId((currentId) =>
         data.some((team) => team.id === currentId) ? currentId : data[0]?.id || null
@@ -91,152 +85,12 @@ export const useStudentTeam = (initialHackathonId) => {
 
   const refreshSelectedTeam = async (teamId = selectedTeam?.id) => {
     if (!teamId) return null;
-    const detail = await studentTeamService.getTeamDetail(teamId);
-    replaceTeam(detail);
-    return detail;
-  };
-
-  const createTeam = async (payload) => {
-    const userInfo = getCurrentUserInfo();
-    if (isKnownUnauthorizedCreator(userInfo)) {
-      showLargeTeamNotice({
-        type: 'warning',
-        message: 'Chưa thể tạo đội',
-        description: `Tài khoản cần là sinh viên đã được phê duyệt. Trạng thái hiện tại: ${userInfo.status || 'chưa xác định'}.`,
-      });
-      return false;
-    }
-
-    setIsActionLoading(true);
     try {
-      const team = await studentTeamService.createTeam(payload);
-      setHackathonId(payload.hackathonId || '');
-      replaceTeam(team);
-      message.success('Đã tạo đội thành công.');
-      return true;
+      const detail = await studentTeamService.getTeamDetail(teamId);
+      replaceTeam(detail);
+      return detail;
     } catch (error) {
-      showLargeTeamNotice({
-        message: 'Tạo đội không thành công',
-        description: getStudentTeamErrorMessage(error, 'Tạo đội thất bại. Vui lòng kiểm tra lại quyền tài khoản và hackathon.'),
-      });
-      return false;
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const inviteMember = async (teamId, email) => {
-    const targetTeam = teams.find((team) => team.id === teamId);
-    const inviteEmail = email?.trim();
-    const existingMember = targetTeam?.members?.find((member) => {
-      const isClosedStatus = member.status === 'REJECTED' || member.status === 'LEFT';
-      return normalizeEmail(member.email) === normalizeEmail(inviteEmail) && !isClosedStatus;
-    });
-
-    if (existingMember) {
-      showLargeTeamNotice({
-        type: 'warning',
-        message: 'Chưa thể gửi lời mời',
-        description:
-          existingMember.status === 'PENDING'
-            ? 'Thành viên này đã có lời mời đang chờ phản hồi trong đội.'
-            : 'Thành viên này đã có trong đội hiện tại.',
-      });
-      return false;
-    }
-
-    setIsActionLoading(true);
-    try {
-      await studentTeamService.inviteMember(teamId, inviteEmail);
-      await refreshSelectedTeam(teamId);
-      message.success('Đã gửi lời mời thành viên.');
-      return true;
-    } catch (error) {
-      showLargeTeamNotice({
-        message: 'Mời thành viên không thành công',
-        description: getStudentTeamErrorMessage(error, 'Mời thành viên thất bại. Vui lòng kiểm tra lại email và trạng thái đội.'),
-      });
-      return false;
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const cancelPendingInvite = async (teamId, userId) => {
-    setIsActionLoading(true);
-    try {
-      await studentTeamService.cancelPendingInvite(teamId, userId);
-      await refreshSelectedTeam(teamId);
-      message.success('Đã hủy lời mời đang chờ.');
-      return true;
-    } catch (error) {
-      message.error(getStudentTeamErrorMessage(error, 'Không thể hủy lời mời.'));
-      return false;
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const leaveTeam = async (teamId) => {
-    const targetTeam = teams.find((team) => team.id === teamId);
-    const currentUserId = targetTeam?.currentMember?.userId || getCurrentUserId();
-
-    if (!currentUserId) {
-      showLargeTeamNotice({
-        type: 'warning',
-        message: 'Chưa thể rời đội',
-        description: 'Không xác định được tài khoản hiện tại. Vui lòng đăng nhập lại rồi thử lại.',
-      });
-      return false;
-    }
-
-    setIsActionLoading(true);
-    try {
-      await studentTeamService.leaveTeam(teamId, currentUserId);
-      await fetchTeams();
-      message.success('Đã rời đội thành công.');
-      return true;
-    } catch (error) {
-      showLargeTeamNotice({
-        message: 'Không thể rời đội',
-        description: getStudentTeamErrorMessage(error, 'Đội đã khóa hoặc bạn không có quyền rời đội này.'),
-      });
-      return false;
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const transferLeader = async (teamId, newLeaderId) => {
-    setIsActionLoading(true);
-    try {
-      await studentTeamService.transferLeader(teamId, newLeaderId);
-      await refreshSelectedTeam(teamId);
-      message.success('Đã chuyển quyền trưởng nhóm.');
-      return true;
-    } catch (error) {
-      message.error(getStudentTeamErrorMessage(error, 'Chuyển quyền thất bại.'));
-      return false;
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const disbandTeam = async (teamId) => {
-    setIsActionLoading(true);
-    try {
-      await studentTeamService.disbandTeam(teamId);
-      await fetchTeams();
-      message.success('Đã giải tán đội.');
-      return true;
-    } catch (error) {
-      notification.error({
-        message: 'Không thể giải tán đội',
-        description: getStudentTeamErrorMessage(error, 'Đội đang có ràng buộc nghiệp vụ.'),
-      });
-      return false;
-    } finally {
-      setIsActionLoading(false);
+      return null;
     }
   };
 
@@ -248,13 +102,8 @@ export const useStudentTeam = (initialHackathonId) => {
     selectedTeamId,
     setSelectedTeamId,
     isLoading,
-    isActionLoading,
     fetchTeams,
-    createTeam,
-    inviteMember,
-    cancelPendingInvite,
-    leaveTeam,
-    transferLeader,
-    disbandTeam,
+    refreshSelectedTeam,
   };
 };
+

@@ -1,4 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+﻿/**
+ * Hook: useStudentInvitations
+ * Chức năng: Quản lý trạng thái và thao tác dữ liệu (Fetch/Respond) cho danh sách lời mời gia nhập đội của sinh viên.
+ */
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { message, notification } from 'antd';
 import { getInvitationErrorMessage } from '../constants/studentInvitation.constants';
 import { studentInvitationService } from '../services/studentInvitation.service';
@@ -13,8 +17,8 @@ const notifyError = (title, error, fallback) => {
   });
 };
 
-export const useStudentInvitations = (initialHackathonId) => {
-  const [hackathonId, setHackathonId] = useState(initialHackathonId || '');
+export const useStudentInvitations = () => {
+  const [hackathonId, setHackathonId] = useState('');
   const [invitations, setInvitations] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [actionKey, setActionKey] = useState('');
@@ -25,14 +29,24 @@ export const useStudentInvitations = (initialHackathonId) => {
   );
 
   const fetchInvitations = useCallback(async () => {
-    if (!hackathonId) {
-      setInvitations([]);
-      return;
-    }
-
     setIsLoading(true);
     try {
-      const data = await studentInvitationService.getInvitations({ hackathonId });
+      let currentHackathonId = hackathonId;
+      if (!currentHackathonId) {
+        const activeHackathon = await studentInvitationService.getActiveHackathon();
+        if (activeHackathon && activeHackathon.id) {
+          currentHackathonId = activeHackathon.id;
+          setHackathonId(currentHackathonId);
+        }
+      }
+
+      if (!currentHackathonId) {
+        setInvitations([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const data = await studentInvitationService.getInvitations({ hackathonId: currentHackathonId });
       setInvitations(data);
     } catch (error) {
       notifyError('Không thể tải lời mời', error, 'Vui lòng thử lại sau.');
@@ -61,9 +75,16 @@ export const useStudentInvitations = (initialHackathonId) => {
     }
   };
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      fetchInvitations();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchInvitations]);
+
   return {
     hackathonId,
-    setHackathonId,
     invitations,
     pendingCount,
     isLoading,
@@ -72,3 +93,4 @@ export const useStudentInvitations = (initialHackathonId) => {
     respondInvitation,
   };
 };
+
