@@ -1,3 +1,7 @@
+﻿/**
+ * Mapper: Student Invitation
+ * Chức năng: Chuyển đổi dữ liệu đội thi và trạng thái thành viên từ Backend thành định dạng hiển thị cho Lời mời.
+ */
 import { INVITATION_STATUS_META } from '../constants/studentInvitation.constants';
 
 const getCurrentUser = () => {
@@ -48,3 +52,4 @@ export const mapTeamToInvitation = (team) => {
     canReject: currentMember.status === 'PENDING' && !team.isLocked,
   };
 };
+

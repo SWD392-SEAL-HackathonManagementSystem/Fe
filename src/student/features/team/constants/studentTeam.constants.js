@@ -1,3 +1,7 @@
+﻿/**
+ * Constants: Student Team
+ * Chức năng: Chứa các hằng số cấu hình, màu sắc và thông báo lỗi tĩnh cho module Quản lý Đội.
+ */
 export const TEAM_MEMBER_LIMITS = {
   MIN_ACCEPTED: 3,
   MAX_ACCEPTED: 5,
@@ -62,6 +66,14 @@ export const TEAM_ACTION_ERROR_MESSAGES = {
 };
 
 export const getStudentTeamErrorMessage = (error, fallback = 'Thao tác thất bại. Vui lòng thử lại.') => {
-  const code = error?.code || error?.data?.error?.code || error?.response?.data?.error?.code;
+  const code = 
+    error?.code || 
+    error?.data?.code || 
+    error?.data?.error?.code || 
+    error?.response?.data?.error?.code ||
+    error?.data?.warnings?.[0]?.code ||
+    error?.response?.data?.warnings?.[0]?.code;
+    
   return TEAM_ACTION_ERROR_MESSAGES[code] || error?.message || fallback;
 };
+

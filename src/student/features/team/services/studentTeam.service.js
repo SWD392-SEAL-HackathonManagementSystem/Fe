@@ -1,3 +1,7 @@
+﻿/**
+ * Service: Student Team
+ * Chức năng: Cung cấp các phương thức gọi API trực tiếp lên hệ thống Backend cho các nghiệp vụ liên quan đến Đội thi.
+ */
 import axiosClient from '../../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../../shared/api/endpoints';
 import { mapStudentTeam } from '../mapper/studentTeam.mapper';
@@ -13,6 +17,12 @@ const unwrapList = (res) => {
 const unwrapItem = (res) => res?.data || res || null;
 
 export const studentTeamService = {
+  getActiveHackathon: async () => {
+    const res = await axiosClient.get('/api/v1/hackathons/active', { params: { size: 1 } });
+    const items = unwrapList(res);
+    return items.length > 0 ? items[0] : null;
+  },
+
   getMyTeams: async ({ hackathonId, status } = {}) => {
     const params = { hackathonId, status };
     const res = await axiosClient.get(ENDPOINTS.TEAMS.BASE, { params });
@@ -50,3 +60,4 @@ export const studentTeamService = {
     return axiosClient.delete(ENDPOINTS.TEAMS.DETAIL(teamId));
   },
 };
+

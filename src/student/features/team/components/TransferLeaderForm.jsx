@@ -28,28 +28,22 @@ const TransferLeaderForm = ({ team, form, loading, onTransferLeader }) => {
       layout="vertical"
       onFinish={handleTransfer}
       requiredMark={false}
-      style={{
-        marginTop: 20,
-        padding: 16,
-        borderRadius: 16,
-        background: token.colorFillQuaternary,
-        border: `1px solid ${token.colorBorderSecondary}`,
-      }}
+      style={{ marginTop: 12 }}
     >
       <Form.Item
-        label="Chuyển quyền trưởng nhóm"
         name="newLeaderId"
         rules={[{ required: true, message: 'Chọn thành viên nhận quyền.' }]}
       >
         <Select
-          placeholder="Chọn thành viên đã tham gia"
+          placeholder="Chọn thành viên..."
+          size="large"
           options={team.transferCandidates.map((member) => ({
             value: member.userId,
             label: `${member.fullName} - ${member.email}`,
           }))}
         />
       </Form.Item>
-      <Button icon={<SwapOutlined />} htmlType="submit" loading={loading} style={{ borderRadius: 10, fontWeight: 700 }}>
+      <Button type="primary" icon={<SwapOutlined />} htmlType="submit" loading={loading} style={{ borderRadius: 8, fontWeight: 600 }}>
         Chuyển leader
       </Button>
     </Form>

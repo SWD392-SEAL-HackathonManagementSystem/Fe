@@ -1,106 +1,64 @@
-import { useEffect } from 'react';
-import { Alert, Button, Card, Form, Input, InputNumber, Space, Typography, theme } from 'antd';
-import { PlusOutlined, TeamOutlined } from '@ant-design/icons';
+/**
+ * Component: TeamCreateCard
+ * Chức năng: Card giao diện chứa Form cho phép sinh viên tự thành lập một đội thi mới.
+ */
+import { Button, Card, Form, Input, Typography, theme, Divider, Modal } from 'antd';
+import { PlusOutlined, RocketOutlined } from '@ant-design/icons';
 
 const { Text, Title } = Typography;
 
-const TeamCreateCard = ({ hackathonId, onCreateTeam, loading }) => {
+const TeamCreateCard = ({ hackathonId, hasTeams, onCreateTeam, loading }) => {
   const [form] = Form.useForm();
   const { token } = theme.useToken();
 
-  useEffect(() => {
-    if (hackathonId) {
-      form.setFieldsValue({ hackathonId: Number(hackathonId) });
-    }
-  }, [form, hackathonId]);
-
   const handleFinish = async (values) => {
+    if (!hackathonId) return; // Bỏ qua nếu chưa load xong ID của Hackathon
+
+    if (hasTeams) {
+      Modal.warning({
+        title: 'Không thể tạo đội mới',
+        content: 'Bạn hiện đang tham gia một đội thi khác. Vui lòng rời đội hiện tại nếu muốn tự thành lập một đội mới.',
+        okText: 'Đã hiểu'
+      });
+      return;
+    }
     const success = await onCreateTeam({
-      hackathonId: values.hackathonId,
+      hackathonId: hackathonId,
       teamName: values.teamName?.trim(),
     });
-
-    if (success) {
-      form.resetFields(['teamName']);
-    }
+    if (success) form.resetFields(['teamName']);
   };
 
   return (
     <Card
       hoverable
-      onMouseEnter={(event) => {
-        event.currentTarget.style.transform = 'translateY(-3px)';
-        event.currentTarget.style.boxShadow = '0 22px 52px rgba(15, 23, 42, 0.11)';
-      }}
-      onMouseLeave={(event) => {
-        event.currentTarget.style.transform = 'translateY(0)';
-        event.currentTarget.style.boxShadow = '0 16px 40px rgba(15, 23, 42, 0.07)';
-      }}
       style={{
-        borderRadius: 20,
+        height: '100%',
+        borderRadius: 24,
         border: `1px solid ${token.colorBorderSecondary}`,
-        boxShadow: '0 16px 40px rgba(15, 23, 42, 0.07)',
-        transition: 'transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease',
+        transition: 'all 0.3s ease',
       }}
-      styles={{ body: { padding: 24 } }}
+      styles={{ body: { padding: 32, display: 'flex', flexDirection: 'column', height: '100%' } }}
     >
-      <Space align="start" size={16} style={{ marginBottom: 20 }}>
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 16,
-            display: 'grid',
-            placeItems: 'center',
-            color: '#fff',
-            background: 'linear-gradient(135deg, #0f62fe, #13c2c2)',
-            boxShadow: '0 12px 26px rgba(15, 98, 254, 0.24)',
-          }}
-        >
-          <TeamOutlined />
+      <div style={{ flex: 1 }}>
+        <div style={{ 
+          width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg, #f5222d, #fa541c)', color: '#fff', 
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, marginBottom: 24,
+          boxShadow: '0 12px 24px rgba(245,34,45,0.25)'
+        }}>
+          <RocketOutlined />
         </div>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>
-            Tạo đội thi
-          </Title>
-          <Text type="secondary">
-            Nhập mã hackathon và tên đội. Track sẽ được Coordinator bốc thăm sau khai mạc.
-          </Text>
-        </div>
-      </Space>
+        <Title level={4} style={{ textAlign: 'left', marginTop: 0 }}>Thành lập đội thi</Title>
+        <Text type="secondary" style={{ display: 'block', textAlign: 'left', marginBottom: 24 }}>
+          Khởi tạo một đội mới và trở thành Trưởng nhóm. Bạn có toàn quyền quản lý thành viên.
+        </Text>
+      </div>
 
-      <Alert
-        type="info"
-        showIcon
-        message="Không chọn Track tại bước này"
-        description="Student chỉ tạo đội và mời thành viên. Track, bảng và Mentor thuộc luồng Coordinator."
-        style={{ borderRadius: 14, marginBottom: 18 }}
-      />
+      <Divider style={{ margin: '0 0 24px 0' }} />
 
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={{ hackathonId }}
-        onFinish={handleFinish}
-        requiredMark={false}
-      >
-        <Form.Item
-          label="Hackathon ID"
-          name="hackathonId"
-          rules={[{ required: true, message: 'Vui lòng nhập Hackathon ID.' }]}
-        >
-          <InputNumber min={1} style={{ width: '100%' }} placeholder="VD: 1" size="large" />
-        </Form.Item>
-
-        <Form.Item
-          label="Tên đội"
-          name="teamName"
-          rules={[
-            { required: true, message: 'Vui lòng nhập tên đội.' },
-            { min: 3, message: 'Tên đội nên có ít nhất 3 ký tự.' },
-          ]}
-        >
-          <Input placeholder="VD: Seal Builders" maxLength={200} showCount size="large" />
+      <Form form={form} layout="vertical" onFinish={handleFinish} requiredMark={false}>
+        <Form.Item name="teamName" rules={[{ required: true, message: 'Nhập tên đội.' }, { min: 3, message: 'Ít nhất 3 ký tự.' }]} style={{ marginBottom: 24 }}>
+          <Input placeholder="Tên đội thi..." maxLength={50} size="large" style={{ borderRadius: 12 }} />
         </Form.Item>
 
         <Button
@@ -109,14 +67,10 @@ const TeamCreateCard = ({ hackathonId, onCreateTeam, loading }) => {
           icon={<PlusOutlined />}
           loading={loading}
           block
-          style={{
-            height: 48,
-            borderRadius: 14,
-            fontWeight: 800,
-            boxShadow: '0 12px 24px rgba(22, 119, 255, 0.22)',
-          }}
+          size="large"
+          style={{ height: 48, borderRadius: 12, fontWeight: 800, background: 'linear-gradient(90deg, #f5222d, #fa541c)', border: 0, boxShadow: '0 8px 20px rgba(245,34,45,0.3)' }}
         >
-          Tạo đội
+          Tạo Đội
         </Button>
       </Form>
     </Card>
@@ -124,3 +78,4 @@ const TeamCreateCard = ({ hackathonId, onCreateTeam, loading }) => {
 };
 
 export default TeamCreateCard;
+

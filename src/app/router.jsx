@@ -24,7 +24,6 @@ import CoordinatorTeamPage from '../features/coordinator-teams/pages/Coordinator
 import GithubCallbackPage from '../features/auth/pages/GithubCallbackPage';
 import LandingPage from '../landing/pages/LandingPage';
 import StudentTeamPage from '../student/features/team/pages/StudentTeamPage';
-import StudentInvitationsPage from '../student/features/invitations/pages/StudentInvitationsPage';
 import JudgeDashboardPage from '../features/judging/pages/JudgeDashboardPage';
 import LiveScoringPage from '../features/judging/pages/LiveScoringPage';
 import JudgeCriteriaViewPage from '../features/judging/pages/JudgeCriteriaViewPage';
@@ -193,7 +192,6 @@ const AppRouter = () => {
       <Route element={<AppLayoutWrapper />}>
         <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
         <Route path={ROUTES.STUDENT_TEAM} element={<StudentTeamPage />} />
-        <Route path={ROUTES.STUDENT_INVITATIONS} element={<StudentInvitationsPage />} />
         <Route path={ROUTES.ONBOARDING} element={<OnboardingPage />} />
         <Route path={ROUTES.PROFILE} element={<OnboardingPage />} />
         <Route path={ROUTES.HACKATHONS} element={<HackathonListPage />} />
