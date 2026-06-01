@@ -23,15 +23,12 @@ import TempJudgesPage from '../features/auth/pages/TempJudgesPage';
 import CoordinatorTeamPage from '../features/coordinator-teams/pages/CoordinatorTeamPage';
 import GithubCallbackPage from '../features/auth/pages/GithubCallbackPage';
 import LandingPage from '../landing/pages/LandingPage';
-<<<<<<< Updated upstream
 import StudentTeamPage from '../student/features/team/pages/StudentTeamPage';
 import StudentInvitationsPage from '../student/features/invitations/pages/StudentInvitationsPage';
-
-=======
 import JudgeDashboardPage from '../features/judging/pages/JudgeDashboardPage';
 import LiveScoringPage from '../features/judging/pages/LiveScoringPage';
 import JudgeCriteriaViewPage from '../features/judging/pages/JudgeCriteriaViewPage';
->>>>>>> Stashed changes
+
 const TrackWrapper = () => {
   const { hackathonId } = useParams();
   return (
