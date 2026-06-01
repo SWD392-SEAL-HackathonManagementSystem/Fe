@@ -16,7 +16,13 @@ import {
   RocketOutlined
 } from '@ant-design/icons';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+<<<<<<< Updated upstream
 import StudentDashboardPage from '../student/dashboard/pages/StudentDashboardPage';
+=======
+import { useAppContext } from './AppContext';
+import { useNavigate, Navigate } from 'react-router-dom';
+import { ROUTES } from '../shared/constants/routes';
+>>>>>>> Stashed changes
 
 const { Title, Text } = Typography;
 
@@ -212,6 +218,10 @@ const Dashboard = () => {
 
   if (userProfile.role === 'STUDENT') {
     return <StudentDashboardPage />;
+  }
+  
+if (userProfile.role === 'JUDGE' || userProfile.role === 'TEMP_JUDGE') {
+    return <Navigate to={ROUTES.JUDGE_DASHBOARD} replace />;
   }
 
   // Mặc định hiển thị Coordinator Dashboard nếu không phải student

@@ -1,8 +1,9 @@
 // src/features/teams/pages/LotteryManagementPage.jsx
 import React, { useState } from 'react';
-import { Card, Table, Button, Space, Select, Typography, Tag, Modal, Input, Form, Alert, theme } from 'antd';
+import { Card, Table, Button, Space, Select, Typography, Tag, Modal, Input, Form, Alert, theme, message } from 'antd';
 import { Shuffle, Edit, Repeat, LayoutGrid } from 'lucide-react';
 import { useLotteryManagement } from '../hooks/useLotteryManagement';
+
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -173,6 +174,7 @@ const LotteryManagementPage = ({ hackathonId }) => {
       </Modal>
 
       {/* Modal 2: Đổi Track (Re-Lottery) */}
+      {/* Modal 2: Đổi Track (Re-Lottery) */}
       <Modal
         title={`Đổi Bảng đấu cho Đội: ${editingTeam?.teamName || editingTeam?.team_name}`}
         open={changeTrackModalVisible}
@@ -181,8 +183,19 @@ const LotteryManagementPage = ({ hackathonId }) => {
         confirmLoading={isLoading}
       >
         <Alert message="Lưu ý: Chỉ có thể đổi bảng khi Vòng thi CHƯA BẮT ĐẦU." type="warning" showIcon style={{ marginBottom: 16 }} />
-        <Form trackForm={trackForm} form={trackForm} layout="vertical" onFinish={(vals) => {
+        
+        {/* ĐOẠN ĐƯỢC CẬP NHẬT: Thêm logic Validation chặn trùng bảng */}
+        <Form form={trackForm} layout="vertical" onFinish={(vals) => {
+          
+          // 1. KIỂM TRA: Nếu Bảng đấu vừa chọn giống hệt bảng đấu hiện tại của đội
+          if (vals.trackId === editingTeam?.trackId || vals.trackId === editingTeam?.track_id) {
+            message.warning('Đội thi hiện đã nằm trong Bảng đấu này. Vui lòng chọn Bảng khác!');
+            return; // Dừng lại ngay lập tức, KHÔNG gọi API xuống Backend
+          }
+
+          // 2. GỌI API: Nếu chọn bảng mới thì mới chạy lệnh này
           handleChangeTrack(editingTeam.id, vals.trackId).then(() => setChangeTrackModalVisible(false));
+          
         }}>
           <Form.Item name="trackId" label="Chọn Bảng đấu mới" rules={[{ required: true, message: 'Vui lòng chọn bảng đấu' }]}>
             <Select placeholder="-- Chọn bảng đấu --">

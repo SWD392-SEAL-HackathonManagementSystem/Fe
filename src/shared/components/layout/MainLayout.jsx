@@ -16,7 +16,8 @@ import {
 } from '@ant-design/icons';
 import {
   LayoutDashboard, Trophy, Users, Activity, BarChart3, Settings, HelpCircle,
-  Mail, CalendarClock, AlertTriangle, CheckCheck, UserCheck, UserPlus, User
+  Mail, CalendarClock, AlertTriangle, CheckCheck, UserCheck, UserPlus, User,
+  ClipboardCheck, History, FileText
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '../../constants/routes';
@@ -89,21 +90,41 @@ const MainLayout = ({ children }) => {
     return () => window.removeEventListener('userInfoUpdated', handleUserInfoUpdated);
   }, []);
 
-  const isCoordinatorOrAdmin = currentUser.role === 'COORDINATOR' || currentUser.role === 'ADMIN';
+  // PHÂN LUỒNG MENU DỰA VÀO ROLE
+  const userRole = currentUser?.role;
+  const isCoordinatorOrAdmin = userRole === 'COORDINATOR' || userRole === 'ADMIN';
+  let menuItems = [];
 
-  const menuItems = [
-    { key: ROUTES.DASHBOARD, icon: <LayoutDashboard size={18} />, label: 'Tổng quan' },
-    { key: ROUTES.PROFILE, icon: <User size={18} />, label: 'Trang cá nhân' },
-    { key: ROUTES.HACKATHONS, icon: <Trophy size={18} />, label: 'Cấu hình Sự kiện' },
-    { key: ROUTES.GLOBAL_TEAMS, icon: <Users size={18} />, label: 'Quản lý Đội thi' },
-    ...(isCoordinatorOrAdmin ? [
+  if (userRole === 'COORDINATOR' || userRole === 'ADMIN') {
+    menuItems = [
+      { key: ROUTES.DASHBOARD, icon: <LayoutDashboard size={18} />, label: 'Tổng quan' },
+      { key: ROUTES.PROFILE, icon: <User size={18} />, label: 'Trang cá nhân' },
+      { key: ROUTES.HACKATHONS, icon: <Trophy size={18} />, label: 'Cấu hình Sự kiện' },
+      { key: ROUTES.GLOBAL_TEAMS, icon: <Users size={18} />, label: 'Quản lý Đội thi' },
       { key: ROUTES.USER_APPROVAL, icon: <UserCheck size={18} />, label: 'Duyệt tài khoản' },
-      { key: ROUTES.TEMP_JUDGES, icon: <UserPlus size={18} />, label: 'Giám khảo khách' }
-    ] : []),
-    { key: 'monitor', icon: <Activity size={18} />, label: 'Giám sát Real-time' },
-    { key: 'analytics', icon: <BarChart3 size={18} />, label: 'Phân tích dữ liệu' },
-    { key: 'settings', icon: <Settings size={18} />, label: 'Cài đặt Hệ thống' },
-  ];
+      { key: ROUTES.TEMP_JUDGES, icon: <UserPlus size={18} />, label: 'Giám khảo khách' },
+      { key: 'monitor', icon: <Activity size={18} />, label: 'Giám sát Real-time' },
+      { key: 'analytics', icon: <BarChart3 size={18} />, label: 'Phân tích dữ liệu' },
+      { key: 'settings', icon: <Settings size={18} />, label: 'Cài đặt Hệ thống' },
+    ];
+  } else if (userRole === 'JUDGE' || userRole === 'TEMP_JUDGE') {
+    menuItems = [
+      { key: ROUTES.JUDGE_DASHBOARD, icon: <LayoutDashboard size={18} />, label: 'Tổng quan' },
+      { key: ROUTES.JUDGE_CRITERIA, icon: <FileText size={18} />, label: 'Tiêu chí Đánh giá' },
+      { key: ROUTES.PROFILE, icon: <User size={18} />, label: 'Trang cá nhân' },
+    ];
+  } else if (userRole === 'STUDENT') {
+    menuItems = [
+      { key: ROUTES.DASHBOARD, icon: <LayoutDashboard size={18} />, label: 'Tổng quan' },
+      { key: ROUTES.PROFILE, icon: <User size={18} />, label: 'Trang cá nhân' },
+      { key: ROUTES.HACKATHONS, icon: <Trophy size={18} />, label: 'Sự kiện Hackathon' },
+      { key: ROUTES.GLOBAL_TEAMS, icon: <Users size={18} />, label: 'Đội thi của tôi' },
+    ];
+  } else {
+    menuItems = [
+      { key: ROUTES.DASHBOARD, icon: <LayoutDashboard size={18} />, label: 'Tổng quan' },
+    ];
+  }
 
   const bottomMenuItems = [
     { key: 'help', icon: <HelpCircle size={18} />, label: 'Trung tâm Hỗ trợ' },
@@ -112,13 +133,8 @@ const MainLayout = ({ children }) => {
 
   const handleMenuClick = ({ key }) => {
     if (isMobile) setDrawerVisible(false);
-    if (
-      key === ROUTES.DASHBOARD ||
-      key === ROUTES.HACKATHONS ||
-      key === ROUTES.GLOBAL_TEAMS ||
-      key === ROUTES.USER_APPROVAL ||
-      key === ROUTES.TEMP_JUDGES
-    ) {
+    // Bỏ qua các key dùng tạm làm UI (chưa có route thật)
+    if (key !== 'monitor' && key !== 'analytics' && key !== 'settings') {
       navigate(key);
     }
   };
@@ -214,11 +230,13 @@ const MainLayout = ({ children }) => {
         {(!collapsed || isMobile) && (
           <div style={{ overflow: 'hidden' }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: token.colorText, lineHeight: '1.2', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>HackOS</div>
-            <div style={{ fontSize: 12, color: token.colorTextSecondary || '#8c8c8c', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>Quản trị viên Doanh nghiệp</div>
+            <div style={{ fontSize: 12, color: token.colorTextSecondary || '#8c8c8c', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+              {isCoordinatorOrAdmin ? 'Quản trị viên Doanh nghiệp' : (userRole === 'JUDGE' ? 'Cổng Giám Khảo SEAL' : 'Thí sinh SEAL')}
+            </div>
           </div>
         )}
       </div>
-      {(!collapsed || isMobile) && (
+      {(!collapsed || isMobile) && (userRole === 'COORDINATOR' || userRole === 'ADMIN') && (
         <div style={{ padding: '0 16px 24px' }}>
           <Button type="primary" icon={<PlusOutlined />} block size="large" style={{ height: 48, borderRadius: 8, fontWeight: 600 }} onClick={() => { if(isMobile) setDrawerVisible(false); navigate(ROUTES.HACKATHON_CREATE); }}>Tạo Sự kiện Mới</Button>
         </div>
