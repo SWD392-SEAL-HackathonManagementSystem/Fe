@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Hook: useStudentTeam
  * Chức năng: Quản lý trạng thái (State) và tự động gọi API (Fetch) để lấy danh sách đội thi của sinh viên.
  */
@@ -60,7 +60,9 @@ export const useStudentTeam = () => {
       }
 
       const rawData = await studentTeamService.getMyTeams({ hackathonId: currentHackathonId });
-      const data = rawData.filter(team => team.currentMember?.isAccepted);
+      const data = rawData.filter(
+        team => team.currentMember?.isAccepted && team.status !== 'REJECTED' && team.status !== 'ELIMINATED'
+      );
       setTeams(data);
       setSelectedTeamId((currentId) =>
         data.some((team) => team.id === currentId) ? currentId : data[0]?.id || null

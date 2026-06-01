@@ -2,10 +2,9 @@
  * Page: StudentTeamPage
  * Chức năng: Trang gốc điều phối luồng dữ liệu (Container) cho toàn bộ không gian Quản lý đội thi. Quyết định hiển thị Onboarding hay Dashboard.
  */
-import React, { useState } from 'react';
-import { Alert, Card, Col, Empty, Input, Row, Select, Skeleton, Space, Typography, theme, Drawer, Grid, Button, message } from 'antd';
-import { TeamOutlined, SearchOutlined, RocketOutlined, CompassOutlined, MailOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Skeleton, Typography, theme, Drawer, Grid, Button } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudentTeam } from '../hooks/useStudentTeam';
 import { useTeamActions } from '../hooks/useTeamActions';
@@ -19,7 +18,6 @@ const { Text, Title } = Typography;
 const StudentTeamPage = () => {
   const { token } = theme.useToken();
   const screens = Grid.useBreakpoint();
-  const navigate = useNavigate();
   const [forceShowMenu, setForceShowMenu] = useState(true);
   const [isInvitationsDrawerOpen, setIsInvitationsDrawerOpen] = useState(false);
   const {
@@ -27,8 +25,6 @@ const StudentTeamPage = () => {
     setHackathonId,
     teams,
     selectedTeam,
-    selectedTeamId,
-    setSelectedTeamId,
     isLoading,
     fetchTeams,
     refreshSelectedTeam,
@@ -50,13 +46,19 @@ const StudentTeamPage = () => {
   });
 
   const {
-    invitations = [],
     pendingCount,
-    isLoading: isInvLoading,
     fetchInvitations,
   } = useStudentInvitations();
 
   const hasTeams = teams.length > 0;
+
+  const handleCreateTeam = async (payload) => {
+    const success = await createTeam(payload);
+    if (success) {
+      setForceShowMenu(false);
+    }
+    return success;
+  };
   
   const handleInvitationActionSuccess = () => {
     fetchTeams();
@@ -129,11 +131,12 @@ const StudentTeamPage = () => {
           </motion.div>
         ) : (!hasTeams || forceShowMenu) ? (
           <StudentTeamOnboarding 
+            hackathonId={hackathonId}
             hasTeams={hasTeams}
             setForceShowMenu={setForceShowMenu}
             setIsInvitationsDrawerOpen={setIsInvitationsDrawerOpen}
             invitationsCount={pendingCount}
-            onCreateTeam={createTeam}
+            onCreateTeam={handleCreateTeam}
             isActionLoading={isActionLoading}
           />
         ) : (

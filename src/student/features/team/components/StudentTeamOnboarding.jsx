@@ -2,7 +2,6 @@
  * Component: StudentTeamOnboarding
  * Chức năng: Layout màn hình chờ (khi sinh viên chưa có đội hoặc muốn xem menu chính), chứa các chức năng tạo đội, mở hộp thư và vào xem đội.
  */
-import React from 'react';
 import { Row, Col, Card, Typography, Button, message, theme } from 'antd';
 import { CompassOutlined, MailOutlined, TeamOutlined } from '@ant-design/icons';
 import { motion } from 'framer-motion';
@@ -11,6 +10,7 @@ import TeamCreateCard from './TeamCreateCard';
 const { Title, Text } = Typography;
 
 const StudentTeamOnboarding = ({ 
+  hackathonId,
   hasTeams, 
   setForceShowMenu, 
   setIsInvitationsDrawerOpen, 
@@ -50,6 +50,7 @@ const StudentTeamOnboarding = ({
       <Row gutter={[32, 32]} justify="center">
         <Col xs={24} md={8}>
           <TeamCreateCard 
+            hackathonId={hackathonId}
             hasTeams={hasTeams}
             onCreateTeam={onCreateTeam} 
             loading={isActionLoading} 

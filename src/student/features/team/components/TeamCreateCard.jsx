@@ -2,7 +2,6 @@
  * Component: TeamCreateCard
  * Chức năng: Card giao diện chứa Form cho phép sinh viên tự thành lập một đội thi mới.
  */
-import { useEffect } from 'react';
 import { Button, Card, Form, Input, Typography, theme, Divider, Modal } from 'antd';
 import { PlusOutlined, RocketOutlined } from '@ant-design/icons';
 
