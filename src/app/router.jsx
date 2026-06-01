@@ -191,7 +191,11 @@ const AppRouter = () => {
       {/* Protected Routes inside role-aware layout */}
       <Route element={<AppLayoutWrapper />}>
         <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
-        <Route path={ROUTES.STUDENT_TEAM} element={<StudentTeamPage />} />
+        <Route path={ROUTES.STUDENT_TEAM} element={
+          <ProtectedRoute allowedRoles={['STUDENT']}>
+            <StudentTeamPage />
+          </ProtectedRoute>
+        } />
         <Route path={ROUTES.ONBOARDING} element={<OnboardingPage />} />
         <Route path={ROUTES.PROFILE} element={<OnboardingPage />} />
         <Route path={ROUTES.HACKATHONS} element={<HackathonListPage />} />
