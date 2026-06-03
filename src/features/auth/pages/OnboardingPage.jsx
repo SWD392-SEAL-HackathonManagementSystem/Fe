@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Form, Input, Select, Button, Upload, message, Steps, Result, Spin, Tag
+  Form, Input, Select, Button, Upload, message, Steps, Result, Spin, Tag, Modal
 } from 'antd';
 import {
   UserOutlined, IdcardOutlined, BankOutlined, PhoneOutlined,
@@ -76,6 +76,23 @@ const OnboardingPage = () => {
         
         // Sync local storage userInfo with fresh info
         const stored = getUserInfo() || {};
+        
+        // Detect transition to APPROVED
+        if (stored.status && stored.status !== 'APPROVED' && freshUser.status === 'APPROVED') {
+          Modal.success({
+            title: '🎉 Hồ sơ đã được phê duyệt!',
+            content: 'Tài khoản của bạn vừa được cấp quyền chính thức. Vui lòng đăng nhập lại.',
+            okText: 'Đăng nhập lại ngay',
+            onOk: () => {
+              localStorage.clear();
+              window.location.href = '/login';
+            },
+            keyboard: false,
+            maskClosable: false,
+          });
+          return;
+        }
+
         const merged = { ...stored, ...freshUser };
         localStorage.setItem('userInfo', JSON.stringify(merged));
         window.dispatchEvent(new Event('userInfoUpdated'));
