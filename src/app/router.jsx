@@ -39,6 +39,8 @@ import StudentResultsIndexPage from '../student/features/results/pages/StudentRe
 import StudentHackathonResultsPage from '../student/features/results/pages/StudentHackathonResultsPage';
 import LateSubmissionReviewPage from '../features/coordinator/pages/LateSubmissionReviewPage';
 import PresentationQueuePage from '../features/presentation/pages/PresentationQueuePage';
+import FinalRoundConfigPage from '../features/coordinator/pages/FinalRoundConfigPage';
+
 
 const TrackWrapper = () => {
   const { hackathonId } = useParams();
@@ -322,8 +324,15 @@ const AppRouter = () => {
             <LateSubmissionReviewPage />
           </ProtectedRoute>
         } />
+        <Route path={ROUTES.COORDINATOR_FINAL_CONFIG} element={
+          <ProtectedRoute allowedRoles={['COORDINATOR', 'ADMIN']}>
+            <FinalRoundConfigPage />
+          </ProtectedRoute>
+        } />
         <Route path={ROUTES.PRESENTATION_QUEUE} element={
-          <PresentationQueuePage />
+          <ProtectedRoute allowedRoles={['MENTOR']}>
+            <PresentationQueuePage />
+          </ProtectedRoute>
         } />
         */}
       </Route>
