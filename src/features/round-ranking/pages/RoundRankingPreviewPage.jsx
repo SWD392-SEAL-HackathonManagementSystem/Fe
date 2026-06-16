@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { Alert, Space } from "antd";
+import { useParams, useNavigate } from "react-router-dom";
+import { Alert, Button, Space } from "antd";
 import PageHeader from "../../../shared/components/ui/PageHeader";
 import EliminateTeamModal from "../../team-elimination/components/EliminateTeamModal";
 import { useEliminateTeam } from "../../team-elimination/hooks/useEliminateTeam";
@@ -16,6 +16,7 @@ const RoundRankingPreviewPage = ({
   embedded = false,
 }) => {
   const params = useParams();
+  const navigate = useNavigate();
   const roundId = roundIdProp || params.roundId || params.id;
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [roundAccess, setRoundAccess] = useState({ roundId: null, canEliminate: false });
@@ -111,10 +112,36 @@ const RoundRankingPreviewPage = ({
 
       {error && (
         <Alert
-          type="error"
+          type={error?.code === 'ROUND_NOT_SCORING_LOCKED' ? 'warning' : 'error'}
           showIcon
-          message="Không thể tải bảng xếp hạng"
-          description={error?.message || "Vui lòng thử làm mới dữ liệu."}
+          message={
+            error?.code === 'ROUND_NOT_SCORING_LOCKED'
+              ? 'Vòng chưa khóa chấm điểm'
+              : 'Không thể tải bảng xếp hạng'
+          }
+          description={
+            error?.code === 'ROUND_NOT_SCORING_LOCKED' ? (
+              <Space direction="vertical">
+                <span>
+                  Preview chỉ khả dụng khi round đã lock scoring. Bạn có thể xem ranking chính thức
+                  sau khi lock.
+                </span>
+                <Button
+                  type="link"
+                  style={{ padding: 0 }}
+                  onClick={() =>
+                    navigate(
+                      `/hackathons/${params.hackathonId}/rounds/${roundId}/results`
+                    )
+                  }
+                >
+                  Xem ranking chính thức
+                </Button>
+              </Space>
+            ) : (
+              error?.message || 'Vui lòng thử làm mới dữ liệu.'
+            )
+          }
         />
       )}
 

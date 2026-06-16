@@ -8,6 +8,7 @@ import { MOCK_PEOPLE } from "../features/people/data/people.mock";
 import { MOCK_ASSIGNMENTS } from "../features/people/data/assignments.mock";
 import { MOCK_EVENTS } from "../features/events/data/event.mock";
 import { MOCK_NOTIFICATIONS } from "../features/notifications/data/notification.mock";
+import { notificationService } from "../features/notifications/services/notificationService";
 
 const AppContext = createContext();
 
@@ -97,6 +98,22 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     localStorage.setItem("notifications", JSON.stringify(notifications));
   }, [notifications]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) return;
+
+    notificationService
+      .list()
+      .then((items) => {
+        if (Array.isArray(items) && items.length > 0) {
+          setNotifications(items);
+        }
+      })
+      .catch(() => {
+        setNotifications((prev) => (prev?.length ? prev : MOCK_NOTIFICATIONS));
+      });
+  }, []);
   useEffect(() => {
     localStorage.setItem("teams", JSON.stringify(teams));
   }, [teams]);
@@ -287,12 +304,25 @@ export const AppProvider = ({ children }) => {
     setNotifications((prev) => [newNotif, ...prev]); // Push lên đầu mảng
   };
 
-  const markAsRead = (id) => {
+  const markAsRead = async (id) => {
+    const ids =
+      id === "ALL"
+        ? notifications.filter((n) => !n.is_read).map((n) => n.id)
+        : [id];
+
+    if (ids.length > 0) {
+      try {
+        await notificationService.markRead(ids);
+      } catch (error) {
+        console.warn("Không thể đánh dấu đã đọc trên server:", error);
+      }
+    }
+
     if (id === "ALL") {
-      setNotifications(notifications.map((n) => ({ ...n, is_read: true })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     } else {
-      setNotifications(
-        notifications.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
       );
     }
   };

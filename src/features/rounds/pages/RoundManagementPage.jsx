@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Space, Popconfirm, message, Timeline, Tag, Card, Spin, Typography, Modal, Alert, Tooltip, Input } from 'antd';
-import { Plus, Edit, Trash2, Calendar, List, BarChart3, PlayCircle, Lock, UserPlus, Trophy } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, List, BarChart3, PlayCircle, Lock, UserPlus, Trophy, FileText, History } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../../../shared/constants/routes';
 import RoundFormModal from '../components/RoundFormModal';
 import { roundService } from '../services/roundService';
 import { trackService } from '../../tracks/services/trackService';
@@ -16,6 +17,7 @@ import {
 } from '../utils/roundAdvancementRules';
 import dayjs from 'dayjs';
 import LiveCodingMonitor from '../components/LiveCodingMonitor';
+import ScoringProgressCard from '../components/ScoringProgressCard';
 
 const { Title, Text } = Typography;
 
@@ -50,6 +52,26 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
   const [lockingRound, setLockingRound] = useState(null);
   const [lockReason, setLockReason] = useState('');
   const [isLocking, setIsLocking] = useState(false);
+
+  const [isReleaseModalVisible, setIsReleaseModalVisible] = useState(false);
+  const [releasingRound, setReleasingRound] = useState(null);
+  const [problemUrl, setProblemUrl] = useState('');
+  const [isReleasing, setIsReleasing] = useState(false);
+  const [progressRoundId, setProgressRoundId] = useState(null);
+
+  const activeRounds = rounds.filter((r) => r.is_active);
+  const progressRound =
+    activeRounds.find((r) => r.id === progressRoundId) || activeRounds[0] || null;
+
+  useEffect(() => {
+    if (activeRounds.length === 0) {
+      setProgressRoundId(null);
+      return;
+    }
+    if (!progressRoundId || !activeRounds.some((r) => r.id === progressRoundId)) {
+      setProgressRoundId(activeRounds[0].id);
+    }
+  }, [activeRounds, progressRoundId]);
 
   const fetchRounds = async () => {
     try {
@@ -136,9 +158,6 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
     });
   };
 
-  // ==========================================
-  // BƯỚC 8: Hàm Khóa chấm điểm
-  // ==========================================
   const handleLockScoring = async () => {
     if (!lockReason.trim()) {
       return message.warning('Vui lòng nhập lý do khóa chấm điểm.');
@@ -146,7 +165,15 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
     
     setIsLocking(true);
     try {
-      await roundService.lockScoring(lockingRound.id, { force_lock_reason: lockReason });
+      const result = await roundService.lockScoring(lockingRound.id, {
+        force: true,
+        reason: lockReason.trim(),
+      });
+      const warnings = result?.warnings || [];
+      const partialWarning = warnings.find((w) => w.code === 'PARTIAL_SCORING_BEFORE_LOCK');
+      if (partialWarning) {
+        message.warning(partialWarning.message || 'Còn bài chưa được chấm điểm — đã force lock theo lý do.');
+      }
       message.success(`Đã khóa chấm điểm cho ${lockingRound.name}. Trạng thái hiện tại: scoring_locked`);
       setIsLockModalVisible(false);
       setLockReason('');
@@ -155,6 +182,24 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
       message.error('Lỗi khi khóa chấm điểm. Vui lòng kiểm tra lại kết nối.');
     } finally {
       setIsLocking(false);
+    }
+  };
+
+  const handleReleaseProblem = async () => {
+    if (!problemUrl.trim()) {
+      return message.warning('Vui lòng nhập URL đề bài.');
+    }
+    setIsReleasing(true);
+    try {
+      await roundService.releaseProblem(releasingRound.id, problemUrl.trim());
+      message.success(`Đã phát đề cho ${releasingRound.name}.`);
+      setIsReleaseModalVisible(false);
+      setProblemUrl('');
+      fetchRounds();
+    } catch (error) {
+      message.error(error?.message || 'Không thể phát đề. Vui lòng thử lại.');
+    } finally {
+      setIsReleasing(false);
     }
   };
 
@@ -406,6 +451,7 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
 
         // Nếu vòng thi ĐANG HOẠT ĐỘNG
         if (record.is_active) {
+          const hasReleasedProblem = Boolean(record.problem_released_at || record.problem_statement_url);
           return (
             <Space size="middle">
               <Tooltip title="Xếp hạng tạm">
@@ -416,6 +462,41 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
                   onClick={() => handleViewRanking(record)}
                 />
               </Tooltip>
+
+              {!hasReleasedProblem && (
+                <Tooltip title="Phát đề bài">
+                  <Button
+                    type="text"
+                    style={{ color: 'var(--ant-color-warning)' }}
+                    icon={<FileText size={16} />}
+                    onClick={() => {
+                      setReleasingRound(record);
+                      setProblemUrl(record.problem_statement_url || '');
+                      setIsReleaseModalVisible(true);
+                    }}
+                  />
+                </Tooltip>
+              )}
+
+              <Tooltip title="Mở hàng đợi thuyết trình">
+                <Button
+                  type="text"
+                  style={{ color: 'var(--ant-color-primary)' }}
+                  icon={<History size={16} />}
+                  onClick={() => navigate(`${ROUTES.PRESENTATION_QUEUE}?roundId=${record.id}`)}
+                />
+              </Tooltip>
+
+              {(record.scoring_locked || record.scoringLocked) && !record.is_final && (
+                <Tooltip title="Công bố & chuyển vòng">
+                  <Button
+                    type="text"
+                    style={{ color: 'var(--ant-color-success)' }}
+                    icon={<Trophy size={16} />}
+                    onClick={() => navigate(`/hackathons/${hackathonId}/rounds/${record.id}/results`)}
+                  />
+                </Tooltip>
+              )}
 
               <Tooltip title="Phân công Giám khảo">
                 <Button 
@@ -509,11 +590,6 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
     return <Card style={{ textAlign: 'center', padding: '40px 0' }}><Spin size="large" /></Card>;
   }
 
-  // ==========================================
-  // THÊM MỚI (BƯỚC 2): Tìm vòng thi đang hoạt động (ACTIVE)
-  // ==========================================
-  const activeRound = rounds.find(r => r.is_active);
-
   return (
     <div>
       <Alert
@@ -526,7 +602,27 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
       {/* ========================================== */}
       {/* THÊM MỚI (BƯỚC 2): Hiển thị Banner Đếm ngược */}
       {/* ========================================== */}
-      {activeRound && <LiveCodingMonitor activeRound={activeRound} />}
+      {activeRounds.length > 0 && <LiveCodingMonitor activeRound={progressRound} />}
+      {activeRounds.length > 1 && (
+        <div style={{ marginBottom: 8 }}>
+          <Typography.Text type="secondary" style={{ marginRight: 8 }}>
+            Tiến độ chấm — chọn vòng:
+          </Typography.Text>
+          <Space wrap>
+            {activeRounds.map((r) => (
+              <Button
+                key={r.id}
+                size="small"
+                type={progressRoundId === r.id ? 'primary' : 'default'}
+                onClick={() => setProgressRoundId(r.id)}
+              >
+                {r.name}
+              </Button>
+            ))}
+          </Space>
+        </div>
+      )}
+      {progressRound && <ScoringProgressCard round={progressRound} />}
 
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
         <Space>
@@ -662,6 +758,34 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
             placeholder="Ví dụ: Đã hết thời gian chấm thi theo quy định..." 
             value={lockReason}
             onChange={(e) => setLockReason(e.target.value)}
+            style={{ marginTop: 8 }}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title={<span><FileText size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} /> Phát đề bài</span>}
+        open={isReleaseModalVisible}
+        onOk={handleReleaseProblem}
+        onCancel={() => {
+          setIsReleaseModalVisible(false);
+          setProblemUrl('');
+        }}
+        confirmLoading={isReleasing}
+        okText="Phát đề"
+        cancelText="Hủy"
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text>
+            Phát đề cho vòng: <strong>{releasingRound?.name}</strong>. Thao tác one-way — không sửa URL sau khi phát.
+          </Text>
+        </div>
+        <div>
+          <Text strong>URL đề bài (problemStatementUrl) <span style={{ color: 'red' }}>*</span></Text>
+          <Input
+            placeholder="https://example.com/debai.pdf"
+            value={problemUrl}
+            onChange={(e) => setProblemUrl(e.target.value)}
             style={{ marginTop: 8 }}
           />
         </div>

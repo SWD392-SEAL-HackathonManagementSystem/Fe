@@ -51,32 +51,37 @@ const PrizeListPanel = ({ data, loading, hackathonId, onRefresh }) => {
       <List
         itemLayout="horizontal"
         dataSource={data}
-        renderItem={(item) => (
+        renderItem={(item) => {
+          const prizeName = item.prizeName ?? item.prize_name ?? 'Giải thưởng';
+          const prizeType = item.prizeRank ?? item.prize_type ?? item.prize_rank;
+          const prizeValue = item.prizeValue ?? item.prize_value;
+          const teamName = item.teamName ?? item.team?.team_name ?? item.team?.teamName;
+          return (
           <List.Item>
             <List.Item.Meta
-              avatar={getPrizeIcon(item.prize_type)}
+              avatar={getPrizeIcon(prizeType)}
               title={
                 <Space>
-                  <Text strong style={{ fontSize: 16 }}>{item.prize_name}</Text>
-                  <Tag color={getPrizeColor(item.prize_type)}>{item.prize_type}</Tag>
+                  <Text strong style={{ fontSize: 16 }}>{prizeName}</Text>
+                  {prizeType && <Tag color={getPrizeColor(prizeType)}>{prizeType}</Tag>}
                   {item.scope === 'INDIVIDUAL' && <Tag color="purple">Giải Cá nhân</Tag>}
                 </Space>
               }
               description={
                 <div style={{ marginTop: 8 }}>
-                  <div><strong>Phần thưởng:</strong> {item.prize_value || 'Chưa công bố'}</div>
+                  <div><strong>Phần thưởng:</strong> {prizeValue || 'Chưa công bố'}</div>
                   <div style={{ marginTop: 4 }}>
-                    {item.scope === 'TEAM' ? (
-                      <Text><strong>Đội đoạt giải:</strong> {item.team?.team_name || 'Chưa có dữ liệu'}</Text>
+                    {item.scope === 'TEAM' || teamName ? (
+                      <Text><strong>Đội đoạt giải:</strong> {teamName || 'Chưa có dữ liệu'}</Text>
                     ) : (
-                      <Text><strong>Cá nhân xuất sắc:</strong> {item.user?.full_name || 'Chưa có dữ liệu'}</Text>
+                      <Text><strong>Cá nhân xuất sắc:</strong> {item.user?.full_name || item.user?.fullName || 'Chưa có dữ liệu'}</Text>
                     )}
                   </div>
                 </div>
               }
             />
           </List.Item>
-        )}
+        );}}
       />
       <AwardPrizeModal 
         visible={isModalVisible} 

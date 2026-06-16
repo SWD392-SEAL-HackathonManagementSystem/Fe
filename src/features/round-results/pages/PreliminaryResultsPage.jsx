@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Alert, Button, Card, Space, Tabs, Tag, Typography } from "antd";
-import { ReloadOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, Modal, Space, Tabs, Tag, Typography } from "antd";
+import { ReloadOutlined, SafetyCertificateOutlined, SendOutlined, TrophyOutlined } from "@ant-design/icons";
 import OfficialRankingPanel from "../components/OfficialRankingPanel";
 import TiebreakPanel from "../components/TiebreakPanel";
 import WildcardPanel from "../components/WildcardPanel";
@@ -14,6 +14,27 @@ const PreliminaryResultsPage = ({ roundId: roundIdProp }) => {
   const roundId = roundIdProp || params.roundId || params.id;
   const [activeTab, setActiveTab] = useState("ranking");
   const results = useRoundResults(roundId);
+
+  const handleAdvance = () => {
+    const payload = results.buildAdvancePayload();
+    Modal.confirm({
+      title: "Chốt chuyển vòng Chung kết",
+      content: (
+        <div>
+          <p>
+            Top {results.ranking.topNAdvance || results.round?.top_n_advance || "?"} mỗi bảng sẽ được chuyển vòng.
+          </p>
+          <p>
+            <strong>{payload.advancedTeamIds.length}</strong> đội vào CK ·{" "}
+            <strong>{payload.eliminatedTeamIds.length}</strong> đội loại
+          </p>
+        </div>
+      ),
+      okText: "Chốt chuyển vòng",
+      cancelText: "Hủy",
+      onOk: () => results.advanceTeams(payload),
+    });
+  };
 
   const tabs = useMemo(
     () => [
@@ -60,8 +81,11 @@ const PreliminaryResultsPage = ({ roundId: roundIdProp }) => {
           <Space direction="vertical" size={7}>
             <Space wrap>
               <Tag color="blue" icon={<SafetyCertificateOutlined />}>Kết quả Sơ loại</Tag>
-              <Tag color={results.ranking.isPublished ? "success" : "warning"}>
-                {results.ranking.isPublished ? "Đã công bố" : "Chưa công bố"}
+              <Tag color={results.scoringLocked ? "processing" : "default"}>
+                {results.scoringLocked ? "Đã khóa chấm" : "Chưa khóa chấm"}
+              </Tag>
+              <Tag color={results.isPublished ? "success" : "warning"}>
+                {results.isPublished ? "Đã công bố" : "Chưa công bố"}
               </Tag>
             </Space>
             <Title level={2} style={{ margin: 0 }}>Chuyển vòng & công bố kết quả</Title>
@@ -69,11 +93,40 @@ const PreliminaryResultsPage = ({ roundId: roundIdProp }) => {
               Kiểm tra leaderboard, theo dõi tiebreak và duyệt đề xuất Wild Card trước khi chốt danh sách Chung kết.
             </Text>
           </Space>
-          <Button icon={<ReloadOutlined spin={results.isRefreshing} />} onClick={() => results.fetchResults({ silent: true })}>
-            Làm mới dữ liệu
-          </Button>
+          <Space wrap>
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              loading={results.isPublishing}
+              disabled={!results.canPublish}
+              onClick={() => results.publishRound()}
+            >
+              Công bố kết quả
+            </Button>
+            <Button
+              type="primary"
+              icon={<TrophyOutlined />}
+              loading={results.isAdvancing}
+              disabled={!results.canAdvance}
+              onClick={handleAdvance}
+            >
+              Chốt chuyển vòng
+            </Button>
+            <Button icon={<ReloadOutlined spin={results.isRefreshing} />} onClick={() => results.fetchResults({ silent: true })}>
+              Làm mới dữ liệu
+            </Button>
+          </Space>
         </div>
       </Card>
+
+      {!results.scoringLocked && (
+        <Alert
+          showIcon
+          type="info"
+          message="Chưa thể công bố"
+          description="Cần khóa chấm điểm (lock-scoring) ở màn Quản lý vòng thi trước khi công bố kết quả."
+        />
+      )}
 
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabs} />
     </Space>

@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { judgeService } from '../services/judgeService';
 import ScoringCountdownCard from '../components/ScoringCountdownCard';
+import CalibrationSessionsPanel from '../components/CalibrationSessionsPanel';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -106,6 +107,7 @@ const JudgeDashboard = ({ user }) => {
   }
 
   const activeAssignmentForCountdown = data.assignments?.find(a => a.status === 'ONGOING' && a.progress < 100) || data.assignments?.[0];
+  const finalAssignment = data.assignments?.find((item) => item.isFinal);
 
   const filteredAssignments = (data.assignments || []).filter(item => {
     const isCompleted = item.status === 'COMPLETED' || item.progress === 100;
@@ -339,6 +341,12 @@ const JudgeDashboard = ({ user }) => {
                   message.info(`Nhiệm vụ này không ở trạng thái đang diễn ra!`);
                 }
               }}
+            />
+            <CalibrationSessionsPanel
+              roundId={finalAssignment?.roundId}
+              isFinal={Boolean(finalAssignment)}
+              assignmentId={finalAssignment?.assignmentId ?? finalAssignment?.id}
+              trackId={finalAssignment?.trackId}
             />
             <Card title={<strong style={{ fontSize: '18px' }}><CalendarOutlined style={{ color: '#f59e0b', marginRight: 8 }}/>Lịch trình sắp tới</strong>} style={{ borderRadius: 16 }}>
                {(data.upcomingEvents || []).map(event => (

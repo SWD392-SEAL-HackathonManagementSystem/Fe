@@ -2,6 +2,7 @@ export const ROUTES = {
   LANDING: '/',
   DASHBOARD: '/dashboard',
   STUDENT_TEAM: '/student/team',
+  STUDENT_MATCHMAKING: '/student/matchmaking',
   STUDENT_RESULTS: '/student/results',
   STUDENT_ROUND_RESULTS: '/student/results/:roundId',
   HACKATHONS: '/hackathons',

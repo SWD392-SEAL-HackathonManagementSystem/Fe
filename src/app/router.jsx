@@ -37,6 +37,7 @@ import PreliminaryResultsPage from '../features/round-results/pages/PreliminaryR
 import StudentRoundLeaderboardPage from '../student/features/results/pages/StudentRoundLeaderboardPage';
 import StudentResultsIndexPage from '../student/features/results/pages/StudentResultsIndexPage';
 import StudentHackathonResultsPage from '../student/features/results/pages/StudentHackathonResultsPage';
+import MatchmakingBoardPage from '../student/features/matchmaking/pages/MatchmakingBoardPage';
 import LateSubmissionReviewPage from '../features/coordinator/pages/LateSubmissionReviewPage';
 import PresentationQueuePage from '../features/presentation/pages/PresentationQueuePage';
 import FinalRoundConfigPage from '../features/coordinator/pages/FinalRoundConfigPage';
@@ -216,6 +217,11 @@ const AppRouter = () => {
             <StudentTeamPage />
           </ProtectedRoute>
         } />
+        <Route path={ROUTES.STUDENT_MATCHMAKING} element={
+          <ProtectedRoute allowedRoles={['STUDENT']}>
+            <MatchmakingBoardPage />
+          </ProtectedRoute>
+        } />
         <Route path={ROUTES.STUDENT_RESULTS} element={
           <ProtectedRoute allowedRoles={['STUDENT']}>
             <StudentResultsIndexPage />
@@ -318,7 +324,6 @@ const AppRouter = () => {
             <StudentSubmissionPage />
           </ProtectedRoute>
         } />
-        {/* 
         <Route path={ROUTES.COORDINATOR_LATE_SUBMISSIONS} element={
           <ProtectedRoute allowedRoles={['COORDINATOR', 'ADMIN']}>
             <LateSubmissionReviewPage />
@@ -330,11 +335,10 @@ const AppRouter = () => {
           </ProtectedRoute>
         } />
         <Route path={ROUTES.PRESENTATION_QUEUE} element={
-          <ProtectedRoute allowedRoles={['MENTOR']}>
+          <ProtectedRoute allowedRoles={['COORDINATOR', 'ADMIN', 'MENTOR', 'JUDGE', 'TEMP_JUDGE']}>
             <PresentationQueuePage />
           </ProtectedRoute>
         } />
-        */}
       </Route>
 
       {/* Fallback */}

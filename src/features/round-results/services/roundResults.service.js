@@ -26,5 +26,11 @@ export const roundResultsService = {
       coordinatorApproved: approved,
       coordinatorNote: note,
     }),
+
+  publishRound: (roundId) =>
+    axiosClient.patch(`/api/v1/rounds/${roundId}/publish`),
+
+  advanceTeams: (roundId, payload) =>
+    axiosClient.post(`/api/v1/rounds/${roundId}/advance`, payload),
 };
 

@@ -40,6 +40,30 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         </Col>
         <Col span={10}>
           <Form.Item
+            name="max_participants"
+            label="Số lượng người tham gia tối đa"
+            extra={fieldHint('Giới hạn số sinh viên đăng ký tham gia giải đấu.')}
+            rules={[
+              { required: true, message: 'Vui lòng nhập số lượng người tham gia tối đa' },
+              {
+                validator: (_, value) => {
+                  const num = Number(value);
+                  if (!value || Number.isNaN(num) || num < 1) {
+                    return Promise.reject(new Error('Giá trị phải là số nguyên dương, tối thiểu 1'));
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
+          >
+            <Input type="number" min={1} placeholder="Ví dụ: 100" />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={24}>
+        <Col span={14}>
+          <Form.Item
             name="slug"
             label="Đường dẫn trên web"
             extra={fieldHint('Không dấu, dùng dấu gạch ngang.')}

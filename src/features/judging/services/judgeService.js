@@ -1,4 +1,5 @@
 import axiosClient from '../../../shared/api/axiosClient';
+import { ENDPOINTS } from '../../../shared/api/endpoints';
 
 export const judgeService = {
   // 2.1 GET /judge-track-assignments - Danh sách Track (Sơ loại)
@@ -42,10 +43,9 @@ export const judgeService = {
     return axiosClient.post('/api/v1/me/tiebreak-evaluations', { roundId, orderedTeamIds });
   },
 
-  // === CÁC API KHÔNG NẰM TRONG MODULE /me NHƯNG CẦN THIẾT CHO CHẤM THI ===
-  // Lấy danh sách bài nộp của thí sinh
+  // Lấy danh sách bài nộp theo track/round (đã lọc theo phân công judge)
   getSubmissions: async (params) => {
-    return axiosClient.get('/api/v1/submissions', { params });
+    return axiosClient.get(ENDPOINTS.JUDGE.SUBMISSIONS, { params });
   },
   
   // Nộp điểm mới (Toàn bộ form)
@@ -58,5 +58,9 @@ export const judgeService = {
     return axiosClient.get(`/api/v1/submissions/${submissionId}/slide`, {
       responseType: 'blob' 
     });
-  }
+  },
+
+  submitCalibrationScore: async (payload) => {
+    return axiosClient.post('/api/v1/scores/calibration', payload);
+  },
 };

@@ -15,21 +15,13 @@ const submissionSchema = z.object({
     .min(1, 'Đường dẫn Repository là bắt buộc')
     .url('Định dạng URL không hợp lệ'),
   demo_url: z.string().url('Định dạng URL không hợp lệ').or(z.literal('')),
-  slide_url: z
-    .string()
-    .min(1, 'Đường dẫn Slide thuyết trình là bắt buộc')
-    .url('Định dạng URL không hợp lệ')
-    .refine(
-      (val) => {
-        try {
-          const url = new URL(val);
-          return !url.pathname.toLowerCase().endsWith('.pdf');
-        } catch {
-          return !val.toLowerCase().endsWith('.pdf');
-        }
-      },
-      { message: 'Slide không được là file PDF. Vui lòng dùng Google Slides, Canva, hoặc tương tự.' }
-    ),
+  slide_file: z
+    .instanceof(File, { message: 'Vui lòng tải lên file slide PDF' })
+    .refine((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'), {
+      message: 'Chỉ chấp nhận file PDF',
+    })
+    .optional(),
+  late_reason: z.string().optional(),
 });
 
 type SubmissionFormValues = z.infer<typeof submissionSchema>;
@@ -127,14 +119,13 @@ const StudentSubmissionPage: React.FC = () => {
     formState: { errors },
   } = useForm<SubmissionFormValues>({
     resolver: zodResolver(submissionSchema),
-    defaultValues: { repo_url: '', demo_url: '', slide_url: '' },
+    defaultValues: { repo_url: '', demo_url: '', slide_file: undefined, late_reason: '' },
   });
 
   useEffect(() => {
     if (submissionData) {
       setValue('repo_url', submissionData.repo_url || '');
       setValue('demo_url', submissionData.demo_url || '');
-      setValue('slide_url', submissionData.slide_url || '');
     }
   }, [submissionData, setValue]);
 
@@ -152,10 +143,15 @@ const StudentSubmissionPage: React.FC = () => {
   });
 
   const onSubmit = (values: SubmissionFormValues) => {
+    if (!values.slide_file && !submissionData?.slide_file && !submissionData?.slide_download_path) {
+      toast.error('Vui lòng tải lên file slide PDF.');
+      return;
+    }
     mutation.mutate({
       repo_url: values.repo_url,
       demo_url: values.demo_url || undefined,
-      slide_url: values.slide_url,
+      slide_file: values.slide_file,
+      late_reason: isOverdue ? values.late_reason : undefined,
     });
   };
 
@@ -340,40 +336,54 @@ const StudentSubmissionPage: React.FC = () => {
               )}
             </div>
 
-            {/* Slide URL */}
+            {/* Slide PDF upload */}
             <div>
               <label style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 fontSize: '13px', fontWeight: 600, color: darkMode ? '#E2E8F0' : '#374151', marginBottom: '6px',
               }}>
                 <span style={{ fontSize: '14px' }}>📊</span>
-                Đường dẫn Slide Thuyết trình (Yêu cầu)
+                File Slide Thuyết trình PDF (Yêu cầu)
               </label>
               <input
-                {...register('slide_url')}
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  setValue('slide_file', file, { shouldValidate: true });
+                }}
                 style={{
                   width: '100%',
                   padding: '9px 12px',
-                  border: `1px solid ${errors.slide_url ? '#EF4444' : (darkMode ? '#334155' : '#D1D5DB')}`,
+                  border: `1px solid ${errors.slide_file ? '#EF4444' : (darkMode ? '#334155' : '#D1D5DB')}`,
                   borderRadius: '8px',
                   fontSize: '13px',
                   color: darkMode ? 'white' : '#111827',
-                  outline: 'none',
                   boxSizing: 'border-box',
-                  background: errors.slide_url ? (darkMode ? '#7F1D1D' : '#FFF5F5') : (darkMode ? '#1E293B' : 'white'),
-                  transition: 'border-color 150ms',
+                  background: darkMode ? '#1E293B' : 'white',
                 }}
-                placeholder="Ví dụ: https://docs.google.com/presentation/d/xxx/edit"
-                onFocus={e => { if (!errors.slide_url) e.target.style.borderColor = '#6366F1'; }}
-                onBlur={e => { if (!errors.slide_url) e.target.style.borderColor = (darkMode ? '#334155' : '#D1D5DB'); }}
               />
-              {errors.slide_url && (
+              {errors.slide_file && (
                 <span style={{ fontSize: '12px', color: '#EF4444', marginTop: '4px', display: 'block' }}>
-                  {errors.slide_url.message}
+                  {errors.slide_file.message}
                 </span>
               )}
+              {(submissionData?.slide_file || submissionData?.slide_download_path) && (
+                <div style={{ fontSize: '12px', color: token.colorTextDescription, marginTop: '6px' }}>
+                  Đã nộp: {submissionData.slide_file || 'slide.pdf'}
+                  {submissionData.slide_download_path && (
+                    <a
+                      href={submissionData.slide_download_path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ marginLeft: '8px', color: '#6366F1' }}
+                    >
+                      Tải xuống
+                    </a>
+                  )}
+                </div>
+              )}
 
-              {/* Green info note */}
               <div style={{
                 marginTop: '8px',
                 background: darkMode ? 'rgba(22, 163, 74, 0.1)' : '#F0FDF4',
@@ -386,9 +396,8 @@ const StudentSubmissionPage: React.FC = () => {
               }}>
                 <span style={{ color: '#16A34A', fontSize: '14px', marginTop: '1px' }}>ℹ️</span>
                 <span style={{ fontSize: '12px', color: darkMode ? '#4ADE80' : '#15803D', lineHeight: '1.5' }}>
-                  <strong>Lưu ý:</strong> Không chấp nhận file PDF. Vui lòng dùng Google Slides, Canva
-                  hoặc{' '}
-                  <span style={{ textDecoration: 'underline' }}>link trình chiếu trực tuyến</span>.
+                  <strong>Lưu ý:</strong> Tải lên file PDF slide thuyết trình (theo quy định v4.1).
+                  Có thể nộp lại khi vòng chưa khóa chấm điểm.
                 </span>
               </div>
             </div>

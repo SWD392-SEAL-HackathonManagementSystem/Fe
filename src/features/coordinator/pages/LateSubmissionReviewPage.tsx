@@ -37,7 +37,7 @@ const LateSubmissionReviewPage: React.FC = () => {
   // Approve Mutation
   const approveMutation = useMutation({
     mutationFn: async (submissionId: string) => {
-      return await personBApi.approveLateSubmission(submissionId);
+      return await personBApi.reviewLateSubmission(submissionId, { decision: 'APPROVE' });
     },
     onSuccess: (_, submissionId) => {
       toast.success('Duyệt bài nộp muộn thành công!');
@@ -54,7 +54,10 @@ const LateSubmissionReviewPage: React.FC = () => {
   // Reject Mutation
   const rejectMutation = useMutation({
     mutationFn: async ({ submissionId, reason }: { submissionId: string; reason: string }) => {
-      return await personBApi.rejectLateSubmission(submissionId, { reason });
+      return await personBApi.reviewLateSubmission(submissionId, {
+        decision: 'REJECT',
+        note: reason,
+      });
     },
     onSuccess: (_, variables) => {
       toast.success('Từ chối bài nộp muộn thành công!');

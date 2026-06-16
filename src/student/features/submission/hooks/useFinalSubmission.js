@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { message } from 'antd';
 import dayjs from 'dayjs';
 import axiosClient from '../../../../shared/api/axiosClient';
+import { studentSubmissionService } from '../services/studentSubmission.service';
 
 export const useFinalSubmission = (teamId, hackathonId) => {
   const [finalRound, setFinalRound] = useState(null);
@@ -94,20 +95,24 @@ export const useFinalSubmission = (teamId, hackathonId) => {
       message.error('Đã hết hạn nộp bài! Hệ thống tự động từ chối (REJECTED).');
       return false;
     }
+
+    if (!payload.slideFile) {
+      message.error('Vui lòng tải lên file slide PDF.');
+      return false;
+    }
     
     setIsSubmitting(true);
     try {
-      // Gọi API POST /api/v1/submissions theo chuẩn Backend
-      await axiosClient.post('/api/v1/submissions', {
-         teamId: teamId,
-         roundId: finalRound.id, // Vòng Chung kết dùng roundId trực tiếp (không dùng trackId)
-         repoUrl: payload.repoUrl,
-         demoUrl: payload.demoUrl,
-         slideUrl: payload.slideUrl, // URL Slide (Bắt buộc theo DB Schema)
-         reportUrl: payload.reportUrl
+      await studentSubmissionService.submitMultipart({
+        teamId,
+        roundId: finalRound.id,
+        repoUrl: payload.repoUrl,
+        demoUrl: payload.demoUrl,
+        slideFile: payload.slideFile,
+        lateReason: payload.lateReason,
       });
       message.success('Nộp bài Chung kết thành công!');
-      await fetchSubmissionData(); // Load lại trạng thái để khóa Form
+      await fetchSubmissionData();
       return true;
     } catch (error) {
       const code = error?.code || error?.response?.data?.error?.code;

@@ -1,6 +1,6 @@
 // Đường dẫn: src/student/features/submission/components/FinalSubmissionPanel.jsx
 import React from 'react';
-import { Card, Form, Input, Button, Typography, Tag, Space, Alert, Row, Col, Spin, message } from 'antd';
+import { Card, Form, Input, Button, Typography, Tag, Space, Alert, Row, Col, Spin, Upload } from 'antd';
 import { CloudUploadOutlined, LockOutlined, CloseCircleOutlined, CheckCircleOutlined, FilePdfOutlined, LinkOutlined } from '@ant-design/icons';
 import { useFinalSubmission } from '../hooks/useFinalSubmission';
 
@@ -16,6 +16,7 @@ const FINAL_CRITERIA_CHECKLIST = [
 
 const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
   const [form] = Form.useForm();
+  const [slideFile, setSlideFile] = React.useState(null);
   
   const { 
     finalRound, 
@@ -64,8 +65,7 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
     await submitFinalWork({
       repoUrl: values.repoUrl || '',
       demoUrl: values.demoUrl || '',
-      slideUrl: values.slideUrl || '', // Slide bắt buộc
-      reportUrl: values.reportUrl || ''
+      slideFile: slideFile || undefined,
     });
   };
 
@@ -145,12 +145,33 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
             disabled={isLocked || isSubmitted}
             initialValues={existingSubmission || {}}
           >
-            <Form.Item 
-              name="slideUrl" 
-              label={<span style={{ fontWeight: 600 }}>Link Slide Thuyết trình <span style={{color: 'red'}}>*</span></span>}
-              rules={[{ required: true, message: 'Bắt buộc phải có Link Slide thuyết trình (Google Slides, Canva, v.v.)' }]}
+            <Form.Item
+              label={<span style={{ fontWeight: 600 }}>File Slide Thuyết trình PDF <span style={{color: 'red'}}>*</span></span>}
+              required
             >
-              <Input prefix={<LinkOutlined style={{ color: '#bfbfbf' }} />} placeholder="https://..." size="large" style={{ borderRadius: 8 }} />
+              <Upload
+                accept=".pdf,application/pdf"
+                maxCount={1}
+                beforeUpload={(file) => {
+                  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+                  if (!isPdf) {
+                    return Upload.LIST_IGNORE;
+                  }
+                  setSlideFile(file);
+                  return false;
+                }}
+                onRemove={() => setSlideFile(null)}
+                disabled={isLocked || isSubmitted}
+              >
+                <Button icon={<CloudUploadOutlined />} disabled={isLocked || isSubmitted}>
+                  Chọn file PDF
+                </Button>
+              </Upload>
+              {(existingSubmission?.slideFile || existingSubmission?.slide_file) && (
+                <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                  Đã nộp: {existingSubmission.slideFile || existingSubmission.slide_file}
+                </Text>
+              )}
             </Form.Item>
 
             <Row gutter={16}>
@@ -165,11 +186,6 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
                 </Form.Item>
               </Col>
             </Row>
-
-            <Form.Item name="reportUrl" label="Link Báo cáo bổ sung (Tùy chọn)">
-              <Input prefix={<LinkOutlined style={{ color: '#bfbfbf' }} />} placeholder="https://..." size="large" style={{ borderRadius: 8 }} />
-            </Form.Item>
-
             {!isSubmitted && (
               <Button 
                 type="primary" 

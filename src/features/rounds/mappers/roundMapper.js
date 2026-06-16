@@ -28,6 +28,8 @@ export const mapRoundToFE = (beData) => {
     min_teams_final: beData.minTeamsFinal,
     tiebreak_rule: beData.tiebreakRule,
     is_active: beData.isActive,
+    scoring_locked: beData.scoringLocked ?? beData.scoring_locked,
+    is_published: beData.isPublished ?? beData.is_published,
   };
 };
 

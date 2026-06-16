@@ -16,6 +16,7 @@ import {
 } from '@ant-design/icons';
 import { useAppContext } from '../../../app/AppContext';
 import toast from 'react-hot-toast';
+import FinalRoundCalibrationSection from '../components/FinalRoundCalibrationSection';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -1908,6 +1909,7 @@ const FinalRoundConfigPage: React.FC = () => {
           </Tabs.TabPane>
 
         </Tabs>
+        <FinalRoundCalibrationSection />
       </div>
     </div>
   );

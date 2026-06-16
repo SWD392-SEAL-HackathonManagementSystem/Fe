@@ -39,6 +39,17 @@ export const ENDPOINTS = {
     // FR-13C: Quản lý Mentor theo vòng
     MENTOR: (teamId, roundId) => `/api/v1/teams/${teamId}/rounds/${roundId}/mentor`,
     MENTOR_HISTORY: (teamId) => `/api/v1/teams/${teamId}/mentors`,
+
+    ORPHANS: (hackathonId) => `/api/v1/teams/hackathons/${hackathonId}/orphans`,
+    INCOMPLETE_TEAMS: (hackathonId) => `/api/v1/teams/hackathons/${hackathonId}/incomplete-teams`,
+    MATCHMAKING: (hackathonId) => `/api/v1/teams/hackathons/${hackathonId}/matchmaking`,
+    ADMIN_CREATE: '/api/v1/teams/admin-create',
+    ADMIN_ADD_MEMBER: (teamId) => `/api/v1/teams/${teamId}/admin-add-member`,
+    ADMIN_MERGE: (teamId) => `/api/v1/teams/${teamId}/admin-merge`,
+  },
+  STUDENT_HACKATHONS: {
+    BROWSE: '/api/v1/me/hackathons/browse',
+    REGISTER: (id) => `/api/v1/me/hackathons/${id}/register`,
   },
   ROUNDS: {
     BASE: '/api/v1/rounds',
@@ -47,6 +58,10 @@ export const ENDPOINTS = {
     CRITERIA: (roundId) => `/api/v1/rounds/${roundId}/criteria`,
     CRITERIA_CLONE: (roundId) => `/api/v1/rounds/${roundId}/criteria/clone`,
     ACTIVATE: (id) => `/api/v1/rounds/${id}/activate`,
+    RELEASE_PROBLEM: (id) => `/api/v1/rounds/${id}/release-problem`,
+    SCORING_PROGRESS: (id) => `/api/v1/rounds/${id}/scoring-progress`,
+    PUBLISH: (id) => `/api/v1/rounds/${id}/publish`,
+    ADVANCE: (id) => `/api/v1/rounds/${id}/advance`,
   },
   TRACKS: {
     BASE: '/api/v1/tracks',
@@ -68,5 +83,31 @@ export const ENDPOINTS = {
     DETAIL: (userId) => `/api/v1/users/${userId}`,
     TEMP_JUDGES: '/api/v1/users/temp-judges',
     RESEND_INVITATION: (invitationId) => `/api/v1/invitations/${invitationId}/resend`,
+  },
+  JUDGE: {
+    SUBMISSIONS: '/api/v1/me/judge/submissions',
+  },
+  PRESENTATION: {
+    QUEUE: '/api/v1/presentation/queue',
+    QUEUE_SHUFFLE: '/api/v1/presentation/queue/shuffle',
+    QUEUE_NEXT: '/api/v1/presentation/queue/next',
+    TIMER_START: '/api/v1/presentation/timer/start',
+    TIMER_PAUSE: '/api/v1/presentation/timer/pause',
+    TIMER_RESUME: '/api/v1/presentation/timer/resume',
+    TIMER_QA: '/api/v1/presentation/timer/qa',
+    TIMER_RESET: '/api/v1/presentation/timer/reset',
+    TRACK_CONTROLLER: (trackId) => `/api/v1/presentation/tracks/${trackId}/controller`,
+    ROUND_CONTROLLER: (roundId) => `/api/v1/presentation/rounds/${roundId}/controller`,
+  },
+  CALIBRATION: {
+    BASE: '/api/v1/calibration-sessions',
+    DETAIL: (id) => `/api/v1/calibration-sessions/${id}`,
+  },
+  NOTIFICATIONS: {
+    ME: '/api/v1/me/notifications',
+    MARK_READ: '/api/v1/me/notifications/read',
+  },
+  SCORES: {
+    CALIBRATION: '/api/v1/scores/calibration',
   },
 };

@@ -2,12 +2,24 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { message } from 'antd';
 import { judgeService } from '../services/judgeService';
 import { criteriaService } from '../../criteria/services/criteriaService';
+import { roundService } from '../../rounds/services/roundService';
+import {
+  presentationService,
+  findPresentingItem,
+  SCORING_OPEN_TIMER_PHASES,
+} from '../services/presentationService';
 
 /**
  * Custom hook quản lý logic phòng chấm thi (Live Scoring)
  * Xử lý tải danh sách đội, tiêu chí, tính điểm và submit điểm về hệ thống.
  */
-export const useLiveScoring = (assignmentId, roundId, trackId, isFinal) => {
+export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options = {}) => {
+  const {
+    isCalibration = false,
+    calibrationSessionId = null,
+    sampleSubmissionId = null,
+  } = options;
+
   const [teams, setTeams] = useState([]);
   const [criteria, setCriteria] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -15,189 +27,376 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentScores, setCurrentScores] = useState({});
   const [comment, setComment] = useState('');
+  const [presentingItem, setPresentingItem] = useState(null);
+  const [trackQueue, setTrackQueue] = useState(null);
+  const [isTimerActionLoading, setIsTimerActionLoading] = useState(false);
+  const [scoringLocked, setScoringLocked] = useState(false);
 
-  // GĐ5: Trạng thái score_type=NORMAL theo yêu cầu để phân biệt với CALIBRATION
-  const scoreType = 'NORMAL';
+  const scoreType = isCalibration ? 'CALIBRATION' : 'NORMAL';
+
+  const refreshPresentationQueue = useCallback(async () => {
+    if (!roundId) {
+      return null;
+    }
+
+    try {
+      const queueData = await presentationService.getQueue(roundId, trackId);
+      const { presentingItem: item, trackQueue: queue } = findPresentingItem(
+        queueData,
+        trackId
+      );
+      setPresentingItem(item);
+      setTrackQueue(queue);
+      return { item, queue };
+    } catch (error) {
+      console.warn('Không tải được hàng đợi thuyết trình:', error);
+      return null;
+    }
+  }, [roundId, trackId]);
+
+  useEffect(() => {
+    if (!roundId) {
+      setScoringLocked(false);
+      return;
+    }
+
+    roundService
+      .getById(roundId)
+      .then((round) => {
+        setScoringLocked(Boolean(round?.scoringLocked ?? round?.scoring_locked));
+      })
+      .catch(() => setScoringLocked(false));
+  }, [roundId]);
 
   const fetchScoringData = useCallback(async () => {
     const cleanParams = {};
-    
-    // Đóng gói tham số an toàn
+
     if (roundId) {
       cleanParams.roundId = roundId;
     }
-    
+
     if (trackId) {
       cleanParams.trackId = trackId;
     }
 
     if (Object.keys(cleanParams).length === 0) {
-      message.error("Lỗi dữ liệu: Không tìm thấy ID Vòng thi/Bảng đấu.");
+      message.error('Lỗi dữ liệu: Không tìm thấy ID Vòng thi/Bảng đấu.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // ==========================================
-      // 1. TẢI DANH SÁCH BÀI NỘP (ĐỘI THI)
-      // ==========================================
-      const resTeams = await judgeService
-        .getSubmissions(cleanParams)
-        .catch(() => {
-          return [];
-        });
-        
-      const rawTeamsData = Array.isArray(resTeams) 
-        ? resTeams 
+      const resTeams = await judgeService.getSubmissions(cleanParams).catch(() => []);
+
+      const rawTeamsData = Array.isArray(resTeams)
+        ? resTeams
         : resTeams?.items || resTeams?.data || [];
 
-      // Map dữ liệu đội thi an toàn
       const mappedTeams = rawTeamsData.map((sub) => {
+        const submissionId = sub.submissionId ?? sub.id;
         return {
-          id: sub.id || sub.submissionId || sub.teamId,
-          name: sub.teamName || sub.team_name || 'Đội thi',
+          id: submissionId,
+          submissionId,
+          name: sub.teamName || sub.displayCode || `Bài #${submissionId}`,
           leader: sub.leaderName || 'Trưởng nhóm',
           status: sub.status === 'SCORED' || sub.isScoredByMe ? 'SCORED' : 'PENDING',
           totalScore: sub.totalScore || sub.weightedAverageScore || 0,
+          trackId: sub.trackId,
         };
       });
 
-      // Nếu API Teams thật sự rỗng (chưa có đội nộp bài), báo lỗi nhẹ
       if (mappedTeams.length === 0) {
-        console.warn("Chưa có đội thi nào nộp bài hoặc được phân công.");
+        console.warn('Chưa có đội thi nào nộp bài hoặc được phân công.');
       }
 
-      setTeams(mappedTeams);
-      
-      // Mặc định chọn đội đầu tiên nếu có dữ liệu
-      if (mappedTeams.length > 0) {
-        setSelectedTeam(mappedTeams[0]);
+      if (isCalibration && sampleSubmissionId) {
+        const calibrationTeam = {
+          id: sampleSubmissionId,
+          submissionId: sampleSubmissionId,
+          name: `Calibration #${sampleSubmissionId}`,
+          leader: 'Mẫu calibration',
+          status: 'PENDING',
+          totalScore: 0,
+          trackId,
+        };
+        setTeams([calibrationTeam]);
+        setSelectedTeam(calibrationTeam);
+      } else {
+        setTeams(mappedTeams);
+
+        const queueResult = await refreshPresentationQueue();
+        const presenting = queueResult?.item;
+
+        if (presenting) {
+          const activeTeam = mappedTeams.find(
+            (team) => team.submissionId === presenting.submissionId
+          );
+          if (activeTeam) {
+            setSelectedTeam(activeTeam);
+          } else if (mappedTeams.length > 0) {
+            setSelectedTeam(mappedTeams[0]);
+          }
+        } else if (mappedTeams.length > 0) {
+          setSelectedTeam(mappedTeams[0]);
+        }
       }
 
-      // ==========================================
-      // 2. TẢI ĐIỂM ĐÃ CHẤM (Phục hồi điểm cũ nếu có)
-      // ==========================================
       if (roundId) {
         judgeService
           .getMyScores(roundId)
           .then((resScores) => {
-            console.log("Dữ liệu điểm đã chấm:", resScores);
+            console.log('Dữ liệu điểm đã chấm:', resScores);
           })
-          .catch(() => {
-            // Bỏ qua im lặng nếu lỗi khi lấy điểm cũ để không làm gián đoạn
-          });
+          .catch(() => {});
       }
 
-      // ==========================================
-      // 3. TẢI DANH SÁCH TIÊU CHÍ (API THẬT)
-      // ==========================================
       let rawCriteria = [];
-      
+
       if (isFinal && roundId) {
         rawCriteria = await criteriaService.listByFinalRound(roundId);
       } else if (trackId) {
         rawCriteria = await criteriaService.listByTrack(trackId);
       }
 
-      let fetchedCriteria = Array.isArray(rawCriteria) 
-        ? rawCriteria 
+      const fetchedCriteria = Array.isArray(rawCriteria)
+        ? rawCriteria
         : rawCriteria?.items || rawCriteria?.data || [];
 
-      // Gán 100% dữ liệu API thật vào state
       setCriteria(fetchedCriteria);
 
       if (fetchedCriteria.length === 0) {
-        message.warning("Vòng thi/Bảng đấu này chưa được cấu hình tiêu chí chấm điểm!");
+        message.warning('Vòng thi/Bảng đấu này chưa được cấu hình tiêu chí chấm điểm!');
       }
     } catch (error) {
-      console.error("Lỗi fetch dữ liệu chấm:", error);
-      message.error("Lỗi kết nối máy chủ khi lấy dữ liệu.");
-      setCriteria([]); // Xóa rỗng state để không bị lỗi UI
+      console.error('Lỗi fetch dữ liệu chấm:', error);
+      message.error('Lỗi kết nối máy chủ khi lấy dữ liệu.');
+      setCriteria([]);
     } finally {
       setIsLoading(false);
     }
-  }, [assignmentId, roundId, trackId, isFinal]);
+  }, [assignmentId, roundId, trackId, isFinal, isCalibration, sampleSubmissionId, refreshPresentationQueue]);
 
-  // Hook khởi chạy
   useEffect(() => {
     fetchScoringData();
   }, [fetchScoringData]);
 
-  // Xử lý thay đổi điểm cục bộ
+  useEffect(() => {
+    if (!roundId || isLoading) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      refreshPresentationQueue();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [roundId, isLoading, refreshPresentationQueue]);
+
+  const timerPhase = presentingItem?.timer?.phase || 'IDLE';
+  const timerRemainingSeconds = presentingItem?.timer?.remainingSeconds ?? 0;
+
+  const scoringBlockReason = useMemo(() => {
+    if (isCalibration) {
+      return null;
+    }
+
+    if (scoringLocked) {
+      return 'Vòng đã khóa chấm điểm (SCORING_LOCKED) — chỉ xem điểm.';
+    }
+
+    if (!roundId) {
+      return 'Thiếu roundId để đồng bộ hàng đợi thuyết trình.';
+    }
+
+    if (trackQueue && trackQueue.shuffled === false) {
+      return 'Hàng đợi chưa được xáo trộn — Coordinator vào màn Hàng đợi thuyết trình để Xáo trộn.';
+    }
+
+    if (!presentingItem) {
+      return 'Chưa có đội đang thuyết trình (PRESENTING) — vào Hàng đợi thuyết trình để shuffle và Start timer.';
+    }
+
+    if (!SCORING_OPEN_TIMER_PHASES.includes(timerPhase)) {
+      if (timerPhase === 'SETUP') {
+        return 'Đội đang chuyển tiếp — Presentation Controller cần bấm Start timer.';
+      }
+      return 'Chưa bắt đầu phiên thuyết trình — Presentation Controller cần Start timer.';
+    }
+
+    const selectedSubmissionId = selectedTeam?.submissionId ?? selectedTeam?.id;
+    if (
+      selectedSubmissionId &&
+      presentingItem.submissionId &&
+      selectedSubmissionId !== presentingItem.submissionId
+    ) {
+      return `Chỉ chấm đội đang thuyết trình: ${presentingItem.teamName || presentingItem.displayCode}.`;
+    }
+
+    return null;
+  }, [isCalibration, scoringLocked, roundId, trackQueue, presentingItem, timerPhase, selectedTeam]);
+
+  const canScore = !scoringLocked && !scoringBlockReason;
+
   const handleScoreChange = (criteriaId, value) => {
-    setCurrentScores((prev) => {
-      return {
-        ...prev,
-        [criteriaId]: value,
-      };
-    });
+    setCurrentScores((prev) => ({
+      ...prev,
+      [criteriaId]: value,
+    }));
   };
 
-  // Tính tổng điểm preview dựa trên trọng số
   const calculateTotalScore = () => {
     let total = 0;
-    
+
     criteria.forEach((c) => {
       const rawScore = currentScores[c.id] || 0;
       total += rawScore * (c.weight || 0);
     });
-    
+
     return total.toFixed(2);
   };
 
-  // Xác định trạng thái có đang chấm hay không
   const isCurrentlyScoring = useMemo(() => {
     const hasScores = Object.keys(currentScores).length > 0;
     const isNotScored = selectedTeam?.status !== 'SCORED';
-    
+
     return hasScores && isNotScored;
   }, [currentScores, selectedTeam]);
 
-  // GỬI ĐIỂM VỀ BACKEND (Gửi Promise.all song song)
+  const runTimerAction = async (action) => {
+    if (!roundId) {
+      return;
+    }
+
+    setIsTimerActionLoading(true);
+    try {
+      await action();
+      await refreshPresentationQueue();
+    } catch (error) {
+      message.error(error?.message || 'Không thể điều khiển timer thuyết trình.');
+    } finally {
+      setIsTimerActionLoading(false);
+    }
+  };
+
+  const handleTimerToggle = () =>
+    runTimerAction(async () => {
+      if (timerPhase === 'PAUSED') {
+        await presentationService.resumeTimer(roundId, trackId);
+        return;
+      }
+
+      if (timerPhase === 'PRESENTING' || timerPhase === 'QA') {
+        await presentationService.pauseTimer(roundId, trackId);
+        return;
+      }
+
+      await presentationService.startTimer(roundId, trackId);
+    });
+
+  const handleStartQa = () =>
+    runTimerAction(() => presentationService.qaTimer(roundId, trackId));
+
+  const handleResetTimer = () =>
+    runTimerAction(() => presentationService.resetTimer(roundId, trackId));
+
+  const handleAdvanceNext = async () => {
+    if (!roundId || !presentingItem?.submissionId) {
+      message.warning('Chưa có đội đang thuyết trình để chuyển tiếp.');
+      return;
+    }
+
+    const runAdvance = async (acknowledgeIncompleteScoring = false) => {
+      await presentationService.advanceNext(roundId, trackId, {
+        currentSubmissionId: presentingItem.submissionId,
+        ...(acknowledgeIncompleteScoring ? { acknowledgeIncompleteScoring: true } : {}),
+      });
+      await refreshPresentationQueue();
+      message.success('Đã chuyển sang đội tiếp theo.');
+    };
+
+    setIsTimerActionLoading(true);
+    try {
+      await runAdvance(false);
+    } catch (error) {
+      const code = error?.code || error?.response?.data?.code;
+      if (code === 'SCORING_INCOMPLETE_BEFORE_NEXT') {
+        const ack = window.confirm(
+          `${error?.message || 'Chưa chấm đủ điểm.'}\n\nChuyển đội tiếp theo anyway?`
+        );
+        if (ack) {
+          try {
+            await runAdvance(true);
+          } catch (retryError) {
+            message.error(retryError?.message || 'Không thể chuyển đội tiếp theo.');
+          }
+        }
+      } else {
+        message.error(error?.message || 'Không thể chuyển đội tiếp theo.');
+      }
+    } finally {
+      setIsTimerActionLoading(false);
+    }
+  };
+
   const submitFinalScore = async () => {
     if (!selectedTeam) {
       return;
     }
-    
-    const missingCriteria = criteria.some((c) => {
-      return currentScores[c.id] === undefined;
-    });
-    
+
+    if (!canScore) {
+      return message.warning(
+        scoringBlockReason || 'Chưa thể chấm điểm — kiểm tra hàng đợi và timer thuyết trình.'
+      );
+    }
+
+    const missingCriteria = criteria.some((c) => currentScores[c.id] === undefined);
+
     if (missingCriteria) {
       return message.warning('Vui lòng chấm tất cả các tiêu chí trước khi chốt.');
     }
 
     setIsSubmitting(true);
-    
+
     try {
-      // 1. Tạo mảng các API Request (Mỗi tiêu chí là một Request)
+      if (isCalibration && calibrationSessionId) {
+        const submitPromises = criteria.map((c) =>
+          judgeService.submitCalibrationScore({
+            calibrationSessionId,
+            submissionId: selectedTeam.submissionId ?? selectedTeam.id,
+            criterionId: c.id,
+            scoreValue: currentScores[c.id] || 0,
+            comment: comment.trim(),
+          })
+        );
+        await Promise.all(submitPromises);
+        message.success('Đã lưu điểm calibration!');
+        setCurrentScores({});
+        setComment('');
+        return;
+      }
+
       const submitPromises = criteria.map((c) => {
         const payload = {
-          submissionId: selectedTeam.id,
+          submissionId: selectedTeam.submissionId ?? selectedTeam.id,
           criterionId: c.id,
           scoreValue: currentScores[c.id] || 0,
           comment: comment.trim(),
+          scoreType,
         };
-        // Trả về promise gọi API (chưa chạy ngay)
         return judgeService.submitScore(payload);
       });
 
-      // 2. Kích hoạt bắn TẤT CẢ API cùng một lúc
       await Promise.all(submitPromises);
 
-      // 3. Cập nhật tiến độ ngầm
       judgeService
         .updateScoringCompletion(assignmentId, 'IN_PROGRESS')
-        .catch(() => {
-          // Bỏ qua lỗi ngầm
-        });
+        .catch(() => {});
 
-      // 4. Báo thành công và cập nhật UI
-      message.success(`Đã lưu toàn bộ điểm thành công!`);
-      
-      setTeams((prev) => {
-        return prev.map((t) => {
+      message.success('Đã lưu toàn bộ điểm thành công!');
+
+      setTeams((prev) =>
+        prev.map((t) => {
           if (t.id === selectedTeam.id) {
             return {
               ...t,
@@ -206,22 +405,26 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal) => {
             };
           }
           return t;
-        });
-      });
-      
-      // Reset state form
+        })
+      );
+
       setCurrentScores({});
       setComment('');
     } catch (error) {
-      // Bắt lỗi khóa vòng thi (Locked) hoặc lỗi chung
       const status = error?.status || error?.response?.status;
       const code = error?.code;
-      
-      if (status === 423 || code === 423) {
-        message.error("Vòng thi đã đóng sổ - không thể thao tác thêm!");
+
+      if (status === 423 || code === 423 || code === 'SCORING_LOCKED') {
+        message.error('Vòng thi đã đóng sổ - không thể thao tác thêm!');
+        setScoringLocked(true);
+      } else if (code === 'SCORING_NOT_OPEN') {
+        message.error(
+          error?.message ||
+            'Chưa mở cửa chấm điểm — kiểm tra hàng đợi PRESENTING và timer trên server.'
+        );
+        refreshPresentationQueue();
       } else {
-        const errorMsg = error?.response?.data?.message || error?.message;
-        message.error(errorMsg || 'Lỗi khi lưu điểm. Vui lòng thử lại!');
+        message.error(error?.message || 'Lỗi khi lưu điểm. Vui lòng thử lại!');
       }
     } finally {
       setIsSubmitting(false);
@@ -243,5 +446,18 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal) => {
     submitFinalScore,
     isCurrentlyScoring,
     scoreType,
+    presentingItem,
+    timerPhase,
+    timerRemainingSeconds,
+    canScore,
+    scoringBlockReason,
+    handleTimerToggle,
+    handleStartQa,
+    handleResetTimer,
+    handleAdvanceNext,
+    isTimerActionLoading,
+    refreshPresentationQueue,
+    scoringLocked,
+    isCalibration,
   };
 };

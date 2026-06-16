@@ -1,4 +1,5 @@
 import axiosClient from '../shared/api/axiosClient';
+import { studentSubmissionService } from '../student/features/submission/services/studentSubmission.service';
 
 const mapSubmissionStatusToFe = (beStatus?: string): 'ON_TIME' | 'LATE_PENDING' | 'REJECTED' | 'NONE' => {
   if (!beStatus) return 'NONE';
@@ -25,11 +26,36 @@ const resolveActiveRoundId = async (): Promise<number | null> => {
   try {
     const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
     const role = userInfo.role || userInfo.userRole;
+
     if (role === 'MENTOR') {
       const rounds = await axiosClient.get<any, any[]>('/api/v1/me/mentor/rounds');
       const list = Array.isArray(rounds) ? rounds : [];
       const active = list.find((r) => r.status === 'ACTIVE') || list[0];
       if (active?.roundId) return Number(active.roundId);
+    }
+
+    if (role === 'JUDGE') {
+      const assignments = await axiosClient.get<any, any[]>('/api/v1/me/judge-track-assignments');
+      const list = Array.isArray(assignments) ? assignments : [];
+      const ongoing = list.find((a) => a.status === 'ONGOING') || list[0];
+      if (ongoing?.roundId) return Number(ongoing.roundId);
+    }
+
+    if (role === 'COORDINATOR' || role === 'ADMIN') {
+      const hackathons = await axiosClient.get<any, any>('/api/v1/hackathons/active');
+      const hackathonList = Array.isArray(hackathons) ? hackathons : hackathons?.items || [];
+      const ongoingHackathon = hackathonList[0];
+      if (ongoingHackathon?.id) {
+        const rounds = await axiosClient.get<any, any>(
+          `/api/v1/hackathons/${ongoingHackathon.id}/rounds`
+        );
+        const roundList = Array.isArray(rounds) ? rounds : rounds?.items || [];
+        const activeRound =
+          roundList.find((r) => r.isActive && !r.isFinal) ||
+          roundList.find((r) => r.isActive) ||
+          roundList.find((r) => !r.isFinal);
+        if (activeRound?.id) return Number(activeRound.id);
+      }
     }
   } catch {
     // ignore
@@ -48,19 +74,49 @@ const mapAssignedTeamItem = (item: any) => ({
   location: item.location,
 });
 
+const mapQueueTeam = (t: any, groupName: string): QueueTeam => ({
+  team_id: String(t.teamId ?? t.team_id ?? t.submissionId ?? ''),
+  team_name: t.teamName ?? t.team_name ?? t.displayCode ?? `Bài #${t.submissionId ?? ''}`,
+  order: t.order ?? 0,
+  status: (t.status || 'WAITING') as QueueTeam['status'],
+  presentation_schedule: t.presentationSchedule ?? t.presentation_schedule,
+  location: t.location,
+  slot_start_at: t.slotStartAt ?? t.slot_start_at,
+  slot_end_at: t.slotEndAt ?? t.slot_end_at,
+  submission_id: t.submissionId ?? t.submission_id,
+  display_code: t.displayCode ?? t.display_code,
+  track_id: t.trackId ?? t.track_id,
+  group_name: groupName,
+  timer: t.timer,
+});
+
 const mapPresentationQueue = (data: any): PresentationQueueResponse => {
+  if (data?.tracks?.length) {
+    const groups: QueueGroup[] = data.tracks.map((track: any) => ({
+      group_name: track.trackName ?? track.track_name ?? `Track ${track.trackId ?? ''}`,
+      track_id: track.trackId ?? track.track_id,
+      shuffled: Boolean(track.shuffled),
+      teams: (track.items || []).map((item: any) =>
+        mapQueueTeam(
+          { ...item, trackId: track.trackId ?? track.track_id },
+          track.trackName ?? track.track_name ?? 'Track'
+        )
+      ),
+    }));
+
+    return {
+      groups,
+      tracks: data.tracks,
+      round_id: data.roundId ?? data.round_id,
+      room_stats: data.roomStats ?? data.room_stats,
+    };
+  }
+
   const groups = (data?.groups || []).map((g: any) => ({
     group_name: g.groupName ?? g.group_name,
-    teams: (g.teams || []).map((t: any) => ({
-      team_id: String(t.teamId ?? t.team_id),
-      team_name: t.teamName ?? t.team_name,
-      order: t.order ?? 0,
-      status: (t.status || 'WAITING') as QueueTeam['status'],
-      presentation_schedule: t.presentationSchedule ?? t.presentation_schedule,
-      location: t.location,
-      slot_start_at: t.slotStartAt ?? t.slot_start_at,
-      slot_end_at: t.slotEndAt ?? t.slot_end_at,
-    })),
+    teams: (g.teams || []).map((t: any) =>
+      mapQueueTeam(t, g.groupName ?? g.group_name ?? 'Nhóm')
+    ),
   }));
 
   return {
@@ -91,15 +147,35 @@ export interface AssignedTeamsResponse {
 export interface SubmissionRequest {
   repo_url: string;
   demo_url?: string;
-  slide_url: string;
+  slide_file?: File;
+  late_reason?: string;
 }
 
 export interface SubmissionResponse {
   status: 'ON_TIME' | 'LATE_PENDING' | 'REJECTED';
-  submitted_at: string;
+  submitted_at?: string;
   repo_url?: string;
   demo_url?: string;
   slide_url?: string;
+  slide_file?: string;
+  slide_download_path?: string;
+}
+
+/** Shape BE trả về sau POST /submissions (axios interceptor đã unwrap `data`). */
+interface BeSubmissionRecord {
+  status?: string;
+  submittedAt?: string;
+  submitted_at?: string;
+  repoUrl?: string;
+  repo_url?: string;
+  demoUrl?: string;
+  demo_url?: string;
+  slideFile?: string;
+  slide_file?: string;
+  slideUrl?: string;
+  slide_url?: string;
+  slideDownloadPath?: string;
+  slide_download_path?: string;
 }
 
 export interface SubmissionStatusResponse {
@@ -108,6 +184,8 @@ export interface SubmissionStatusResponse {
   repo_url?: string;
   demo_url?: string;
   slide_url?: string;
+  slide_file?: string;
+  slide_download_path?: string;
 }
 
 export interface DeadlineResponse {
@@ -139,15 +217,29 @@ export interface QueueTeam {
   location?: string;
   slot_start_at?: string;
   slot_end_at?: string;
+  submission_id?: number;
+  display_code?: string;
+  track_id?: number;
+  group_name?: string;
+  timer?: {
+    phase?: string;
+    remainingSeconds?: number;
+    presentationMinutes?: number;
+    qaMinutes?: number;
+  };
 }
 
 export interface QueueGroup {
   group_name: string;
   teams: QueueTeam[];
+  track_id?: number;
+  shuffled?: boolean;
 }
 
 export interface PresentationQueueResponse {
   groups: QueueGroup[];
+  tracks?: any[];
+  round_id?: number;
   room_stats?: { total?: number; done?: number; absent?: number };
 }
 
@@ -235,6 +327,8 @@ export const personBApi = {
         repo_url: submission.repoUrl ?? submission.repo_url,
         demo_url: submission.demoUrl ?? submission.demo_url,
         slide_url: submission.slideUrl ?? submission.slide_url,
+        slide_file: submission.slideFile ?? submission.slide_file,
+        slide_download_path: submission.slideDownloadPath ?? submission.slide_download_path,
       };
     } catch (err: any) {
       if (err?.status === 404) return { status: 'NONE' };
@@ -259,15 +353,29 @@ export const personBApi = {
       throw new Error('Đội chưa được phân bảng đấu — hoàn tất bốc thăm trước khi nộp bài.');
     }
 
+    const roundId =
+      myTeam.activeRoundId ??
+      myTeam.roundId ??
+      myTeam.prelimRoundId ??
+      (await resolveActiveRoundId());
+
     const payload = {
       teamId: Number(teamId),
       trackId: Number(trackId),
+      roundId: roundId ? Number(roundId) : undefined,
       repoUrl: data.repo_url,
-      demoUrl: data.demo_url || null,
-      slideUrl: data.slide_url,
+      demoUrl: data.demo_url || undefined,
+      lateReason: data.late_reason,
+      slideFile: data.slide_file,
     };
 
-    const res = await axiosClient.post<any, any>('/api/v1/submissions', payload);
+    if (!payload.slideFile) {
+      throw new Error('Vui lòng tải lên file slide PDF.');
+    }
+
+    const res = (await studentSubmissionService.submitMultipart(
+      payload
+    )) as unknown as BeSubmissionRecord;
     const mapped = mapSubmissionStatusToFe(res.status);
 
     return {
@@ -275,9 +383,13 @@ export const personBApi = {
       submitted_at: res.submittedAt ?? res.submitted_at,
       repo_url: res.repoUrl ?? res.repo_url,
       demo_url: res.demoUrl ?? res.demo_url,
-      slide_url: res.slideUrl ?? res.slide_url,
+      slide_file: res.slideFile ?? res.slide_file,
+      slide_download_path: res.slideDownloadPath ?? res.slide_download_path,
     };
   },
+
+  /** Resolve roundId cho presentation queue / coordinator ops (không dùng student-only deadline khi role khác). */
+  resolveActiveRoundId,
 
   /** GET /api/v1/me/rounds/current/deadline */
   getCurrentDeadline: async (): Promise<DeadlineResponse> => {
@@ -332,28 +444,78 @@ export const personBApi = {
   rejectLateSubmission: async (submissionId: string | number, data: RejectSubmissionRequest) =>
     axiosClient.patch(`/api/v1/submissions/${submissionId}/reject`, { reason: data.reason }),
 
+  reviewLateSubmission: async (
+    submissionId: string | number,
+    data: { decision: 'APPROVE' | 'REJECT'; note?: string }
+  ) => {
+    try {
+      return await axiosClient.patch(`/api/v1/submissions/${submissionId}/review-late`, data);
+    } catch {
+      if (data.decision === 'APPROVE') {
+        return axiosClient.patch(`/api/v1/submissions/${submissionId}/approve`, {});
+      }
+      return axiosClient.patch(`/api/v1/submissions/${submissionId}/reject`, {
+        reason: data.note || '',
+      });
+    }
+  },
+
   /** GET /api/v1/me/mentor/teams/{teamId}/presentation-slot */
   getTeamPresentationSlot: async (teamId: string | number) =>
     axiosClient.get(`/api/v1/me/mentor/teams/${teamId}/presentation-slot`),
 
-  /** GET /api/v1/presentation/queue?roundId= */
-  getPresentationQueue: async (roundId?: string | number): Promise<PresentationQueueResponse> => {
+  /** POST /api/v1/presentation/queue/shuffle */
+  shufflePresentationQueue: async (roundId: string | number, trackIds?: number[]) => {
+    const rid = Number(roundId);
+    if (!rid) {
+      throw new Error('roundId là bắt buộc để xáo trộn hàng đợi.');
+    }
+    const body: { roundId: number; trackIds?: number[] } = { roundId: rid };
+    if (trackIds?.length) {
+      body.trackIds = trackIds;
+    }
+    return axiosClient.post('/api/v1/presentation/queue/shuffle', body);
+  },
+
+  /** GET /api/v1/presentation/queue?roundId=&trackId= */
+  getPresentationQueue: async (
+    roundId?: string | number,
+    trackId?: number
+  ): Promise<PresentationQueueResponse> => {
     const rid = roundId ?? (await resolveActiveRoundId());
     if (!rid) {
       throw new Error('Không xác định được roundId cho hàng đợi thuyết trình.');
     }
-    const data = await axiosClient.get<any, any>(`/api/v1/presentation/queue?roundId=${rid}`);
+    const trackQuery = trackId ? `&trackId=${trackId}` : '';
+    const data = await axiosClient.get<any, any>(
+      `/api/v1/presentation/queue?roundId=${rid}${trackQuery}`
+    );
     return mapPresentationQueue(data);
   },
 
   /** PATCH /api/v1/presentation/queue/next?roundId= */
-  triggerNextPresentation: async (roundId?: string | number, currentTeamId?: string | number) => {
+  triggerNextPresentation: async (
+    roundId?: string | number,
+    currentTeamId?: string | number,
+    options?: { currentSubmissionId?: number; trackId?: number; acknowledgeIncompleteScoring?: boolean }
+  ) => {
     const rid = roundId ?? (await resolveActiveRoundId());
     if (!rid) {
       throw new Error('Không xác định được roundId để chuyển team tiếp theo.');
     }
     const params = new URLSearchParams({ roundId: String(rid) });
-    const body = currentTeamId ? { currentTeamId: Number(currentTeamId) } : {};
+    if (options?.trackId) {
+      params.set('trackId', String(options.trackId));
+    }
+    const body: Record<string, unknown> = {};
+    if (options?.currentSubmissionId) {
+      body.currentSubmissionId = options.currentSubmissionId;
+    } else if (currentTeamId) {
+      body.currentTeamId = Number(currentTeamId);
+    }
+    if (options?.acknowledgeIncompleteScoring) {
+      body.acknowledgeIncompleteScoring = true;
+    }
     return axiosClient.patch(`/api/v1/presentation/queue/next?${params.toString()}`, body);
   },
 

@@ -7,6 +7,7 @@ import HackathonTimeline from '../components/HackathonTimeline';
 import TeamOverviewWidget from '../components/TeamOverviewWidget';
 import LiveCountdownWidget from '../components/LiveCountdownWidget';
 import FinalSubmissionPanel from '../../features/submission/components/FinalSubmissionPanel';
+import HackathonRegistrationPanel from '../../features/hackathon/components/HackathonRegistrationPanel';
 
 const { Text, Title } = Typography;
 
@@ -84,6 +85,10 @@ const StudentDashboardPage = () => {
       }}
     >
       <ProfileStatusBanner user={user} />
+
+      {user?.status === 'APPROVED' && (
+        <HackathonRegistrationPanel hasTeam={Boolean(selectedTeam)} />
+      )}
 
       <motion.section
         initial={{ opacity: 0, y: 18 }}

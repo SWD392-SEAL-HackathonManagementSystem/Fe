@@ -249,6 +249,11 @@ const HackathonListPage = () => {
                         Reg: {hackathon.registration_start || "N/A"} -{" "}
                         {hackathon.registration_end || "N/A"}
                       </div>
+                      {hackathon.max_participants != null && (
+                        <div style={{ fontSize: 12, color: "#8c8c8c", marginTop: 4 }}>
+                          Tối đa: {hackathon.max_participants} người tham gia
+                        </div>
+                      )}
                     </div>
                   }
                 />

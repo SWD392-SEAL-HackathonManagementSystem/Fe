@@ -1,7 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Typography, Spin } from 'antd';
+import { Typography, Spin, Alert, Segmented } from 'antd';
 import { personBApi, PresentationQueueResponse, QueueTeam, QueueGroup } from '../../../api/personB.api';
+import { presentationService } from '../../judging/services/presentationService';
+import { roundService } from '../../rounds/services/roundService';
+import PresentationControllerCard from '../components/PresentationControllerCard';
+import {
+  COORD_TIMER_WARN_KEY,
+  getPresentationRoleHints,
+  getShuffleLockedWarning,
+  getTimerPhaseBanner,
+  shouldWarnShuffleWhenLocked,
+} from '../utils/presentationWorkflow';
 import toast from 'react-hot-toast';
 
 const { Title, Text } = Typography;
@@ -10,36 +21,62 @@ interface FlatTeam extends QueueTeam {
   group_name: string;
 }
 
+interface RoundDetail {
+  scoringLocked?: boolean;
+  scoring_locked?: boolean;
+  isFinal?: boolean;
+  is_final?: boolean;
+}
+
+interface PresentationControllerInfo {
+  judgeId?: number;
+  judge_id?: number;
+  judgeName?: string;
+  judge_name?: string;
+  source?: string;
+}
+
 const PresentationQueuePage: React.FC = () => {
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-  const isCoordinator = ['COORDINATOR', 'ADMIN'].includes(userInfo.role);
+  const userRole = userInfo.role || '';
+  const userId = userInfo.id ?? userInfo.userId;
+  const isCoordinator = ['COORDINATOR', 'ADMIN'].includes(userRole);
+  const isJudge = ['JUDGE', 'TEMP_JUDGE'].includes(userRole);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const roundIdFromUrl = searchParams.get('roundId');
+  const trackIdFromUrl = searchParams.get('trackId');
 
   const [localGroups, setLocalGroups] = useState<QueueGroup[]>([]);
   const [useMock, setUseMock] = useState(false);
   const [roundId, setRoundId] = useState<number | null>(null);
-
-  const { data: deadlineData } = useQuery({
-    queryKey: ['currentDeadline'],
-    queryFn: () => personBApi.getCurrentDeadline(),
-    retry: false,
-    enabled: !useMock,
-  });
+  const [selectedTrackId, setSelectedTrackId] = useState<number | null>(
+    trackIdFromUrl ? Number(trackIdFromUrl) : null
+  );
 
   useEffect(() => {
-    if (deadlineData?.round_id) {
-      setRoundId(Number(deadlineData.round_id));
+    if (useMock) return;
+    if (roundIdFromUrl) {
+      setRoundId(Number(roundIdFromUrl));
+      return;
     }
-  }, [deadlineData]);
+    personBApi.resolveActiveRoundId().then((id) => {
+      if (id) setRoundId(id);
+    });
+  }, [roundIdFromUrl, useMock]);
 
   const { data: queueData, isLoading, error, refetch } = useQuery<PresentationQueueResponse>({
-    queryKey: ['presentationQueue', roundId, useMock],
+    queryKey: ['presentationQueue', roundId, selectedTrackId, useMock],
     queryFn: async () => {
       if (useMock) {
         const { mockPresentationQueue } = await import('../../../api/personB.mock');
         return mockPresentationQueue;
       }
       try {
-        return await personBApi.getPresentationQueue(roundId ?? undefined);
+        return await personBApi.getPresentationQueue(
+          roundId ?? undefined,
+          selectedTrackId ?? undefined
+        );
       } catch (err: any) {
         toast.error(`Lỗi tải thứ tự thuyết trình: ${err?.message || 'Không thể lấy dữ liệu'}`);
         throw err;
@@ -49,6 +86,14 @@ const PresentationQueuePage: React.FC = () => {
     retry: false
   });
 
+  const { data: roundDetail } = useQuery<RoundDetail>({
+    queryKey: ['roundDetail', roundId],
+    queryFn: () => roundService.getById(roundId!) as Promise<RoundDetail>,
+    enabled: !!roundId && !useMock,
+  });
+
+  const scoringLocked = Boolean(roundDetail?.scoringLocked ?? roundDetail?.scoring_locked);
+
   // Keep local groups in sync with query data
   useEffect(() => {
     if (queueData?.groups) {
@@ -56,11 +101,55 @@ const PresentationQueuePage: React.FC = () => {
     }
   }, [queueData]);
 
-  // Flatten the queue to manage order transitions
-  const flatTeams: FlatTeam[] = localGroups.reduce((acc: FlatTeam[], group) => {
-    const groupTeams = group.teams.map((t) => ({ ...t, group_name: group.group_name }));
-    return [...acc, ...groupTeams];
-  }, []).sort((a, b) => a.order - b.order);
+  useEffect(() => {
+    if (!localGroups.length) return;
+    const urlTrack = trackIdFromUrl ? Number(trackIdFromUrl) : null;
+    const fromUrl = localGroups.find((g) => g.track_id === urlTrack);
+    if (fromUrl?.track_id) {
+      setSelectedTrackId(fromUrl.track_id);
+      return;
+    }
+    if (!selectedTrackId && localGroups[0]?.track_id) {
+      setSelectedTrackId(localGroups[0].track_id);
+    }
+  }, [localGroups, trackIdFromUrl, selectedTrackId]);
+
+  const selectedGroup = useMemo(() => {
+    if (!localGroups.length) return null;
+    return localGroups.find((g) => g.track_id === selectedTrackId) || localGroups[0];
+  }, [localGroups, selectedTrackId]);
+
+  const handleTrackChange = (trackId: number) => {
+    setSelectedTrackId(trackId);
+    const next = new URLSearchParams(searchParams);
+    next.set('trackId', String(trackId));
+    if (roundId) next.set('roundId', String(roundId));
+    setSearchParams(next, { replace: true });
+  };
+
+  // Teams scoped to selected track (not cross-track flatten)
+  const flatTeams: FlatTeam[] = useMemo(() => {
+    if (!selectedGroup) return [];
+    return selectedGroup.teams
+      .map((t) => ({ ...t, group_name: selectedGroup.group_name }))
+      .sort((a, b) => a.order - b.order);
+  }, [selectedGroup]);
+
+  const { data: controllerInfo } = useQuery<PresentationControllerInfo>({
+    queryKey: ['trackController', selectedTrackId],
+    queryFn: () =>
+      presentationService.getTrackController(selectedTrackId!) as Promise<PresentationControllerInfo>,
+    enabled: !!selectedTrackId && !useMock,
+  });
+
+  const controllerJudgeId = controllerInfo?.judgeId ?? controllerInfo?.judge_id;
+  const isController =
+    isCoordinator || (isJudge && controllerJudgeId != null && controllerJudgeId === userId);
+  const roleHints = getPresentationRoleHints({
+    role: userRole,
+    isController,
+    scoringLocked,
+  });
 
   // Find currently presenting team
   const currentTeamIndex = flatTeams.findIndex((t) => t.status === 'PRESENTING');
@@ -74,104 +163,153 @@ const PresentationQueuePage: React.FC = () => {
     ? flatTeams.slice(currentTeamIndex + 1).find(t => t.status === 'WAITING')
     : flatTeams.find(t => t.status === 'WAITING');
 
-  // Timer States
-  const [phase, setPhase] = useState<'present' | 'qa'>('present');
-  const [timeLeft, setTimeLeft] = useState(5 * 60); // 300s
+  const trackIds = useMemo(
+    () =>
+      (queueData?.groups || [])
+        .map((g) => g.track_id)
+        .filter((id): id is number => id != null),
+    [queueData?.groups]
+  );
 
-  // Timer Effect
+  const isQueueShuffled = useMemo(
+    () => Boolean(selectedGroup?.shuffled),
+    [selectedGroup?.shuffled]
+  );
+
+  const timerPhase = currentTeam?.timer?.phase || 'IDLE';
+  const phaseBanner = getTimerPhaseBanner(timerPhase);
+  const isPresentPhase = ['PRESENTING', 'PAUSED', 'SETUP'].includes(timerPhase);
+  const isQaPhase = timerPhase === 'QA';
+  const displaySeconds = currentTeam?.timer?.remainingSeconds ?? 0;
+
   useEffect(() => {
-    if (!currentTeam) return;
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 0) {
-          if (phase === 'present') {
-            setPhase('qa');
-            toast.success('Hết giờ thuyết trình! Chuyển sang phần phản biện (Q&A).');
-            return 3 * 60; // 180s Q&A
-          }
-          clearInterval(interval);
-          toast.error('Hết giờ phản biện! Vui lòng chuyển sang đội tiếp theo.');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
+    if (!roundId) return undefined;
+    const interval = setInterval(() => refetch(), 3000);
     return () => clearInterval(interval);
-  }, [phase, currentTeam]);
+  }, [roundId, refetch]);
 
-  const nextMutation = useMutation({
-    mutationFn: async (currentTeamId?: string | number) => {
-      return await personBApi.triggerNextPresentation(roundId ?? undefined, currentTeamId);
+  const shuffleMutation = useMutation({
+    mutationFn: async (ids?: number[]) => {
+      if (!roundId) throw new Error('Thiếu roundId');
+      const trackIdsToShuffle = ids?.length ? ids : selectedTrackId ? [selectedTrackId] : trackIds;
+      return personBApi.shufflePresentationQueue(roundId, trackIdsToShuffle.length ? trackIdsToShuffle : undefined);
     },
-    onSuccess: () => {
-      toast.success('Đã đồng bộ thứ tự tiếp theo lên hệ thống.');
+    onSuccess: async () => {
+      toast.success('Đã xáo trộn hàng đợi thuyết trình.');
+      await refetch();
     },
     onError: (err: any) => {
-      toast.error(`Lỗi gửi báo hiệu BE: ${err?.message || 'Không thể đồng bộ'}`);
-    }
+      const code = err?.code || err?.response?.data?.error?.code;
+      if (code === 'INVALID_STATE') {
+        toast.error(err?.message || 'Trạng thái không hợp lệ — round có thể đã khóa.');
+      } else {
+        toast.error(err?.message || 'Không thể xáo trộn hàng đợi.');
+      }
+    },
   });
 
-  // Start Q&A phase
-  const handleStartQA = () => {
-    setPhase('qa');
-    setTimeLeft(3 * 60); // 180s
+  const confirmCoordTimerAction = useCallback(() => {
+    if (!roleHints.showTimerControls) return false;
+    if (isCoordinator && roleHints.warningMessage && !sessionStorage.getItem(COORD_TIMER_WARN_KEY)) {
+      const ok = window.confirm(`${roleHints.warningMessage}\n\nTiếp tục thao tác?`);
+      if (!ok) return false;
+      sessionStorage.setItem(COORD_TIMER_WARN_KEY, '1');
+    }
+    return true;
+  }, [isCoordinator, roleHints]);
+
+  const handleShuffleClick = () => {
+    if (shouldWarnShuffleWhenLocked(scoringLocked)) {
+      const ok = window.confirm(getShuffleLockedWarning());
+      if (!ok) return;
+    }
+    shuffleMutation.mutate(selectedTrackId ? [selectedTrackId] : trackIds);
   };
 
-  // Start the queue manually from the first team
-  const handleStartQueue = () => {
-    if (!firstUpcomingTeam) {
-      toast.error('Không tìm thấy đội nào đang chờ trong hàng đợi.');
-      return;
+  const nextMutation = useMutation({
+    mutationFn: async (options?: {
+      currentSubmissionId?: number;
+      currentTeamId?: string | number;
+      acknowledgeIncompleteScoring?: boolean;
+    }) => {
+      return personBApi.triggerNextPresentation(roundId ?? undefined, options?.currentTeamId, {
+        currentSubmissionId: options?.currentSubmissionId,
+        trackId: currentTeam?.track_id,
+        acknowledgeIncompleteScoring: options?.acknowledgeIncompleteScoring,
+      });
+    },
+    onSuccess: async () => {
+      toast.success('Đã chuyển đội tiếp theo trên hệ thống.');
+      await refetch();
+    },
+    onError: (err: any) => {
+      if (err?.code === 'SCORING_INCOMPLETE_BEFORE_NEXT') {
+        const ack = window.confirm(
+          `${err?.message || 'Chưa chấm đủ điểm.'}\n\nBạn có muốn chuyển đội tiếp theo anyway?`
+        );
+        if (ack && currentTeam) {
+          nextMutation.mutate({
+            currentSubmissionId: currentTeam.submission_id,
+            currentTeamId: currentTeam.team_id,
+            acknowledgeIncompleteScoring: true,
+          });
+        }
+        return;
+      }
+      toast.error(err?.message || 'Không thể đồng bộ đội tiếp theo.');
+    },
+  });
+
+  const handleStartQA = async () => {
+    if (!roundId || !confirmCoordTimerAction()) return;
+    try {
+      await presentationService.qaTimer(roundId, currentTeam?.track_id);
+      toast.success('Đã chuyển sang pha Q&A.');
+      await refetch();
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể chuyển sang Q&A.');
     }
+  };
 
-    const updatedGroups = localGroups.map((group) => {
-      return {
-        ...group,
-        teams: group.teams.map((t) => {
-          if (t.team_id === firstUpcomingTeam.team_id) {
-            return { ...t, status: 'PRESENTING' as const };
-          }
-          return t;
-        })
-      };
-    });
+  const handleStartTimer = async () => {
+    if (!roundId || !confirmCoordTimerAction()) return;
+    try {
+      const trackId = currentTeam?.track_id ?? selectedTrackId ?? trackIds[0];
+      await presentationService.startTimer(roundId, trackId);
+      toast.success('Đã bắt đầu timer thuyết trình.');
+      await refetch();
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể bắt đầu timer.');
+    }
+  };
 
-    setLocalGroups(updatedGroups);
-    setPhase('present');
-    setTimeLeft(5 * 60); // 300s
-
-    nextMutation.mutate(firstUpcomingTeam.team_id);
+  const handleStartQueue = async () => {
+    if (!roundId || !confirmCoordTimerAction()) return;
+    try {
+      if (!isQueueShuffled || flatTeams.length === 0) {
+        await shuffleMutation.mutateAsync(
+          selectedTrackId ? [selectedTrackId] : trackIds
+        );
+      }
+      const trackId = currentTeam?.track_id ?? selectedTrackId ?? trackIds[0];
+      await presentationService.startTimer(roundId, trackId);
+      toast.success('Đã bắt đầu timer thuyết trình.');
+      await refetch();
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể bắt đầu thuyết trình.');
+    }
   };
 
   const handleNextTeam = () => {
-    if (!nextTeam) {
+    if (!confirmCoordTimerAction()) return;
+    if (!nextTeam && !currentTeam) {
       toast.error('Đã đến đội cuối cùng trong hàng đợi.');
       return;
     }
-
-    // Local state transformation
-    const updatedGroups = localGroups.map((group) => {
-      return {
-        ...group,
-        teams: group.teams.map((t) => {
-          if (t.team_id === currentTeam?.team_id) {
-            return { ...t, status: 'DONE' as const };
-          }
-          if (t.team_id === nextTeam.team_id) {
-            return { ...t, status: 'PRESENTING' as const };
-          }
-          return t;
-        })
-      };
+    nextMutation.mutate({
+      currentSubmissionId: currentTeam?.submission_id,
+      currentTeamId: currentTeam?.team_id,
     });
-
-    setLocalGroups(updatedGroups);
-    setPhase('present');
-    setTimeLeft(5 * 60); // 300s
-
-    nextMutation.mutate(currentTeam?.team_id);
   };
 
   // Timer display helper
@@ -249,7 +387,30 @@ const PresentationQueuePage: React.FC = () => {
           }}>
             👥 Thứ Tự Thuyết Trình
           </h1>
-          <button 
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {roleHints.showShuffle && (
+              <button
+                onClick={handleShuffleClick}
+                disabled={shuffleMutation.isPending || !roundId}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 14px',
+                  border: '1px solid #BBF7D0',
+                  borderRadius: '8px',
+                  background: '#DCFCE7',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: shuffleMutation.isPending ? 'not-allowed' : 'pointer',
+                  color: '#166534',
+                  opacity: shuffleMutation.isPending ? 0.7 : 1,
+                }}
+              >
+                🔀 Xáo trộn
+              </button>
+            )}
+            <button 
             onClick={() => refetch()}
             style={{
               display: 'inline-flex',
@@ -268,12 +429,45 @@ const PresentationQueuePage: React.FC = () => {
           >
             ↺ Làm mới
           </button>
+          </div>
         </div>
 
         {/* Subtitle */}
         <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 10px 0' }}>
           Điều hành phòng thuyết trình và theo dõi thời gian trình bày, phản biện.
         </p>
+
+        {localGroups.length > 1 && (
+          <div style={{ marginBottom: 12 }}>
+            <Segmented
+              value={selectedTrackId ?? undefined}
+              onChange={(value) => handleTrackChange(Number(value))}
+              options={localGroups.map((g) => ({
+                label: g.group_name,
+                value: g.track_id!,
+              }))}
+            />
+          </div>
+        )}
+
+        {roleHints.warningMessage && (
+          <Alert
+            type="info"
+            showIcon
+            message={roleHints.warningMessage}
+            style={{ marginBottom: 12 }}
+          />
+        )}
+
+        {scoringLocked && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Round đã khóa chấm điểm"
+            description="Xáo trộn/timer vẫn có thể thử — BE là gate cuối."
+            style={{ marginBottom: 12 }}
+          />
+        )}
 
         {/* Role badge */}
         <span style={{
@@ -361,9 +555,9 @@ const PresentationQueuePage: React.FC = () => {
           
           {/* CỘT TRÁI — QUEUE LIST */}
           <div>
-            {localGroups.map((group) => (
+            {selectedGroup && (
               <div 
-                key={group.group_name}
+                key={selectedGroup.group_name}
                 style={{
                   background: 'white',
                   border: '1px solid #E5E7EB',
@@ -385,11 +579,11 @@ const PresentationQueuePage: React.FC = () => {
                   color: '#374151',
                   background: '#F9FAFB'
                 }}>
-                  👥 {group.group_name}
+                  👥 {selectedGroup.group_name}
                 </div>
 
                 {/* Danh sách đội */}
-                {group.teams.map((team, idx) => {
+                {selectedGroup.teams.map((team, idx) => {
                   const isPresenting = team.status === 'PRESENTING';
                   const isDone = team.status === 'DONE';
                   const isEliminated = team.status === 'ELIMINATED';
@@ -399,7 +593,7 @@ const PresentationQueuePage: React.FC = () => {
                     <div 
                       key={team.team_id}
                       style={{
-                        borderBottom: idx < group.teams.length - 1 ? '1px solid #F3F4F6' : 'none'
+                        borderBottom: idx < selectedGroup.teams.length - 1 ? '1px solid #F3F4F6' : 'none'
                       }}
                     >
                       {isPresenting ? (
@@ -615,11 +809,25 @@ const PresentationQueuePage: React.FC = () => {
                   );
                 })}
               </div>
-            ))}
+            )}
           </div>
 
           {/* CỘT PHẢI — PANEL */}
           <div>
+            <PresentationControllerCard
+              trackId={selectedTrackId}
+              roundId={roundId}
+              canGrant={isCoordinator}
+            />
+
+            {phaseBanner && (
+              <Alert
+                type={phaseBanner.type as 'info' | 'warning' | 'success'}
+                message={phaseBanner.text}
+                style={{ marginBottom: 12 }}
+                showIcon
+              />
+            )}
             
             {/* Card 1: Đội đang thuyết trình — dark card */}
             <div style={{
@@ -666,7 +874,7 @@ const PresentationQueuePage: React.FC = () => {
                   fontWeight: 600,
                 }}>
                   {currentTeam 
-                    ? (phase === 'present' ? 'Thuyết Trình' : 'Hỏi & Đáp')
+                    ? (isQaPhase ? 'Hỏi & Đáp' : isPresentPhase ? 'Thuyết Trình' : timerPhase)
                     : 'Chưa Bắt Đầu'}
                 </span>
                 <span style={{
@@ -708,7 +916,7 @@ const PresentationQueuePage: React.FC = () => {
                     lineHeight: currentTeam ? 'inherit' : '24px'
                   }}>
                     {currentTeam 
-                      ? formatTime(timeLeft) 
+                      ? formatTime(displaySeconds) 
                       : (firstUpcomingTeam && firstUpcomingTeam.slot_start_at 
                           ? formatDateTime(firstUpcomingTeam.slot_start_at) 
                           : 'N/A')}
@@ -743,10 +951,32 @@ const PresentationQueuePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Nút điều khiển — Chỉ dành cho Coordinator/Admin */}
-              {isCoordinator && (
+              {/* Nút điều khiển — Coord hỗ trợ / Judge controller */}
+              {roleHints.showTimerControls && (
                 currentTeam ? (
-                  phase === 'present' ? (
+                  timerPhase === 'IDLE' || timerPhase === 'SETUP' ? (
+                    <button
+                      onClick={handleStartTimer}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        background: '#16A34A',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: '0 2px 4px rgba(22,163,74,0.3)',
+                      }}
+                    >
+                      ▶ Bắt đầu timer
+                    </button>
+                  ) : (timerPhase === 'PRESENTING' || timerPhase === 'PAUSED') && !isQaPhase ? (
                     <button 
                       onClick={handleStartQA}
                       style={{
@@ -794,7 +1024,7 @@ const PresentationQueuePage: React.FC = () => {
                     </button>
                   )
                 ) : (
-                  firstUpcomingTeam && (
+                  (currentTeam || firstUpcomingTeam) && (
                     <button 
                       onClick={handleStartQueue}
                       style={{

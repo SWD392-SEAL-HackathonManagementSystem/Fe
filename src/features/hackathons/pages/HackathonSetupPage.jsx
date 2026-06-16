@@ -14,6 +14,7 @@ import { roundService } from '../../rounds/services/roundService';
 import { mapHackathonToFE } from '../mappers/hackathonMapper';
 import { mapRoundToFE } from '../../rounds/mappers/roundMapper';
 import LotteryManagementPage from '../../teams/pages/LotteryManagementPage';
+import HackathonGeneralConfig from '../components/HackathonGeneralConfig';
 
 // 1. IMPORT TRANG ANALYTICS MỚI (CHỈ THÊM DÒNG NÀY)
 import AnalyticsPage from '../../analytics/pages/AnalyticsPage.jsx';
@@ -87,6 +88,16 @@ const HackathonSetupPage = () => {
   }
 
   const items = [
+    {
+      key: 'general',
+      label: 'Cấu hình chung',
+      children: (
+        <HackathonGeneralConfig
+          hackathon={hackathon}
+          onUpdated={refreshHackathon}
+        />
+      ),
+    },
     {
       key: 'rounds',
       label: 'Vòng thi (Rounds)',

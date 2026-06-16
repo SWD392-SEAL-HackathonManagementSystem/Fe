@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Row,
   Col,
@@ -16,7 +16,8 @@ import {
   Empty,
   Badge,
   Modal,
-  message
+  message,
+  Alert,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -71,7 +72,8 @@ const LiveScoringPage = () => {
   const { assignmentId } = useParams();
 
   // BẢN VÁ LỖI: Lấy ID và cờ isReadOnly từ Router State
-  const { roundId, trackId, isFinal, isReadOnly } = location.state || {};
+  const { roundId, trackId, isFinal, isReadOnly, isCalibration, calibrationSessionId, sampleSubmissionId } =
+    location.state || {};
 
   // Custom hook chứa toàn bộ logic API
   const {
@@ -88,8 +90,23 @@ const LiveScoringPage = () => {
     calculateTotalScore,
     submitFinalScore,
     isCurrentlyScoring,
-    scoreType, // Lấy cờ scoreType (NORMAL) từ hook
-  } = useLiveScoring(assignmentId, roundId, trackId, isFinal);
+    scoreType,
+    presentingItem,
+    timerPhase,
+    timerRemainingSeconds,
+    canScore,
+    scoringBlockReason,
+    handleTimerToggle,
+    handleStartQa,
+    handleResetTimer,
+    handleAdvanceNext,
+    isTimerActionLoading,
+    scoringLocked,
+  } = useLiveScoring(assignmentId, roundId, trackId, isFinal, {
+    isCalibration,
+    calibrationSessionId,
+    sampleSubmissionId,
+  });
 
   // ==========================================
   // STATE: QUẢN LÝ MODAL VIEW FILE PDF
@@ -98,34 +115,25 @@ const LiveScoringPage = () => {
   const [slideBlobUrl, setSlideBlobUrl] = useState(null);
   const [isLoadingSlide, setIsLoadingSlide] = useState(false);
 
-  // ==========================================
-  // STATE: QUẢN LÝ ĐỒNG HỒ Q&A REBUTTAL (3 PHÚT)
-  // ==========================================
-  const [timer, setTimer] = useState(180); // 180s = 3 phút
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-
-  /**
-   * Effect xử lý đếm ngược thời gian Q&A
-   */
-  useEffect(() => {
-    let interval;
-    if (isTimerRunning && timer > 0) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-    } else if (timer === 0 && isTimerRunning) {
-      setIsTimerRunning(false);
-      message.warning('Đã hết 3 phút hỏi - đáp!');
+  const getTimerPhaseLabel = () => {
+    switch (timerPhase) {
+      case 'PRESENTING':
+        return 'Thời gian Thuyết trình';
+      case 'QA':
+        return 'Thời gian Hỏi - Đáp';
+      case 'PAUSED':
+        return 'Tạm dừng';
+      case 'ENDED':
+        return 'Đã kết thúc phiên';
+      default:
+        return 'Chưa bắt đầu timer';
     }
-    return () => clearInterval(interval);
-  }, [isTimerRunning, timer]);
+  };
 
-  /**
-   * Format giây thành chuỗi MM:SS
-   */
   const formatTime = (secs) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
+    const safeSecs = Math.max(0, secs || 0);
+    const m = Math.floor(safeSecs / 60);
+    const s = safeSecs % 60;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
@@ -214,7 +222,8 @@ const LiveScoringPage = () => {
   }
 
   // Cờ khóa form: Khóa nếu trạng thái team là SCORED hoặc cờ isReadOnly được truyền từ Dashboard
-  const isFormLocked = isReadOnly || selectedTeam?.status === 'SCORED';
+  const isFormLocked = isReadOnly || scoringLocked || selectedTeam?.status === 'SCORED';
+  const canSubmitScore = canScore && !isFormLocked;
 
   return (
     <div style={{ padding: '24px', background: '#f5f7fa', minHeight: '100vh' }}>
@@ -264,7 +273,7 @@ const LiveScoringPage = () => {
           </div>
         </div>
 
-        {/* Cụm Đồng hồ Q&A Rebuttal */}
+        {/* Cụm Đồng hồ thuyết trình (đồng bộ BE) */}
         <div
           style={{
             background: '#fff',
@@ -282,37 +291,88 @@ const LiveScoringPage = () => {
               type="secondary"
               style={{ fontSize: 12, display: 'block', fontWeight: 600 }}
             >
-              Thời gian Hỏi - Đáp
+              {getTimerPhaseLabel()}
+              {presentingItem?.teamName ? ` — ${presentingItem.teamName}` : ''}
             </Text>
             <Text
               strong
               style={{
                 fontSize: 20,
-                color: timer <= 30 ? '#ef4444' : '#1677ff',
+                color: timerRemainingSeconds <= 30 ? '#ef4444' : '#1677ff',
                 fontFamily: 'monospace',
               }}
             >
-              {formatTime(timer)}
+              {formatTime(timerRemainingSeconds)}
             </Text>
           </div>
           <Space>
             <Button
               type="primary"
               shape="circle"
-              icon={isTimerRunning ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
-              onClick={() => setIsTimerRunning(!isTimerRunning)}
+              loading={isTimerActionLoading}
+              icon={
+                timerPhase === 'PRESENTING' || timerPhase === 'QA' ? (
+                  <PauseCircleOutlined />
+                ) : (
+                  <PlayCircleOutlined />
+                )
+              }
+              onClick={handleTimerToggle}
+              disabled={isReadOnly || !presentingItem}
             />
+            {timerPhase === 'PRESENTING' && (
+              <Button size="small" onClick={handleStartQa} loading={isTimerActionLoading}>
+                Q&A
+              </Button>
+            )}
+            <Button
+              size="small"
+              onClick={handleAdvanceNext}
+              loading={isTimerActionLoading}
+              disabled={isReadOnly || !presentingItem}
+            >
+              Đội tiếp
+            </Button>
             <Button
               shape="circle"
               icon={<ReloadOutlined />}
-              onClick={() => {
-                setTimer(180);
-                setIsTimerRunning(false);
-              }}
+              loading={isTimerActionLoading}
+              onClick={handleResetTimer}
+              disabled={isReadOnly || !presentingItem}
             />
           </Space>
         </div>
       </div>
+
+      {scoringLocked && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Vòng đã khóa chấm điểm"
+          description="Form chấm điểm ở chế độ chỉ đọc (SCORING_LOCKED)."
+        />
+      )}
+
+      {isCalibration && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Chế độ Calibration"
+          description="Chấm bài mẫu — không cần đội PRESENTING hay timer."
+        />
+      )}
+
+      {!isReadOnly && !scoringLocked && scoringBlockReason && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Chưa thể chấm điểm"
+          description={scoringBlockReason}
+        />
+      )}
 
       {/* ========================================== */}
       {/* MAIN CONTENT: CHIA 2 CỘT                     */}
@@ -678,6 +738,7 @@ const LiveScoringPage = () => {
                           size="large"
                           icon={<SaveOutlined />}
                           loading={isSubmitting}
+                          disabled={!canSubmitScore}
                           onClick={submitFinalScore}
                           style={{
                             background: '#10b981',

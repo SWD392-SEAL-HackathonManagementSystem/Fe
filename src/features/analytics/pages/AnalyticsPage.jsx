@@ -196,7 +196,7 @@ const AnalyticsPage = ({ hackathonId, hackathon, rounds }) => {
               <Col xs={24} md={8} style={{ textAlign: 'center' }}>
                 <Progress 
                   type="dashboard" 
-                  percent={(progressData?.completionPct || 0) * 100} 
+                  percent={progressData?.completionPct ?? 0} 
                   strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
                   format={percent => `${percent.toFixed(1)}%`}
                 />

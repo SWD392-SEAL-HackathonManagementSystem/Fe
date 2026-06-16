@@ -34,5 +34,13 @@ export const roundService = {
   // ==========================================
   lockScoring: async (id, payload) => {
     return axiosClient.patch(`/api/v1/rounds/${id}/lock-scoring`, payload);
-  }
+  },
+
+  releaseProblem: async (id, problemStatementUrl) => {
+    return axiosClient.patch(ENDPOINTS.ROUNDS.RELEASE_PROBLEM(id), { problemStatementUrl });
+  },
+
+  getScoringProgress: async (id) => {
+    return axiosClient.get(ENDPOINTS.ROUNDS.SCORING_PROGRESS(id));
+  },
 };

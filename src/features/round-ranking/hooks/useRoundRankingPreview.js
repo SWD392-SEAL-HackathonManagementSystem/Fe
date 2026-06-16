@@ -30,6 +30,7 @@ export const useRoundRankingPreview = (roundId, options = {}) => {
         setError(null);
       } catch (fetchError) {
         setError(fetchError);
+        setItems([]);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);

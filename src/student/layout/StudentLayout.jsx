@@ -8,7 +8,7 @@ import {
   MoonOutlined,
   SunOutlined,
 } from '@ant-design/icons';
-import { BarChart3, CalendarDays, FileCheck2, LayoutDashboard, Trophy, UsersRound } from 'lucide-react';
+import { BarChart3, CalendarDays, FileCheck2, LayoutDashboard, Megaphone, Trophy, UsersRound } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../shared/constants/routes';
 import { useAppContext } from '../../app/AppContext';
@@ -58,6 +58,12 @@ const StudentLayout = ({ children }) => {
         key: ROUTES.STUDENT_TEAM,
         icon: <UsersRound size={18} />,
         label: 'Quản lý đội',
+        disabled: currentUser.status !== 'APPROVED',
+      },
+      {
+        key: ROUTES.STUDENT_MATCHMAKING,
+        icon: <Megaphone size={18} />,
+        label: 'Bảng tin ghép đội',
         disabled: currentUser.status !== 'APPROVED',
       },
       {
