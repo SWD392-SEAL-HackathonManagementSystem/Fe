@@ -47,8 +47,8 @@ const StudentLayout = ({ children }) => {
 
   const unreadCount = notifications.filter((item) => !item.is_read).length;
 
-  const menuItems = useMemo(
-    () => [
+  const menuItems = useMemo(() => {
+    const baseItems = [
       {
         key: ROUTES.DASHBOARD,
         icon: <LayoutDashboard size={18} />,
@@ -88,9 +88,15 @@ const StudentLayout = ({ children }) => {
         icon: <FileCheck2 size={18} />,
         label: 'Hồ sơ',
       },
-    ],
-    [currentUser.status]
-  );
+    ];
+
+    if (currentUser.status !== 'APPROVED') {
+      return baseItems.filter((item) =>
+        [ROUTES.DASHBOARD, ROUTES.PROFILE].includes(item.key)
+      );
+    }
+    return baseItems;
+  }, [currentUser.status]);
 
   const handleMenuClick = ({ key }) => {
     if (isMobile) {

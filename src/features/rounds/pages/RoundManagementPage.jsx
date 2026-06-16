@@ -11,6 +11,7 @@ import { mapRoundToFE, mapRoundToBE, sortRoundsByExamAt } from '../mappers/round
 import { getRoundErrorMessage } from '../../../shared/constants/roundErrors';
 import { formatDate } from '../../../shared/utils/date';
 import { teamService } from '../../teams/services/teamService';
+import { hackathonService } from '../../hackathons/services/hackathonService';
 import {
   buildPartitionStats,
   validateAdvancementConfig,
@@ -146,6 +147,28 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
       cancelText: 'Hủy',
       onOk: async () => {
         try {
+          if (round.is_final) {
+            const readiness = await hackathonService.getReadiness(hackathonId, 'FINAL_ROUND');
+            const blockers = Array.isArray(readiness?.blockers) ? readiness.blockers : [];
+            if (readiness?.ready === false || blockers.length > 0) {
+              Modal.error({
+                title: 'Chưa thể kích hoạt Chung kết',
+                content: (
+                  <div>
+                    <p>Readiness FINAL_ROUND chưa đạt. Vui lòng xử lý các blocker sau:</p>
+                    <ul style={{ paddingLeft: 18 }}>
+                      {blockers.slice(0, 6).map((item, idx) => (
+                        <li key={`${item.code || 'BLOCKER'}-${idx}`}>
+                          {item.message || item.code || 'Blocker chưa rõ chi tiết'}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ),
+              });
+              return;
+            }
+          }
           setLoading(true);
           await roundService.activate(round.id, { note: 'Kích hoạt thủ công' });
           message.success(`ROUND_STARTED: ${round.name} đã được kích hoạt thành công!`);
@@ -177,7 +200,29 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
       message.success(`Đã khóa chấm điểm cho ${lockingRound.name}. Trạng thái hiện tại: scoring_locked`);
       setIsLockModalVisible(false);
       setLockReason('');
-      fetchRounds();
+      await fetchRounds();
+
+      const isFinalLock = Boolean(lockingRound.is_final || lockingRound.isFinal);
+      if (isFinalLock && hackathonId) {
+        try {
+          const updatedHackathon = await hackathonService.getById(hackathonId);
+          const status = String(updatedHackathon?.status || '').toUpperCase();
+          if (onHackathonSync) {
+            await onHackathonSync();
+          }
+          if (status === 'PENDING_CONFIRM') {
+            Modal.success({
+              title: 'Đã khóa Chung kết — sẵn sàng GĐ6',
+              content:
+                'Hackathon đã chuyển sang trạng thái PENDING_CONFIRM. Tiếp theo: trao giải và chốt sổ kết quả.',
+              okText: 'Mở kết quả & trao giải',
+              onOk: () => navigate(`/hackathons/${hackathonId}/results`),
+            });
+          }
+        } catch {
+          // non-blocking
+        }
+      }
     } catch (error) {
       message.error('Lỗi khi khóa chấm điểm. Vui lòng kiểm tra lại kết nối.');
     } finally {
@@ -478,6 +523,7 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
                 </Tooltip>
               )}
 
+              {!record.is_final && (
               <Tooltip title="Mở hàng đợi thuyết trình">
                 <Button
                   type="text"
@@ -486,6 +532,7 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
                   onClick={() => navigate(`${ROUTES.PRESENTATION_QUEUE}?roundId=${record.id}`)}
                 />
               </Tooltip>
+              )}
 
               {(record.scoring_locked || record.scoringLocked) && !record.is_final && (
                 <Tooltip title="Công bố & chuyển vòng">
@@ -494,6 +541,17 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
                     style={{ color: 'var(--ant-color-success)' }}
                     icon={<Trophy size={16} />}
                     onClick={() => navigate(`/hackathons/${hackathonId}/rounds/${record.id}/results`)}
+                  />
+                </Tooltip>
+              )}
+
+              {(record.scoring_locked || record.scoringLocked) && record.is_final && (
+                <Tooltip title="Kết quả Chung kết & chốt sổ">
+                  <Button
+                    type="text"
+                    style={{ color: 'var(--ant-color-success)' }}
+                    icon={<Trophy size={16} />}
+                    onClick={() => navigate(`/hackathons/${hackathonId}/results`)}
                   />
                 </Tooltip>
               )}

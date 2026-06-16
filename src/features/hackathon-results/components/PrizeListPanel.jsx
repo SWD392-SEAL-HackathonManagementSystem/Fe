@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Card, List, Tag, Typography, Space, Button } from 'antd';
-import { Gift, Award, Star, Plus } from 'lucide-react';
+import { Card, List, Tag, Typography, Space, Button, Popconfirm } from 'antd';
+import { Gift, Award, Star, Plus, Trash2 } from 'lucide-react';
 import AwardPrizeModal from './AwardPrizeModal';
 
 const { Text } = Typography;
@@ -27,7 +27,7 @@ const getPrizeColor = (type) => {
   }
 };
 
-const PrizeListPanel = ({ data, loading, hackathonId, onRefresh }) => {
+const PrizeListPanel = ({ data, loading, hackathonId, onRefresh, canRevoke, onRevoke }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   return (
@@ -57,7 +57,22 @@ const PrizeListPanel = ({ data, loading, hackathonId, onRefresh }) => {
           const prizeValue = item.prizeValue ?? item.prize_value;
           const teamName = item.teamName ?? item.team?.team_name ?? item.team?.teamName;
           return (
-          <List.Item>
+          <List.Item
+            actions={canRevoke && (item.id ?? item.prizeId) ? [
+              <Popconfirm
+                key="revoke"
+                title="Thu hồi giải thưởng?"
+                description="Chỉ thực hiện khi chưa chốt sổ."
+                onConfirm={() => onRevoke?.(item.id ?? item.prizeId)}
+                okText="Thu hồi"
+                cancelText="Hủy"
+              >
+                <Button type="text" danger icon={<Trash2 size={16} />} size="small">
+                  Thu hồi
+                </Button>
+              </Popconfirm>,
+            ] : undefined}
+          >
             <List.Item.Meta
               avatar={getPrizeIcon(prizeType)}
               title={

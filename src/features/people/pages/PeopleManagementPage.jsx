@@ -21,8 +21,10 @@ const PeopleManagementPage = ({ hackathonId }) => {
     judges,
     tempJudges,
     tracks,
+    rounds,
     trackMentors,
     judgeAssignments,
+    finalJudgeAssignments,
     isLoading,
     createTempJudge,
     assignMentor,
@@ -32,6 +34,23 @@ const PeopleManagementPage = ({ hackathonId }) => {
     isMentorBlockedForTrack,
     isJudgeBlockedForTrack,
   } = usePeopleManagement(hackathonId);
+  const trackByRoundType = (isFinal) =>
+    tracks.filter((track) => {
+      const roundId = track.roundId || track.round_id;
+      const round = rounds.find((r) => r.id === roundId);
+      const roundIsFinal =
+        Boolean(round?.isFinal ?? round?.is_final) ||
+        String(round?.roundType || round?.round_type || '').toUpperCase() === 'FINAL' ||
+        /chung\s*kết|final/i.test(String(round?.name || ''));
+      return roundIsFinal === isFinal;
+    });
+  const prelimTracks = trackByRoundType(false);
+  const finalTracks = trackByRoundType(true);
+  const finalRounds = rounds.filter((round) =>
+    Boolean(round?.isFinal ?? round?.is_final) ||
+    String(round?.roundType || round?.round_type || '').toUpperCase() === 'FINAL' ||
+    /chung\s*kết|final/i.test(String(round?.name || ''))
+  );
 
   const renderJudgeRole = (role) => {
     switch (role) {
@@ -212,12 +231,12 @@ const PeopleManagementPage = ({ hackathonId }) => {
               <Form
                 layout="inline"
                 form={judgeForm}
-                initialValues={{ assignment_type: 'NORMAL' }}
+                initialValues={{ assignment_type: 'FINAL_EXTERNAL' }}
                 onFinish={(vals) => assignJudge(vals, () => judgeForm.resetFields())}
               >
                 <Form.Item name="track_id" rules={[{ required: true, message: 'Chọn bảng đấu' }]}>
                   <Select placeholder="Chọn bảng đấu" style={{ width: 220 }} showSearch optionFilterProp="children">
-                    {tracks.map((t) => (
+                    {prelimTracks.map((t) => (
                       <Option key={t.id} value={t.id}>
                         {t.name}
                       </Option>
@@ -239,13 +258,11 @@ const PeopleManagementPage = ({ hackathonId }) => {
 
                 <Form.Item name="assignment_type">
                   <Select style={{ width: 130 }}>
-                    <Option value="NORMAL">Giám khảo</Option>
-                    <Option value="HEAD">Trưởng ban</Option>
-                    <Option value="CALIBRATION">Chấm chéo</Option>
+                    <Option value="FINAL_EXTERNAL">FINAL_EXTERNAL</Option>
                   </Select>
                 </Form.Item>
 
-                <Button type="primary" htmlType="submit" loading={isLoading}>
+                <Button type="primary" htmlType="submit" loading={isLoading} disabled={!prelimTracks.length}>
                   Gán giám khảo
                 </Button>
               </Form>
@@ -280,6 +297,86 @@ const PeopleManagementPage = ({ hackathonId }) => {
                     </Popconfirm>
                   ),
                 },
+              ]}
+            />
+          </Tabs.TabPane>
+
+          <Tabs.TabPane tab="Giám khảo Chung kết" key="4">
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+              message="Bước 4.5 - Gán giám khảo Chung kết"
+              description="Luồng này dùng API round-scoped theo BE: POST /api/v1/rounds/{finalRoundId}/judge-assignments."
+            />
+            <Card type="inner" style={{ marginBottom: 24, background: '#fafafa', borderRadius: 8 }}>
+              <Form
+                layout="inline"
+                form={judgeForm}
+                initialValues={{ assignment_type: 'FINAL_EXTERNAL', is_final_assignment: true }}
+                onFinish={(vals) => assignJudge(vals, () => judgeForm.resetFields())}
+              >
+                {finalTracks.length > 0 ? (
+                  <Form.Item name="track_id" rules={[{ required: true, message: 'Chọn bảng đấu CK' }]}>
+                    <Select placeholder="Chọn bảng đấu CK" style={{ width: 240 }} showSearch optionFilterProp="children">
+                      {finalTracks.map((t) => (
+                        <Option key={t.id} value={t.id}>
+                          {t.name}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                ) : (
+                  <Form.Item name="round_id" rules={[{ required: true, message: 'Chọn vòng CK' }]}>
+                    <Select placeholder="Chọn vòng Chung kết" style={{ width: 240 }} showSearch optionFilterProp="children">
+                      {finalRounds.map((r) => (
+                        <Option key={r.id} value={r.id}>
+                          {r.name}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                )}
+                <Form.Item name="person_id" rules={[{ required: true, message: 'Chọn giám khảo' }]}>
+                  <Select
+                    placeholder="Chọn giám khảo"
+                    style={{ width: 240 }}
+                    showSearch
+                    optionFilterProp="children"
+                    disabled={!selectedJudgeTrackId && finalTracks.length > 0}
+                  >
+                    {judgeOptionsForTrack(selectedJudgeTrackId)}
+                  </Select>
+                </Form.Item>
+                <Form.Item name="is_final_assignment" hidden>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="assignment_type">
+                  <Select style={{ width: 130 }}>
+                    <Option value="FINAL_EXTERNAL">FINAL_EXTERNAL</Option>
+                  </Select>
+                </Form.Item>
+                <Button type="primary" htmlType="submit" loading={isLoading} disabled={!finalTracks.length && !finalRounds.length}>
+                  Gán giám khảo CK
+                </Button>
+              </Form>
+            </Card>
+            <Table
+              dataSource={finalJudgeAssignments}
+              rowKey="id"
+              pagination={{ pageSize: 10 }}
+              loading={isLoading}
+              locale={{ emptyText: 'Chưa gán giám khảo Chung kết.' }}
+              columns={[
+                {
+                  title: 'Giám khảo',
+                  render: (_, r) => {
+                    const found = judges.find((j) => j.id === r.person_id) || tempJudges.find((j) => j.id === r.person_id);
+                    return <strong>{found?.fullName || found?.name || r.judge_name || 'Không rõ'}</strong>;
+                  },
+                },
+                { title: 'Vòng', dataIndex: 'target_name', render: (t) => <Tag color="purple">{t}</Tag> },
+                { title: 'Vai trò', dataIndex: 'assignment_type', render: renderJudgeRole },
               ]}
             />
           </Tabs.TabPane>

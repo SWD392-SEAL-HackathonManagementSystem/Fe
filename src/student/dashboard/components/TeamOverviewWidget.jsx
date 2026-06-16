@@ -73,6 +73,7 @@ const TeamOverviewWidget = ({ user, selectedTeam, isLoading }) => {
           >
             <Metric label="Thành viên" value={selectedTeam.memberCapacityLabel || `${acceptedCount}/5`} />
             <Metric label="Leader" value={selectedTeam.leaderName || 'Chưa rõ'} />
+            <Metric label="Track dự thi" value={selectedTeam.trackName || 'Chưa bốc thăm'} />
             <Metric label="Khóa đội" value={selectedTeam.isLocked ? 'Đã khóa' : 'Đang mở'} />
           </div>
 

@@ -48,14 +48,12 @@ const PresentationQueuePage: React.FC = () => {
   const trackIdFromUrl = searchParams.get('trackId');
 
   const [localGroups, setLocalGroups] = useState<QueueGroup[]>([]);
-  const [useMock, setUseMock] = useState(false);
   const [roundId, setRoundId] = useState<number | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<number | null>(
     trackIdFromUrl ? Number(trackIdFromUrl) : null
   );
 
   useEffect(() => {
-    if (useMock) return;
     if (roundIdFromUrl) {
       setRoundId(Number(roundIdFromUrl));
       return;
@@ -63,15 +61,11 @@ const PresentationQueuePage: React.FC = () => {
     personBApi.resolveActiveRoundId().then((id) => {
       if (id) setRoundId(id);
     });
-  }, [roundIdFromUrl, useMock]);
+  }, [roundIdFromUrl]);
 
   const { data: queueData, isLoading, error, refetch } = useQuery<PresentationQueueResponse>({
-    queryKey: ['presentationQueue', roundId, selectedTrackId, useMock],
+    queryKey: ['presentationQueue', roundId, selectedTrackId],
     queryFn: async () => {
-      if (useMock) {
-        const { mockPresentationQueue } = await import('../../../api/personB.mock');
-        return mockPresentationQueue;
-      }
       try {
         return await personBApi.getPresentationQueue(
           roundId ?? undefined,
@@ -82,14 +76,14 @@ const PresentationQueuePage: React.FC = () => {
         throw err;
       }
     },
-    enabled: useMock || roundId != null,
+    enabled: roundId != null,
     retry: false
   });
 
   const { data: roundDetail } = useQuery<RoundDetail>({
     queryKey: ['roundDetail', roundId],
     queryFn: () => roundService.getById(roundId!) as Promise<RoundDetail>,
-    enabled: !!roundId && !useMock,
+    enabled: !!roundId,
   });
 
   const scoringLocked = Boolean(roundDetail?.scoringLocked ?? roundDetail?.scoring_locked);
@@ -139,7 +133,7 @@ const PresentationQueuePage: React.FC = () => {
     queryKey: ['trackController', selectedTrackId],
     queryFn: () =>
       presentationService.getTrackController(selectedTrackId!) as Promise<PresentationControllerInfo>,
-    enabled: !!selectedTrackId && !useMock,
+    enabled: !!selectedTrackId,
   });
 
   const controllerJudgeId = controllerInfo?.judgeId ?? controllerInfo?.judge_id;
@@ -501,7 +495,7 @@ const PresentationQueuePage: React.FC = () => {
           <Spin size="large" />
           <div style={{ color: '#6B7280', fontSize: '14px' }}>Đang tải thứ tự thuyết trình...</div>
         </div>
-      ) : error && !useMock ? (
+      ) : error ? (
         <div style={{
           background: 'white',
           border: '1px solid #FCA5A5',
@@ -527,20 +521,6 @@ const PresentationQueuePage: React.FC = () => {
               }}
             >
               Thử lại
-            </button>
-            <button 
-              onClick={() => setUseMock(true)} 
-              style={{
-                padding: '8px 16px',
-                background: 'white',
-                border: '1px solid #D1D5DB',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                color: '#374151',
-                fontWeight: 500
-              }}
-            >
-              Xem Demo Mock
             </button>
           </div>
         </div>
@@ -591,7 +571,7 @@ const PresentationQueuePage: React.FC = () => {
                   // Row wrapper with bottom border separation
                   return (
                     <div 
-                      key={team.team_id}
+                      key={`${team.submission_id ?? team.team_id}-${team.order}`}
                       style={{
                         borderBottom: idx < selectedGroup.teams.length - 1 ? '1px solid #F3F4F6' : 'none'
                       }}
@@ -629,7 +609,7 @@ const PresentationQueuePage: React.FC = () => {
                               {team.team_name}
                             </div>
                             <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px', display: 'flex', gap: '8px' }}>
-                              <span>ID: {team.team_id}</span>
+                              <span>Mã bài: {team.display_code || (team.submission_id ? `#${team.submission_id}` : 'N/A')}</span>
                               {team.slot_start_at && (
                                 <span style={{ color: '#4B5563', fontWeight: 500 }}>
                                   ⏱ {formatTimeRange(team.slot_start_at, team.slot_end_at)}
@@ -686,7 +666,7 @@ const PresentationQueuePage: React.FC = () => {
                               {team.team_name}
                             </div>
                             <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px', display: 'flex', gap: '8px' }}>
-                              <span>ID: {team.team_id}</span>
+                              <span>Mã bài: {team.display_code || (team.submission_id ? `#${team.submission_id}` : 'N/A')}</span>
                               {team.slot_start_at && (
                                 <span style={{ color: '#9CA3AF' }}>
                                   ⏱ {formatTimeRange(team.slot_start_at, team.slot_end_at)}
@@ -733,7 +713,7 @@ const PresentationQueuePage: React.FC = () => {
                               {team.team_name}
                             </div>
                             <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px', display: 'flex', gap: '8px' }}>
-                              <span>ID: {team.team_id}</span>
+                              <span>Mã bài: {team.display_code || (team.submission_id ? `#${team.submission_id}` : 'N/A')}</span>
                               {team.slot_start_at && (
                                 <span style={{ color: '#9CA3AF' }}>
                                   ⏱ {formatTimeRange(team.slot_start_at, team.slot_end_at)}
@@ -779,7 +759,7 @@ const PresentationQueuePage: React.FC = () => {
                               {team.team_name}
                             </div>
                             <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px', display: 'flex', gap: '8px' }}>
-                              <span>ID: {team.team_id}</span>
+                              <span>Mã bài: {team.display_code || (team.submission_id ? `#${team.submission_id}` : 'N/A')}</span>
                               {team.slot_start_at && (
                                 <span style={{ color: '#4B5563' }}>
                                   ⏱ {formatTimeRange(team.slot_start_at, team.slot_end_at)}
@@ -934,7 +914,7 @@ const PresentationQueuePage: React.FC = () => {
                     marginBottom: '4px',
                     textTransform: 'uppercase'
                   }}>
-                    MÃ NHÓM
+                    MÃ BÀI
                   </div>
                   <div style={{
                     fontSize: '18px',
@@ -944,9 +924,11 @@ const PresentationQueuePage: React.FC = () => {
                     overflow: 'hidden',
                     textOverflow: 'ellipsis'
                   }}>
-                    {currentTeam 
-                      ? `ID: ${currentTeam.team_id}` 
-                      : (firstUpcomingTeam ? `ID: ${firstUpcomingTeam.team_id}` : 'N/A')}
+                    {currentTeam
+                      ? currentTeam.display_code || (currentTeam.submission_id ? `#${currentTeam.submission_id}` : 'N/A')
+                      : firstUpcomingTeam
+                        ? firstUpcomingTeam.display_code || (firstUpcomingTeam.submission_id ? `#${firstUpcomingTeam.submission_id}` : 'N/A')
+                        : 'N/A'}
                   </div>
                 </div>
               </div>

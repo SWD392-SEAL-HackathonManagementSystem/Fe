@@ -71,8 +71,8 @@ export const mapStudentTeam = (team) => {
   return {
     key: teamId,
     id: teamId,
-    hackathonId: team.hackathonId,
-    hackathonName: team.hackathonName || 'Hackathon',
+    hackathonId: team.hackathonId ?? team.hackathon?.id ?? null,
+    hackathonName: team.hackathonName || team.hackathon?.name || 'Hackathon',
     teamName: team.teamName || 'N/A',
     trackId: team.trackId ?? null,
     trackName: team.trackName ?? null,

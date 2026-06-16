@@ -68,6 +68,7 @@ export const useRoundResults = (roundId) => {
 
   const buildAdvancePayload = useCallback(() => {
     const topN = Number(ranking.topNAdvance || round?.top_n_advance || 0);
+    const minTeamsFinal = Number(round?.min_teams_final || round?.minTeamsFinal || 0);
     const byGroup = {};
 
     ranking.items.forEach((item) => {
@@ -82,12 +83,35 @@ export const useRoundResults = (roundId) => {
       advancedTeamIds.push(...sorted.slice(0, topN || sorted.length).map((team) => team.teamId));
     });
 
+    // Merge wildcard approved teams (BE: coordinatorApproved/approved = true)
+    const wildcardApprovedTeamIds = wildcard.items
+      .filter((item) => item?.coordinatorApproved === true)
+      .map((item) => item.teamId)
+      .filter(Boolean);
+
+    const mergedAdvanced = [...advancedTeamIds];
+    wildcardApprovedTeamIds.forEach((teamId) => {
+      if (!mergedAdvanced.includes(teamId)) mergedAdvanced.push(teamId);
+    });
+
     const allTeamIds = ranking.items.map((item) => item.teamId);
-    const advancedSet = new Set(advancedTeamIds);
+    const advancedSet = new Set(mergedAdvanced);
     const eliminatedTeamIds = allTeamIds.filter((teamId) => !advancedSet.has(teamId));
 
-    return { advancedTeamIds, eliminatedTeamIds, note: "" };
-  }, [ranking.items, ranking.topNAdvance, round?.top_n_advance]);
+    // Soft guard to satisfy FINAL min team gate from BE.
+    if (minTeamsFinal > 0 && mergedAdvanced.length < minTeamsFinal) {
+      const fillCandidates = ranking.items
+        .map((item) => item.teamId)
+        .filter((teamId) => !advancedSet.has(teamId));
+      const needed = minTeamsFinal - mergedAdvanced.length;
+      fillCandidates.slice(0, needed).forEach((teamId) => {
+        mergedAdvanced.push(teamId);
+        advancedSet.add(teamId);
+      });
+    }
+
+    return { advancedTeamIds: mergedAdvanced, eliminatedTeamIds: allTeamIds.filter((teamId) => !advancedSet.has(teamId)), note: "" };
+  }, [ranking.items, ranking.topNAdvance, round?.top_n_advance, round?.min_teams_final, round?.minTeamsFinal, wildcard.items]);
 
   const scoringLocked = Boolean(round?.scoring_locked ?? round?.scoringLocked);
   const isPublished = Boolean(round?.is_published ?? ranking.isPublished);

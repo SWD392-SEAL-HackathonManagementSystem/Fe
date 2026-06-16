@@ -33,9 +33,10 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
   const [scoringLocked, setScoringLocked] = useState(false);
 
   const scoreType = isCalibration ? 'CALIBRATION' : 'NORMAL';
+  const skipPresentationQueue = isFinal && !isCalibration;
 
   const refreshPresentationQueue = useCallback(async () => {
-    if (!roundId) {
+    if (!roundId || skipPresentationQueue) {
       return null;
     }
 
@@ -52,7 +53,7 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
       console.warn('Không tải được hàng đợi thuyết trình:', error);
       return null;
     }
-  }, [roundId, trackId]);
+  }, [roundId, trackId, skipPresentationQueue]);
 
   useEffect(() => {
     if (!roundId) {
@@ -125,20 +126,26 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
       } else {
         setTeams(mappedTeams);
 
-        const queueResult = await refreshPresentationQueue();
-        const presenting = queueResult?.item;
+        if (skipPresentationQueue) {
+          if (mappedTeams.length > 0) {
+            setSelectedTeam(mappedTeams[0]);
+          }
+        } else {
+          const queueResult = await refreshPresentationQueue();
+          const presenting = queueResult?.item;
 
-        if (presenting) {
-          const activeTeam = mappedTeams.find(
-            (team) => team.submissionId === presenting.submissionId
-          );
-          if (activeTeam) {
-            setSelectedTeam(activeTeam);
+          if (presenting) {
+            const activeTeam = mappedTeams.find(
+              (team) => team.submissionId === presenting.submissionId
+            );
+            if (activeTeam) {
+              setSelectedTeam(activeTeam);
+            } else if (mappedTeams.length > 0) {
+              setSelectedTeam(mappedTeams[0]);
+            }
           } else if (mappedTeams.length > 0) {
             setSelectedTeam(mappedTeams[0]);
           }
-        } else if (mappedTeams.length > 0) {
-          setSelectedTeam(mappedTeams[0]);
         }
       }
 
@@ -175,14 +182,14 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
     } finally {
       setIsLoading(false);
     }
-  }, [assignmentId, roundId, trackId, isFinal, isCalibration, sampleSubmissionId, refreshPresentationQueue]);
+  }, [assignmentId, roundId, trackId, isFinal, isCalibration, sampleSubmissionId, skipPresentationQueue, refreshPresentationQueue]);
 
   useEffect(() => {
     fetchScoringData();
   }, [fetchScoringData]);
 
   useEffect(() => {
-    if (!roundId || isLoading) {
+    if (!roundId || isLoading || skipPresentationQueue) {
       return undefined;
     }
 
@@ -191,13 +198,16 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [roundId, isLoading, refreshPresentationQueue]);
+  }, [roundId, isLoading, skipPresentationQueue, refreshPresentationQueue]);
 
   const timerPhase = presentingItem?.timer?.phase || 'IDLE';
   const timerRemainingSeconds = presentingItem?.timer?.remainingSeconds ?? 0;
 
   const scoringBlockReason = useMemo(() => {
-    if (isCalibration) {
+    if (isCalibration || skipPresentationQueue) {
+      if (scoringLocked) {
+        return 'Vòng đã khóa chấm điểm (SCORING_LOCKED) — chỉ xem điểm.';
+      }
       return null;
     }
 
@@ -234,7 +244,7 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
     }
 
     return null;
-  }, [isCalibration, scoringLocked, roundId, trackQueue, presentingItem, timerPhase, selectedTeam]);
+  }, [isCalibration, skipPresentationQueue, scoringLocked, roundId, trackQueue, presentingItem, timerPhase, selectedTeam]);
 
   const canScore = !scoringLocked && !scoringBlockReason;
 
@@ -346,7 +356,10 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
 
     if (!canScore) {
       return message.warning(
-        scoringBlockReason || 'Chưa thể chấm điểm — kiểm tra hàng đợi và timer thuyết trình.'
+        scoringBlockReason ||
+          (skipPresentationQueue
+            ? 'Chưa thể chấm điểm — kiểm tra trạng thái vòng Chung kết.'
+            : 'Chưa thể chấm điểm — kiểm tra hàng đợi và timer thuyết trình.')
       );
     }
 
@@ -354,6 +367,14 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
 
     if (missingCriteria) {
       return message.warning('Vui lòng chấm tất cả các tiêu chí trước khi chốt.');
+    }
+
+    const invalidScore = criteria.find((c) => {
+      const val = Number(currentScores[c.id]);
+      return Number.isNaN(val) || val < 0 || val >= 10;
+    });
+    if (invalidScore) {
+      return message.warning('Điểm mỗi tiêu chí phải trong khoảng từ 0 đến nhỏ hơn 10.');
     }
 
     setIsSubmitting(true);

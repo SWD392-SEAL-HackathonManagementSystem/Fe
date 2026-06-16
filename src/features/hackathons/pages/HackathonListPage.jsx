@@ -14,7 +14,7 @@ import {
   Select,
   Spin,
 } from "antd";
-import { Plus, Edit, Trash2, Settings, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Settings, Search, Trophy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../../../shared/components/ui/PageHeader";
 import StatusBadge from "../../../shared/components/ui/StatusBadge";
@@ -121,6 +121,7 @@ const HackathonListPage = () => {
               <Option value="DRAFT">Nháp</Option>
               <Option value="PUBLISHED">Đã công bố</Option>
               <Option value="ONGOING">Đang diễn ra</Option>
+              <Option value="PENDING_CONFIRM">Chờ chốt sổ</Option>
               <Option value="FINISHED">Đã hoàn thành</Option>
             </Select>
           </Col>
@@ -229,6 +230,16 @@ const HackathonListPage = () => {
                       }
                     >
                      Xem chi tiết
+                    </Button>
+                  ),
+                  (hackathon.status === "PENDING_CONFIRM" || hackathon.status === "FINISHED") && (
+                    <Button
+                      type="text"
+                      icon={<Trophy size={16} />}
+                      key="results"
+                      onClick={() => navigate(`/hackathons/${hackathon.id}/results`)}
+                    >
+                      Kết quả
                     </Button>
                   ),
                 ].filter(Boolean)}

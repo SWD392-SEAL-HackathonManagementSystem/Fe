@@ -278,6 +278,38 @@ const RoundFormModal = ({
                 { required: true, message: 'Vui lòng chọn ngày giờ thi' },
                 ({ getFieldValue }) => ({
                   validator(_, value) {
+                    if (!isFinal || !value || !prelimRoundForSchedule) {
+                      return Promise.resolve();
+                    }
+                    const prelimExam = prelimRoundForSchedule.exam_at
+                      ? dayjs(prelimRoundForSchedule.exam_at)
+                      : null;
+                    if (!prelimExam) {
+                      return Promise.resolve();
+                    }
+                    const prelimEnd = prelimExam.add(
+                      Math.max(prelimRoundForSchedule.coding_duration_hours || 0, 0),
+                      'hour'
+                    );
+                    const minFinal = prelimEnd.add(1, 'hour');
+                    const maxFinal = prelimEnd.add(2, 'hour');
+                    if (
+                      dayjs(value).isBefore(minFinal) ||
+                      dayjs(value).isAfter(maxFinal)
+                    ) {
+                      return Promise.reject(
+                        new Error(
+                          `Chung kết phải cách Sơ loại 1-2 giờ (${minFinal.format(
+                            'DD/MM HH:mm'
+                          )} - ${maxFinal.format('DD/MM HH:mm')})`
+                        )
+                      );
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
                     const open = getFieldValue('submission_open');
                     if (!value || !open || dayjs(value).isBefore(dayjs(open))) {
                       return Promise.resolve();

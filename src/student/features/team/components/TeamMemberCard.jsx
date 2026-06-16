@@ -2,7 +2,7 @@
  * Component: TeamMemberCard
  * Chức năng: Card hiển thị thông tin của một thành viên trong đội (Avatar, Vai trò, Trạng thái) và các nút hành động (Xóa, Hủy mời).
  */
-import { Button, Space, Tag, Typography, theme, Avatar, Tooltip } from 'antd';
+import { Button, Space, Tag, Typography, theme, Avatar } from 'antd';
 import { DeleteOutlined, CrownOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -14,7 +14,7 @@ const getInitials = (name) => {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
-const TeamMemberCard = ({ member, teamId, canCancelInvite, loading, onCancelInvite }) => {
+const TeamMemberCard = ({ member, teamId, canCancelInvite, canKickMember, loading, onCancelInvite, onKickMember }) => {
   const { token } = theme.useToken();
   const isLeader = member.role === 'LEADER';
   const isPending = member.status === 'PENDING';
@@ -110,6 +110,23 @@ const TeamMemberCard = ({ member, teamId, canCancelInvite, loading, onCancelInvi
             style={{ width: '100%', borderRadius: 6, fontWeight: 600 }}
           >
             Hủy lời mời
+          </Button>
+        </div>
+      )}
+
+      {!isPending && canKickMember && (
+        <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px dashed ${token.colorBorder}` }}>
+          <Button
+            danger
+            type="primary"
+            ghost
+            size="small"
+            icon={<DeleteOutlined />}
+            loading={loading}
+            onClick={() => onKickMember(teamId, member.userId)}
+            style={{ width: '100%', borderRadius: 6, fontWeight: 600 }}
+          >
+            Mời rời đội
           </Button>
         </div>
       )}

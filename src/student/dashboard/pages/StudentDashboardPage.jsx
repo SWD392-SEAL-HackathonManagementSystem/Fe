@@ -261,7 +261,7 @@ const StudentDashboardPage = () => {
         >
           <FinalSubmissionPanel
             teamId={selectedTeam.id}
-            hackathonId={activeHackathon?.id}
+            hackathonId={activeHackathon?.id || selectedTeam.hackathonId}
           />
         </motion.div>
       )}

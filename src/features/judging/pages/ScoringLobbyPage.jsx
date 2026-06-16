@@ -147,9 +147,10 @@ const ScoringLobbyPage = () => {
                       navigate(`/judging/${item.id}/scoring`, { 
                         state: { 
                           roundId: item.roundId, 
-                          trackId: item.trackId, 
+                          trackId: item.isFinal ? null : item.trackId, 
                           isFinal: item.isFinal,
-                          isReadOnly: isCompleted // Truyền cờ Khóa form (Read-Only) sang trang trong
+                          isReadOnly: isCompleted,
+                          assignmentType: item.assignmentType || item.role,
                         } 
                       });
                     }

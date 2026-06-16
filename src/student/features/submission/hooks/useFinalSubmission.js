@@ -4,54 +4,144 @@ import dayjs from 'dayjs';
 import axiosClient from '../../../../shared/api/axiosClient';
 import { studentSubmissionService } from '../services/studentSubmission.service';
 
+const parseList = (res) => (Array.isArray(res) ? res : res?.items || res?.data || []);
+
+const isAdvancedParticipation = (status) => {
+  const normalized = String(status || '').toUpperCase();
+  return normalized === 'ADVANCED';
+};
+
+const isEliminatedParticipation = (status) => {
+  const normalized = String(status || '').toUpperCase();
+  return normalized === 'ELIMINATED';
+};
+
+const checkTeamAdvancedToFinal = async (hackathonId, teamId, teamData) => {
+  try {
+    const teamsRes = await axiosClient.get('/api/v1/me/teams');
+    const teams = parseList(teamsRes);
+    const myTeam = teams.find((item) => Number(item.teamId ?? item.id) === Number(teamId));
+    if (myTeam) {
+      const status = myTeam.lotteryStatus ?? myTeam.lottery_status ?? myTeam.participationStatus;
+      if (isEliminatedParticipation(status)) {
+        return false;
+      }
+      if (isAdvancedParticipation(status)) {
+        return true;
+      }
+    }
+  } catch {
+    // fallback below
+  }
+
+  try {
+    const rankingsRes = await axiosClient.get(`/api/v1/me/hackathons/${hackathonId}/rankings`);
+    const rankings = parseList(rankingsRes);
+    const myEntry = rankings.find(
+      (item) => Number(item.teamId ?? item.team_id) === Number(teamId)
+    );
+    if (myEntry) {
+      const advancedFlag =
+        myEntry.isAdvanced ??
+        myEntry.is_advanced ??
+        (myEntry.qualificationStatus === 'ADVANCED' ||
+          myEntry.participationStatus === 'ADVANCED' ||
+          myEntry.participation_status === 'ADVANCED');
+      return Boolean(advancedFlag);
+    }
+  } catch {
+    // rankings only available when hackathon FINISHED/PENDING_CONFIRM
+  }
+
+  const teamStatus = String(teamData?.status || '').toUpperCase();
+  if (teamStatus === 'ELIMINATED') {
+    return false;
+  }
+
+  return false;
+};
+
 export const useFinalSubmission = (teamId, hackathonId) => {
   const [finalRound, setFinalRound] = useState(null);
   const [existingSubmission, setExistingSubmission] = useState(null);
   const [isEligible, setIsEligible] = useState(false);
+  const [isFinalRoundActive, setIsFinalRoundActive] = useState(false);
+  const [isAdvanced, setIsAdvanced] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [timeLeft, setTimeLeft] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. LẤY THÔNG TIN VÒNG CHUNG KẾT & TRẠNG THÁI NỘP BÀI TỪ BACKEND
   const fetchSubmissionData = useCallback(async () => {
     if (!teamId || !hackathonId) return;
     setIsLoading(true);
     try {
-      // 1.1 Lấy danh sách vòng thi, tìm vòng Chung kết (is_final = true)
-      const roundsRes = await axiosClient.get(`/api/v1/hackathons/${hackathonId}/rounds`);
-      const rounds = Array.isArray(roundsRes) ? roundsRes : roundsRes?.items || roundsRes?.data || [];
-      const finalRnd = rounds.find(r => r.is_final || r.isFinal || r.roundType === 'FINAL');
-      
-      setFinalRound(finalRnd);
+      let finalRnd = null;
+
+      try {
+        const roundsRes = await axiosClient.get(`/api/v1/hackathons/${hackathonId}/rounds`);
+        const rounds = parseList(roundsRes);
+        finalRnd = rounds.find((r) => r.is_final || r.isFinal || r.roundType === 'FINAL');
+      } catch {
+        // Student không có quyền coordinator rounds list — fallback GĐ5 endpoint
+      }
 
       if (!finalRnd) {
-         setIsEligible(false);
-         return;
+        try {
+          const studentFinal = await axiosClient.get(
+            `/api/v1/me/hackathons/${hackathonId}/final-round`
+          );
+          const data = studentFinal?.data || studentFinal;
+          if (data?.roundId) {
+            finalRnd = {
+              id: data.roundId,
+              name: data.name,
+              is_active: data.isActive,
+              isActive: data.isActive,
+              scoring_locked: data.scoringLocked,
+              scoringLocked: data.scoringLocked,
+              submission_deadline: data.submissionDeadline,
+              submissionDeadline: data.submissionDeadline,
+            };
+          }
+        } catch {
+          // not advanced or no final round yet
+        }
       }
 
-      // 1.2 Lấy chi tiết Team để xem trạng thái (ACTIVE = Được đi tiếp, ELIMINATED = Bị loại)
+      setFinalRound(finalRnd || null);
+      setExistingSubmission(null);
+
+      if (!finalRnd) {
+        setIsEligible(false);
+        setIsFinalRoundActive(false);
+        setIsAdvanced(false);
+        return;
+      }
+
+      const finalActive = Boolean(finalRnd.is_active || finalRnd.isActive);
+      setIsFinalRoundActive(finalActive);
+
       const teamDetail = await axiosClient.get(`/api/v1/teams/${teamId}`);
       const teamData = teamDetail?.data || teamDetail;
-      
-      if (teamData?.status === 'ACTIVE') {
-         setIsEligible(true);
-      } else {
-         setIsEligible(false); // Nếu là ELIMINATED, không đủ điều kiện nộp bài
-      }
 
-      // 1.3 Lấy lịch sử nộp bài (FR-U-20)
-      const teamSubmissions = await axiosClient.get(`/api/v1/me/teams/${teamId}/submissions`).catch(() => []);
-      const subs = Array.isArray(teamSubmissions) ? teamSubmissions : teamSubmissions?.items || teamSubmissions?.data || [];
-      
-      // Tìm bài nộp thuộc về vòng Chung kết
-      const finalSub = subs.find(s => s.roundId === finalRnd.id || s.round_id === finalRnd.id);
+      const advanced = await checkTeamAdvancedToFinal(hackathonId, teamId, teamData);
+      setIsAdvanced(advanced);
+      setIsEligible(finalActive && advanced);
+
+      const teamSubmissions = await axiosClient
+        .get(`/api/v1/me/teams/${teamId}/submissions`)
+        .catch(() => []);
+      const subs = parseList(teamSubmissions);
+      const finalSub = subs.find(
+        (s) => Number(s.roundId ?? s.round_id) === Number(finalRnd.id)
+      );
       if (finalSub) {
-         setExistingSubmission(finalSub);
+        setExistingSubmission(finalSub);
       }
-
     } catch (error) {
-      console.error("Lỗi fetch submission data:", error);
+      console.error('Lỗi fetch submission data:', error);
+      setIsEligible(false);
     } finally {
       setIsLoading(false);
     }
@@ -61,13 +151,12 @@ export const useFinalSubmission = (teamId, hackathonId) => {
     fetchSubmissionData();
   }, [fetchSubmissionData]);
 
-  // 2. TÍNH TOÁN ĐẾM NGƯỢC THỜI GIAN THEO DEADLINE CHUNG KẾT
   const calculateDeadline = useCallback(() => {
     if (!finalRound?.submissionDeadline && !finalRound?.submission_deadline) return;
-    
+
     const deadline = dayjs(finalRound.submissionDeadline || finalRound.submission_deadline);
     const now = dayjs();
-    
+
     if (now.isAfter(deadline)) {
       setIsLocked(true);
       setTimeLeft('ĐÃ HẾT HẠN');
@@ -89,8 +178,17 @@ export const useFinalSubmission = (teamId, hackathonId) => {
     return () => clearInterval(timer);
   }, [calculateDeadline]);
 
-  // 3. API NỘP BÀI CHUNG KẾT
   const submitFinalWork = async (payload) => {
+    if (!isFinalRoundActive) {
+      message.error('Vòng Chung kết chưa mở hoặc đã kết thúc!');
+      return false;
+    }
+
+    if (!isAdvanced) {
+      message.error('Đội của bạn chưa đủ điều kiện tham gia Vòng Chung kết.');
+      return false;
+    }
+
     if (isLocked) {
       message.error('Đã hết hạn nộp bài! Hệ thống tự động từ chối (REJECTED).');
       return false;
@@ -100,7 +198,7 @@ export const useFinalSubmission = (teamId, hackathonId) => {
       message.error('Vui lòng tải lên file slide PDF.');
       return false;
     }
-    
+
     setIsSubmitting(true);
     try {
       await studentSubmissionService.submitMultipart({
@@ -115,11 +213,15 @@ export const useFinalSubmission = (teamId, hackathonId) => {
       await fetchSubmissionData();
       return true;
     } catch (error) {
-      const code = error?.code || error?.response?.data?.error?.code;
+      const code = error?.code || error?.response?.data?.error?.code || error?.response?.data?.code;
       if (code === 'ROUND_NOT_ACTIVE') {
-         message.error("Vòng Chung kết chưa mở hoặc đã kết thúc!");
+        message.error('Vòng Chung kết chưa mở hoặc đã kết thúc!');
+      } else if (code === 'TEAM_NOT_IN_ROUND') {
+        message.error('Đội của bạn chưa được xác nhận tham gia Vòng Chung kết.');
       } else {
-         message.error(error?.response?.data?.message || error?.message || 'Lỗi khi nộp bài. Vui lòng thử lại!');
+        message.error(
+          error?.response?.data?.message || error?.message || 'Lỗi khi nộp bài. Vui lòng thử lại!'
+        );
       }
       return false;
     } finally {
@@ -131,10 +233,12 @@ export const useFinalSubmission = (teamId, hackathonId) => {
     finalRound,
     existingSubmission,
     isEligible,
+    isFinalRoundActive,
+    isAdvanced,
     isLocked,
     timeLeft,
     isSubmitting,
     isLoading,
-    submitFinalWork
+    submitFinalWork,
   };
 };

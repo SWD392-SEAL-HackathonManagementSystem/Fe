@@ -2,7 +2,7 @@
  * Page: StudentTeamPage
  * Chức năng: Trang gốc điều phối luồng dữ liệu (Container) cho toàn bộ không gian Quản lý đội thi. Quyết định hiển thị Onboarding hay Dashboard.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Card, Drawer, Grid, Skeleton, Space, Typography, theme } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -95,14 +95,22 @@ const StudentTeamWorkspace = () => {
     refreshSelectedTeam,
   } = useStudentTeam();
 
+  useEffect(() => {
+    if (teams.length === 1 && teams[0]?.id) {
+      setForceShowMenu(false);
+    }
+  }, [teams]);
+
   const {
     isActionLoading,
     createTeam,
     inviteMember,
     cancelPendingInvite,
     leaveTeam,
+    kickMember,
     transferLeader,
     disbandTeam,
+    confirmTeamFormation,
   } = useTeamActions({
     teams,
     fetchTeams,
@@ -207,12 +215,15 @@ const StudentTeamWorkspace = () => {
         ) : (
           <StudentTeamDashboard 
             selectedTeam={selectedTeam}
+            hackathonId={hackathonId}
             isActionLoading={isActionLoading}
             inviteMember={inviteMember}
             cancelPendingInvite={cancelPendingInvite}
             leaveTeam={leaveTeam}
+            kickMember={kickMember}
             transferLeader={transferLeader}
             disbandTeam={disbandTeam}
+            confirmTeamFormation={confirmTeamFormation}
             fetchInvitations={fetchInvitations}
           />
         )}

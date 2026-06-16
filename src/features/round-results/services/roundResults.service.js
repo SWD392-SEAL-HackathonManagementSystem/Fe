@@ -23,7 +23,7 @@ export const roundResultsService = {
 
   decideWildcardReview: (reviewId, { approved, note }) =>
     axiosClient.patch(`/api/v1/wildcard-reviews/${reviewId}`, {
-      coordinatorApproved: approved,
+      approved,
       coordinatorNote: note,
     }),
 

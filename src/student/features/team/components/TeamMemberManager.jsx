@@ -14,7 +14,7 @@ import TransferLeaderForm from './TransferLeaderForm';
 
 const { Text, Title } = Typography;
 
-const TeamMemberManager = ({ team, onInviteMember, onCancelInvite, onLeaveTeam, onTransferLeader, onDisbandTeam, loading }) => {
+const TeamMemberManager = ({ team, onInviteMember, onCancelInvite, onLeaveTeam, onKickMember, onTransferLeader, onDisbandTeam, loading }) => {
   const [inviteForm] = Form.useForm();
   const [transferForm] = Form.useForm();
   const [memberFilter, setMemberFilter] = useState(MEMBER_STATUS.ACCEPTED);
@@ -121,8 +121,10 @@ const TeamMemberManager = ({ team, onInviteMember, onCancelInvite, onLeaveTeam, 
                 member={member}
                 teamId={team.id}
                 canCancelInvite={team.isCurrentUserLeader}
+                canKickMember={team.isCurrentUserLeader && member.status === 'ACCEPTED' && member.roleInTeam !== 'LEADER' && !team.isLocked}
                 loading={loading}
                 onCancelInvite={onCancelInvite}
+                onKickMember={onKickMember}
               />
             </motion.div>
           ))}

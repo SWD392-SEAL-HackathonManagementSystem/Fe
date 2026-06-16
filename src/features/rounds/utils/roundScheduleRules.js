@@ -118,7 +118,12 @@ export const isRoundDateDisabled = (current, ctx) => {
 
   if (ctx.isFinal && ctx.prelimRound?.exam_at) {
     const prelimEnd = getPreliminaryEndMoment(ctx.prelimRound);
-    if (prelimEnd && current.isBefore(prelimEnd.startOf('day'), 'day')) return true;
+    if (prelimEnd) {
+      const minFinalStart = prelimEnd.add(1, 'hour');
+      const maxFinalStart = prelimEnd.add(2, 'hour');
+      if (current.isBefore(minFinalStart.startOf('day'), 'day')) return true;
+      if (current.isAfter(maxFinalStart.endOf('day'), 'day')) return true;
+    }
   }
 
   if (!ctx.isFinal && ctx.finalRound?.exam_at) {
@@ -144,10 +149,15 @@ export const getRoundExamDisabledTime = (current, ctx) => {
   if (ctx.isFinal && ctx.prelimRound) {
     const prelimEnd = getPreliminaryEndMoment(ctx.prelimRound);
     if (prelimEnd) {
-      if (current.isSame(prelimEnd, 'day')) {
-        if (!minMoment || prelimEnd.isAfter(minMoment)) {
-          minMoment = prelimEnd;
+      const minFinalStart = prelimEnd.add(1, 'hour');
+      const maxFinalStart = prelimEnd.add(2, 'hour');
+      if (current.isSame(minFinalStart, 'day')) {
+        if (!minMoment || minFinalStart.isAfter(minMoment)) {
+          minMoment = minFinalStart;
         }
+      }
+      if (current.isSame(maxFinalStart, 'day')) {
+        maxMoment = maxFinalStart;
       }
     } else if (ctx.prelimRound.exam_at) {
       const prelimExam = dayjs(ctx.prelimRound.exam_at);
@@ -226,7 +236,11 @@ export const getRoundScheduleHint = (ctx) => {
   if (ctx.isFinal) {
     const prelimEnd = ctx.prelimRound ? getPreliminaryEndMoment(ctx.prelimRound) : null;
     if (prelimEnd) {
-      return `Vòng Chung kết phải bắt đầu từ ${prelimEnd.format('DD/MM/YYYY HH:mm')} trở đi (sau khi Sơ loại kết thúc). Cùng ngày thì chỉ chọn giờ sau mốc này.`;
+      return `Vòng Chung kết phải bắt đầu trong khoảng ${prelimEnd
+        .add(1, 'hour')
+        .format('DD/MM/YYYY HH:mm')} đến ${prelimEnd
+        .add(2, 'hour')
+        .format('DD/MM/YYYY HH:mm')} (cách Sơ loại 1-2 giờ).`;
     }
     if (ctx.prelimRound?.exam_at) {
       return `Vòng Chung kết phải diễn ra sau ngày giờ thi Sơ loại (${dayjs(ctx.prelimRound.exam_at).format('DD/MM/YYYY HH:mm')}).`;

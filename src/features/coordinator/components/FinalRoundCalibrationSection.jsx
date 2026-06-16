@@ -6,14 +6,17 @@ import toast from 'react-hot-toast';
 
 const { Title, Text } = Typography;
 
-const FinalRoundCalibrationSection = () => {
+const parseList = (res) => (Array.isArray(res) ? res : res?.items || res?.data || []);
+
+const FinalRoundCalibrationSection = ({ hackathonId: hackathonIdProp }) => {
   const [finalRound, setFinalRound] = useState(null);
   const [sessions, setSessions] = useState([]);
+  const [sampleSubmissions, setSampleSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
 
-  const hackathonId = JSON.parse(localStorage.getItem('userInfo') || '{}')?.hackathonId;
+  const hackathonId = hackathonIdProp || JSON.parse(localStorage.getItem('userInfo') || '{}')?.hackathonId;
 
   const loadData = async () => {
     if (!hackathonId) {
@@ -23,19 +26,26 @@ const FinalRoundCalibrationSection = () => {
     setLoading(true);
     try {
       const roundsRes = await axiosClient.get(`/api/v1/hackathons/${hackathonId}/rounds`);
-      const rounds = Array.isArray(roundsRes) ? roundsRes : roundsRes?.items || roundsRes?.data || [];
+      const rounds = parseList(roundsRes);
       const finalRnd = rounds.find((r) => r.is_final || r.isFinal);
       setFinalRound(finalRnd || null);
 
       if (finalRnd?.id && (finalRnd.is_active || finalRnd.isActive)) {
-        const data = await calibrationService.listByRound(finalRnd.id);
-        const items = Array.isArray(data) ? data : data?.items || data?.data || [];
-        setSessions(items);
+        const [sessionData, submissionRes] = await Promise.all([
+          calibrationService.listByRound(finalRnd.id),
+          axiosClient
+            .get('/api/v1/submissions', { params: { roundId: finalRnd.id } })
+            .catch(() => []),
+        ]);
+        setSessions(parseList(sessionData));
+        setSampleSubmissions(parseList(submissionRes));
       } else {
         setSessions([]);
+        setSampleSubmissions([]);
       }
     } catch {
       setSessions([]);
+      setSampleSubmissions([]);
     } finally {
       setLoading(false);
     }
@@ -113,18 +123,40 @@ const FinalRoundCalibrationSection = () => {
       <Form form={form} layout="vertical" onFinish={handleCreate}>
         <Form.Item
           name="sampleSubmissionId"
-          label="Sample submission ID"
-          rules={[{ required: true, message: 'Nhập submission mẫu' }]}
+          label="Bài nộp mẫu (từ vòng Chung kết)"
+          rules={[{ required: true, message: 'Chọn bài nộp mẫu' }]}
         >
-          <InputNumber style={{ width: '100%' }} min={1} />
+          <Select
+            placeholder="Chọn submission đã nộp ở CK"
+            showSearch
+            optionFilterProp="label"
+            notFoundContent={
+              sampleSubmissions.length === 0
+                ? 'Chưa có bài nộp CK — student cần nộp trước.'
+                : undefined
+            }
+            options={sampleSubmissions.map((sub) => {
+              const id = sub.id ?? sub.submissionId;
+              const teamName = sub.teamName || sub.team_name || sub.displayCode || `Team #${sub.teamId}`;
+              return {
+                value: id,
+                label: `#${id} — ${teamName}`,
+              };
+            })}
+          />
         </Form.Item>
         <Form.Item name="targetScore" label="Target score" rules={[{ required: true }]}>
           <InputNumber style={{ width: '100%' }} min={0} max={10} step={0.1} />
         </Form.Item>
         <Form.Item name="instructions" label="Hướng dẫn">
-          <Input.TextArea rows={3} />
+          <Input.TextArea rows={3} placeholder="Chấm thử bài mẫu trước khi chấm chính thức" />
         </Form.Item>
-        <Button type="primary" htmlType="submit" loading={submitting}>
+        <Button
+          type="primary"
+          htmlType="submit"
+          loading={submitting}
+          disabled={sampleSubmissions.length === 0}
+        >
           Tạo phiên calibration
         </Button>
       </Form>

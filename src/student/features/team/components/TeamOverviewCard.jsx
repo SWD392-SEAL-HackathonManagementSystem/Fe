@@ -2,13 +2,13 @@
  * Component: TeamOverviewCard
  * Chức năng: Card hiển thị các thông tin tóm tắt chung về đội thi hiện tại (Tên đội, Thời gian tạo, Trạng thái).
  */
-import { Card, Progress, Space, Tag, Typography, theme, Avatar, Divider } from 'antd';
+import { Button, Card, Progress, Space, Tag, Typography, theme, Avatar, Divider } from 'antd';
 import { LockOutlined, UnlockOutlined, TrophyOutlined, TeamOutlined, MailOutlined } from '@ant-design/icons';
 import { TEAM_MEMBER_LIMITS } from '../constants/studentTeam.constants';
 
 const { Text, Title } = Typography;
 
-const TeamOverviewCard = ({ team }) => {
+const TeamOverviewCard = ({ team, onConfirmFormation }) => {
   const { token } = theme.useToken();
 
   if (!team) return null;
@@ -17,6 +17,11 @@ const TeamOverviewCard = ({ team }) => {
     100,
     Math.round((team.acceptedMemberCount / TEAM_MEMBER_LIMITS.MAX_ACCEPTED) * 100)
   );
+  const canConfirmFormation =
+    team.isCurrentUserLeader &&
+    !team.isLocked &&
+    team.status === 'PENDING' &&
+    team.acceptedMemberCount >= TEAM_MEMBER_LIMITS.MIN_ACCEPTED;
 
   return (
     <Card
@@ -65,6 +70,13 @@ const TeamOverviewCard = ({ team }) => {
           <Title level={5} style={{ margin: 0 }}>{team.leaderName}</Title>
         </div>
 
+        <div style={{ background: token.colorFillAlter, borderRadius: 16, padding: 20, marginBottom: 24 }}>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>
+            Track tham gia sơ loại
+          </Text>
+          <Title level={5} style={{ margin: 0 }}>{team.trackName || 'Chưa bốc thăm track'}</Title>
+        </div>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
           <div style={{ textAlign: 'center', flex: 1 }}>
             <TeamOutlined style={{ fontSize: 24, color: token.colorPrimary, marginBottom: 8 }} />
@@ -94,6 +106,19 @@ const TeamOverviewCard = ({ team }) => {
             strokeWidth={10}
           />
         </div>
+
+        {team.isCurrentUserLeader && (
+          <div style={{ marginTop: 16 }}>
+            <Button
+              type="primary"
+              block
+              disabled={!canConfirmFormation}
+              onClick={() => onConfirmFormation?.(team.id)}
+            >
+              Xác nhận thành lập đội
+            </Button>
+          </div>
+        )}
 
         {team.rejectionReason && (
           <div style={{ marginTop: 20, padding: 16, borderRadius: 12, color: token.colorError, background: token.colorErrorBg, border: `1px solid ${token.colorErrorBorder}` }}>

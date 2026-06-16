@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Typography, Row, Col, Card, Statistic, Button, Space, Tag, List, Progress, Skeleton, message, Input, Segmented } from 'antd';
 import { 
   CheckCircleOutlined, ClockCircleOutlined, ArrowRightOutlined, 
@@ -21,7 +21,7 @@ const itemVariants = {
 const JudgeDashboard = ({ user }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState({ stats: {}, assignments: [], upcomingEvents: [] });
+  const [data, setData] = useState({ stats: {}, assignments: [], upcomingEvents: [], prelimExternalFiltered: 0 });
   
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
@@ -40,10 +40,21 @@ const JudgeDashboard = ({ user }) => {
         const rawFinals = Array.isArray(finalsRes) ? finalsRes : finalsRes?.items || finalsRes?.data || [];
         const rawSchedule = Array.isArray(scheduleRes) ? scheduleRes : scheduleRes?.items || scheduleRes?.data || [];
 
-        const mappedTracks = rawTracks.map(item => ({
+        const prelimExternalFiltered = rawTracks.filter((item) => {
+          const assignmentType = String(item.assignmentType || item.role || '').toUpperCase();
+          return assignmentType.includes('EXTERNAL');
+        }).length;
+
+        const mappedTracks = rawTracks
+          .filter((item) => {
+            const assignmentType = String(item.assignmentType || item.role || '').toUpperCase();
+            return !assignmentType.includes('EXTERNAL');
+          })
+          .map(item => ({
           id: item.id || item.assignmentId || Math.random(),
           hackathonName: item.hackathonName || item.hackathon_name || 'Hackathon',
           role: item.role || item.assignmentType || 'Giám khảo',
+          assignmentType: item.assignmentType || item.role,
           trackName: item.trackName || item.track_name || 'Bảng Sơ loại',
           roundName: item.roundName || item.round_name || 'Vòng Sơ Loại',
           status: item.status || 'ONGOING',
@@ -59,6 +70,7 @@ const JudgeDashboard = ({ user }) => {
           id: item.id || item.assignmentId || Math.random(),
           hackathonName: item.hackathonName || item.hackathon_name || 'Hackathon',
           role: item.role || item.assignmentType || 'Giám khảo',
+          assignmentType: item.assignmentType || item.role,
           trackName: 'Tất cả các bảng',
           roundName: item.roundName || item.round_name || 'Vòng Chung Kết',
           status: item.status || 'ONGOING',
@@ -86,6 +98,7 @@ const JudgeDashboard = ({ user }) => {
             calibrationScore: 100 
           },
           assignments: allAssignments,
+          prelimExternalFiltered,
           upcomingEvents: mappedEvents.length > 0 ? mappedEvents : [
             { id: 1, title: 'Đang chờ Ban tổ chức lên lịch...', time: '--', type: 'CALIBRATION' }
           ]
@@ -150,6 +163,13 @@ const JudgeDashboard = ({ user }) => {
 
       {/* 2. THẺ THỐNG KÊ */}
       <motion.div variants={itemVariants}>
+        {data.prelimExternalFiltered > 0 && (
+          <Card style={{ borderRadius: 16, marginBottom: 16, border: '1px solid #ffe58f', background: '#fffbe6' }}>
+            <Text>
+              Đã ẩn {data.prelimExternalFiltered} phân công giám khảo external khỏi vòng sơ loại theo rule GĐ3.
+            </Text>
+          </Card>
+        )}
         <Row gutter={[24, 24]} style={{ marginBottom: 32 }}>
           <Col xs={24} sm={8}>
             <Card style={{ borderRadius: 16 }}>
@@ -296,9 +316,10 @@ const JudgeDashboard = ({ user }) => {
                                   navigate(`/judging/${item.id}/scoring`, { 
                                     state: { 
                                       roundId: item.roundId, 
-                                      trackId: item.trackId, 
+                                      trackId: item.isFinal ? null : item.trackId, 
                                       isFinal: item.isFinal,
-                                      isReadOnly: isCompleted
+                                      isReadOnly: isCompleted,
+                                      assignmentType: item.assignmentType,
                                     } 
                                   });
                                 } else {
@@ -332,9 +353,10 @@ const JudgeDashboard = ({ user }) => {
                   navigate(`/judging/${item.id}/scoring`, { 
                     state: { 
                       roundId: item.roundId, 
-                      trackId: item.trackId, 
+                      trackId: item.isFinal ? null : item.trackId, 
                       isFinal: item.isFinal,
-                      isReadOnly: isCompletedCountdown
+                      isReadOnly: isCompletedCountdown,
+                      assignmentType: item.assignmentType,
                     } 
                   });
                 } else {

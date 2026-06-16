@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Row,
   Col,
@@ -72,7 +72,7 @@ const LiveScoringPage = () => {
   const { assignmentId } = useParams();
 
   // BẢN VÁ LỖI: Lấy ID và cờ isReadOnly từ Router State
-  const { roundId, trackId, isFinal, isReadOnly, isCalibration, calibrationSessionId, sampleSubmissionId } =
+  const { roundId, trackId, isFinal, isReadOnly, isCalibration, calibrationSessionId, sampleSubmissionId, assignmentType } =
     location.state || {};
 
   // Custom hook chứa toàn bộ logic API
@@ -114,6 +114,7 @@ const LiveScoringPage = () => {
   const [isSlideModalVisible, setIsSlideModalVisible] = useState(false);
   const [slideBlobUrl, setSlideBlobUrl] = useState(null);
   const [isLoadingSlide, setIsLoadingSlide] = useState(false);
+  const [isDownloadingSlide, setIsDownloadingSlide] = useState(false);
 
   const getTimerPhaseLabel = () => {
     switch (timerPhase) {
@@ -149,13 +150,11 @@ const LiveScoringPage = () => {
     setIsLoadingSlide(true);
 
     try {
-      const response = await judgeService.getSubmissionSlide(selectedTeam.id);
-
-      // Tạo một URL ảo từ dữ liệu Blob lấy về để render iframe
-      const file = new Blob([response.data], { type: 'application/pdf' });
+      const blob = await judgeService.getSubmissionSlide(selectedTeam.id);
+      const file = new Blob([blob], { type: 'application/pdf' });
       const fileUrl = URL.createObjectURL(file);
       setSlideBlobUrl(fileUrl);
-    } catch (error) {
+    } catch {
       message.error(
         'Không thể tải bài nộp. Đội này có thể chưa nộp file hoặc file bị lỗi.'
       );
@@ -170,6 +169,25 @@ const LiveScoringPage = () => {
     if (slideBlobUrl) {
       URL.revokeObjectURL(slideBlobUrl);
       setSlideBlobUrl(null);
+    }
+  };
+
+  const handleDownloadSlide = async () => {
+    if (!selectedTeam?.id) return;
+    setIsDownloadingSlide(true);
+    try {
+      const blob = await judgeService.downloadSubmissionSlide(selectedTeam.id);
+      const file = new Blob([blob], { type: 'application/pdf' });
+      const fileUrl = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = `submission-${selectedTeam.id}.pdf`;
+      link.click();
+      URL.revokeObjectURL(fileUrl);
+    } catch {
+      message.error('Không thể tải file PDF. Vui lòng thử lại.');
+    } finally {
+      setIsDownloadingSlide(false);
     }
   };
 
@@ -222,8 +240,10 @@ const LiveScoringPage = () => {
   }
 
   // Cờ khóa form: Khóa nếu trạng thái team là SCORED hoặc cờ isReadOnly được truyền từ Dashboard
-  const isFormLocked = isReadOnly || scoringLocked || selectedTeam?.status === 'SCORED';
+  const isExternalPrelim = !isFinal && String(assignmentType || '').toUpperCase().includes('EXTERNAL');
+  const isFormLocked = isReadOnly || scoringLocked || selectedTeam?.status === 'SCORED' || isExternalPrelim;
   const canSubmitScore = canScore && !isFormLocked;
+  const showPresentationControls = !isFinal || isCalibration;
 
   return (
     <div style={{ padding: '24px', background: '#f5f7fa', minHeight: '100vh' }}>
@@ -273,7 +293,8 @@ const LiveScoringPage = () => {
           </div>
         </div>
 
-        {/* Cụm Đồng hồ thuyết trình (đồng bộ BE) */}
+        {/* Cụm Đồng hồ thuyết trình (chỉ Sơ loại / calibration) */}
+        {showPresentationControls && (
         <div
           style={{
             background: '#fff',
@@ -342,7 +363,18 @@ const LiveScoringPage = () => {
             />
           </Space>
         </div>
+        )}
       </div>
+
+      {isFinal && !isCalibration && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Chấm Chung kết (GĐ5)"
+          description="Vòng Chung kết không dùng hàng đợi thuyết trình — chọn đội từ danh sách và chấm trực tiếp."
+        />
+      )}
 
       {scoringLocked && (
         <Alert
@@ -364,13 +396,23 @@ const LiveScoringPage = () => {
         />
       )}
 
-      {!isReadOnly && !scoringLocked && scoringBlockReason && (
+      {!isReadOnly && !scoringLocked && scoringBlockReason && showPresentationControls && (
         <Alert
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
           message="Chưa thể chấm điểm"
           description={scoringBlockReason}
+        />
+      )}
+
+      {isExternalPrelim && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Giám khảo external không chấm vòng sơ loại"
+          description="Dữ liệu phân công không hợp lệ theo rule GĐ3. Vui lòng liên hệ Coordinator để phân công lại."
         />
       )}
 
@@ -631,6 +673,7 @@ const LiveScoringPage = () => {
                     const currentVal = currentScores[c.id] || 0;
                     const componentScore = (currentVal * (c.weight || 0)).toFixed(2);
                     const maxPoint = c.maxScore || c.max_score || 10;
+                    const inputMaxPoint = Math.min(maxPoint, 9.99);
                     const weightPercent = ((c.weight || 0) * 100).toFixed(0);
 
                     return (
@@ -671,7 +714,7 @@ const LiveScoringPage = () => {
                               <Space>
                                 <InputNumber
                                   min={0}
-                                  max={maxPoint}
+                                  max={inputMaxPoint}
                                   value={currentVal}
                                   onChange={(val) => handleScoreChange(c.id, val)}
                                   style={{
@@ -684,7 +727,7 @@ const LiveScoringPage = () => {
                                   disabled={isFormLocked} // Khóa ô nhập nếu đã chấm hoặc chỉ được xem
                                 />
                                 <Text type="secondary" style={{ fontSize: 16, fontWeight: 500 }}>
-                                  / {maxPoint}
+                                  / {'<10'}
                                 </Text>
                               </Space>
                               <Text style={{ marginTop: 8, fontSize: 13, color: '#64748b' }}>
@@ -697,10 +740,10 @@ const LiveScoringPage = () => {
 
                         <Slider
                           min={0}
-                          max={maxPoint}
+                          max={inputMaxPoint}
                           value={currentVal}
                           onChange={(val) => handleScoreChange(c.id, val)}
-                          marks={{ 0: '0', [maxPoint]: maxPoint.toString() }}
+                          marks={{ 0: '0', [inputMaxPoint]: '<10' }}
                           tooltip={{ formatter: (val) => `${val} Điểm` }}
                           trackStyle={{ backgroundColor: '#1677ff', height: 6 }}
                           railStyle={{ height: 6 }}
@@ -797,12 +840,8 @@ const LiveScoringPage = () => {
             type="primary"
             icon={<DownloadOutlined />}
             disabled={!slideBlobUrl}
-            onClick={() => {
-              const link = document.createElement('a');
-              link.href = slideBlobUrl;
-              link.download = `Bai_Nop_${selectedTeam?.name}.pdf`;
-              link.click();
-            }}
+            loading={isDownloadingSlide}
+            onClick={handleDownloadSlide}
           >
             Tải xuống máy
           </Button>,

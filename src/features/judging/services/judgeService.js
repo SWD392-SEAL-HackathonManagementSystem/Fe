@@ -60,6 +60,13 @@ export const judgeService = {
     });
   },
 
+  downloadSubmissionSlide: async (submissionId) => {
+    return axiosClient.get(`/api/v1/submissions/${submissionId}/slide`, {
+      params: { download: true },
+      responseType: 'blob',
+    });
+  },
+
   submitCalibrationScore: async (payload) => {
     return axiosClient.post('/api/v1/scores/calibration', payload);
   },

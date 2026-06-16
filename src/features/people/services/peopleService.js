@@ -13,6 +13,12 @@ export const peopleService = {
   
   // Phân công Giám khảo (Judge Assignments)
   assignJudge: async (data) => axiosClient.post('/api/v1/judge-assignments', data),
+  assignFinalRoundJudge: async ({ roundId, judgeId, assignmentType = 'FINAL_EXTERNAL' }) =>
+    axiosClient.post(`/api/v1/rounds/${roundId}/judge-assignments`, {
+      judgeId,
+      judgeIds: [judgeId],
+      assignmentType,
+    }),
   removeJudgeAssignment: async (id) => axiosClient.delete(`/api/v1/judge-assignments/${id}`),
   getTrackJudges: async (trackId) => axiosClient.get(`/api/v1/tracks/${trackId}/judges`),
   getRoundJudges: async (roundId) => axiosClient.get(`/api/v1/rounds/${roundId}/judges`),

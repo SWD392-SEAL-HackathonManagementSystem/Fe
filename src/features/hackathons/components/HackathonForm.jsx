@@ -1,5 +1,5 @@
 import React from 'react';
-import { Form, Input, DatePicker, Select, Switch, Row, Col, Space, Button, Typography } from 'antd';
+import { Form, Input, DatePicker, Select, Switch, Row, Col, Typography } from 'antd';
 import dayjs from 'dayjs';
 
 const { TextArea } = Input;
@@ -111,7 +111,11 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         <TextArea rows={4} placeholder="Quy định và thể lệ cuộc thi" />
       </Form.Item>
 
-      <Form.Item name="banner_url" label="Link ảnh Banner">
+      <Form.Item
+        name="banner_url"
+        label="Link ảnh Banner"
+        extra={fieldHint('BE hiện lưu banner dưới dạng URL. Vui lòng dùng link ảnh công khai.')}
+      >
         <Input placeholder="https://example.com/banner.jpg" />
       </Form.Item>
 

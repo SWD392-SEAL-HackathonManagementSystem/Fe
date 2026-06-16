@@ -171,6 +171,21 @@ export const useTeamActions = ({ teams, fetchTeams, refreshSelectedTeam, setHack
     }
   };
 
+  const kickMember = async (teamId, userId) => {
+    setIsActionLoading(true);
+    try {
+      await studentTeamService.kickMember(teamId, userId);
+      if (refreshSelectedTeam) await refreshSelectedTeam(teamId);
+      message.success('Đã mời thành viên rời đội.');
+      return true;
+    } catch (error) {
+      message.error(getStudentTeamErrorMessage(error, 'Không thể mời thành viên rời đội.'));
+      return false;
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const disbandTeam = async (teamId) => {
     setIsActionLoading(true);
     try {
@@ -189,14 +204,34 @@ export const useTeamActions = ({ teams, fetchTeams, refreshSelectedTeam, setHack
     }
   };
 
+  const confirmTeamFormation = async (teamId) => {
+    setIsActionLoading(true);
+    try {
+      const detail = refreshSelectedTeam ? await refreshSelectedTeam(teamId) : null;
+      if (detail?.status === 'ACTIVE') {
+        message.info('Đội đã được Coordinator duyệt trước đó.');
+        return true;
+      }
+      message.info('Đội ở trạng thái PENDING đã được xem là đang chờ Coordinator duyệt theo BE.');
+      return true;
+    } catch {
+      message.error('Không thể tải trạng thái đội lúc này.');
+      return false;
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   return {
     isActionLoading,
     createTeam,
     inviteMember,
     cancelPendingInvite,
     leaveTeam,
+    kickMember,
     transferLeader,
     disbandTeam,
+    confirmTeamFormation,
   };
 };
 

@@ -59,6 +59,10 @@ export const useStudentTeam = () => {
           team.status !== 'REJECTED' &&
           team.status !== 'ELIMINATED'
       );
+      if (!currentHackathonId && data[0]?.hackathonId) {
+        currentHackathonId = data[0].hackathonId;
+        setHackathonId(currentHackathonId);
+      }
       setTeams(data);
       setSelectedTeamId((currentId) =>
         data.some((team) => team.id === currentId) ? currentId : data[0]?.id || null

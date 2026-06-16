@@ -49,6 +49,19 @@ export const hackathonResultsService = {
     return response.data;
   },
 
+  revokePrize: async (prizeId) => {
+    await axiosClient.delete(`/api/v1/prizes/${prizeId}`);
+  },
+
+  createExportJob: async (hackathonId, payload = { type: 'CSV_RANKINGS' }) => {
+    const response = await axiosClient.post(`/api/v1/hackathons/${hackathonId}/export-jobs`, payload);
+    return response?.data ?? response;
+  },
+
+  downloadExportFile: async (jobId) => {
+    return axiosClient.get(`/api/v1/export-jobs/${jobId}/download`, { responseType: 'blob' });
+  },
+
   // === HELPER APIs (Lấy Data cho Modal) ===
 
   getHackathonRounds: async (hackathonId) => {
