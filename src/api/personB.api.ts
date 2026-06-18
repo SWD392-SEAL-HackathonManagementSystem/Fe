@@ -204,6 +204,18 @@ export interface LateSubmission {
   status: 'LATE_PENDING';
 }
 
+export interface RoundSubmissionItem {
+  id: number;
+  team_id: number;
+  team_name: string;
+  track_id?: number;
+  track_name?: string;
+  round_id?: number;
+  status: string;
+  submitted_at?: string;
+  is_late?: boolean;
+}
+
 export interface RejectSubmissionRequest {
   reason: string;
 }
@@ -412,6 +424,26 @@ export const personBApi = {
   /** GET /api/v1/me/rounds/{roundId}/problem */
   getRoundProblem: async (roundId: number | string) => {
     return axiosClient.get(`/api/v1/me/rounds/${roundId}/problem`);
+  },
+
+  /** GET /api/v1/submissions?roundId= — Coordinator xem toàn bộ bài theo vòng */
+  getRoundSubmissions: async (roundId: number | string): Promise<RoundSubmissionItem[]> => {
+    const submissions = await axiosClient.get<any, any[]>(
+      `/api/v1/submissions?roundId=${roundId}`
+    );
+    const list = Array.isArray(submissions) ? submissions : [];
+
+    return list.map((sub) => ({
+      id: sub.id,
+      team_id: sub.teamId ?? sub.team_id,
+      team_name: sub.teamName ?? sub.team_name ?? `Đội ${sub.teamId ?? sub.team_id}`,
+      track_id: sub.trackId ?? sub.track_id,
+      track_name: sub.trackName ?? sub.track_name,
+      round_id: sub.roundId ?? sub.round_id,
+      status: sub.status ?? 'UNKNOWN',
+      submitted_at: sub.submittedAt ?? sub.submitted_at,
+      is_late: sub.isLate ?? sub.is_late,
+    }));
   },
 
   /** GET /api/v1/submissions?status=LATE_PENDING — Coordinator */

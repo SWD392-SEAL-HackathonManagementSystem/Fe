@@ -27,8 +27,6 @@ export const studentSubmissionService = {
       formData.append('slideFile', slideFile);
     }
 
-    return axiosClient.post('/api/v1/submissions', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return axiosClient.post('/api/v1/submissions', formData);
   },
 };

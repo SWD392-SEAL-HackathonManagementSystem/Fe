@@ -33,6 +33,15 @@ export const getRowTone = (item, movement, token) => {
     };
   }
 
+  if (item.rank === 1 && !item.isEliminated) {
+    return {
+      background: `linear-gradient(90deg, ${token.colorWarningBg}, ${token.colorBgContainer})`,
+      borderColor: token.colorWarningBorder,
+      accent: token.colorWarning,
+      opacity: 1,
+    };
+  }
+
   if (item.rank === 2) {
     return {
       background: token.colorFillSecondary,

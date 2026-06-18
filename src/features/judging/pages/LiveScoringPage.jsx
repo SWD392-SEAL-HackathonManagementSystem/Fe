@@ -102,6 +102,10 @@ const LiveScoringPage = () => {
     handleAdvanceNext,
     isTimerActionLoading,
     scoringLocked,
+    trackQueue,
+    presentingSubmissionId,
+    scoringStatus,
+    canAdvanceQueue,
   } = useLiveScoring(assignmentId, roundId, trackId, isFinal, {
     isCalibration,
     calibrationSessionId,
@@ -129,6 +133,29 @@ const LiveScoringPage = () => {
       default:
         return 'Chưa bắt đầu timer';
     }
+  };
+
+  const getQueueStatusTag = (team) => {
+    const isPresenting =
+      team.queueStatus === 'PRESENTING' || team.submissionId === presentingSubmissionId;
+    if (isPresenting) {
+      return { label: 'Đang thuyết trình', color: 'processing', bg: '#dbeafe', text: '#1d4ed8' };
+    }
+    if (team.status === 'SCORED') {
+      return {
+        label: `Đã chấm · ${team.totalScore}đ`,
+        color: 'success',
+        bg: '#d1fae5',
+        text: '#047857',
+      };
+    }
+    if (team.queueStatus === 'DONE') {
+      return { label: 'Đã TT xong', color: 'default', bg: '#f3f4f6', text: '#6b7280' };
+    }
+    if (team.queueStatus === 'WAITING') {
+      return { label: 'Chờ thuyết trình', color: 'default', bg: '#f9fafb', text: '#6b7280' };
+    }
+    return { label: 'Chờ chấm', color: 'default', bg: '#f9fafb', text: '#6b7280' };
   };
 
   const formatTime = (secs) => {
@@ -244,6 +271,8 @@ const LiveScoringPage = () => {
   const isFormLocked = isReadOnly || scoringLocked || selectedTeam?.status === 'SCORED' || isExternalPrelim;
   const canSubmitScore = canScore && !isFormLocked;
   const showPresentationControls = !isFinal || isCalibration;
+  const isPresentingSelected =
+    (selectedTeam?.submissionId ?? selectedTeam?.id) === presentingSubmissionId;
 
   return (
     <div style={{ padding: '24px', background: '#f5f7fa', minHeight: '100vh' }}>
@@ -350,7 +379,14 @@ const LiveScoringPage = () => {
               size="small"
               onClick={handleAdvanceNext}
               loading={isTimerActionLoading}
-              disabled={isReadOnly || !presentingItem}
+              disabled={isReadOnly || !presentingItem || !canAdvanceQueue}
+              title={
+                canAdvanceQueue
+                  ? 'Chuyển sang bài tiếp theo trong hàng đợi'
+                  : scoringStatus?.judgesAssigned <= 1
+                    ? 'Chốt điểm đủ tiêu chí trước khi chuyển đội'
+                    : 'Cần tất cả judge Chốt điểm đủ tiêu chí trước khi chuyển đội'
+              }
             >
               Đội tiếp
             </Button>
@@ -406,6 +442,40 @@ const LiveScoringPage = () => {
         />
       )}
 
+      {showPresentationControls && trackQueue?.shuffled && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Thứ tự danh sách đồng bộ với Coordinator"
+          description="Các bài được sắp theo hàng đợi đã xáo trộn (#1, #2, #3…). Judge chỉ thấy mã bài ẩn danh — thứ tự khớp phòng thuyết trình."
+        />
+      )}
+
+      {showPresentationControls && scoringStatus?.judgesAssigned === 1 && !canAdvanceQueue && presentingItem && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Track chỉ có 1 judge"
+          description="Chấm đủ tiêu chí → bấm Chốt điểm → sau đó bấm Đội tiếp. Không cần bước xác nhận riêng."
+        />
+      )}
+
+      {showPresentationControls && scoringStatus?.judgesAssigned > 1 && (
+        <Alert
+          type={canAdvanceQueue ? 'success' : 'warning'}
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={`Tiến độ chấm: ${scoringStatus.judgesFullyScored ?? scoringStatus.judgesScored}/${scoringStatus.judgesAssigned} judge`}
+          description={
+            canAdvanceQueue
+              ? 'Đủ judge đã chấm xong — có thể bấm Đội tiếp để chuyển bài.'
+              : 'Mỗi judge chấm đủ tiêu chí rồi bấm Chốt điểm. Chỉ khi đủ judge chấm xong mới chuyển đội.'
+          }
+        />
+      )}
+
       {isExternalPrelim && (
         <Alert
           type="error"
@@ -433,7 +503,12 @@ const LiveScoringPage = () => {
           >
             {/* Card Danh sách đội */}
             <Card
-              title={<span style={{ fontWeight: 600 }}>Danh sách Đội thi ({teams.length})</span>}
+              title={
+                <span style={{ fontWeight: 600 }}>
+                  Danh sách bài thi ({teams.length})
+                  {trackQueue?.shuffled ? ' · theo hàng đợi' : ''}
+                </span>
+              }
               style={{
                 borderRadius: 16,
                 flex: 1,
@@ -448,6 +523,10 @@ const LiveScoringPage = () => {
                   const isSelected = selectedTeam?.id === team.id;
                   const isScored = team.status === 'SCORED';
                   const isThisTeamScoring = isSelected && isCurrentlyScoring;
+                  const isPresenting =
+                    team.queueStatus === 'PRESENTING' ||
+                    team.submissionId === presentingSubmissionId;
+                  const queueTag = getQueueStatusTag(team);
 
                   return (
                     <div
@@ -456,10 +535,12 @@ const LiveScoringPage = () => {
                         padding: '16px 24px',
                         cursor: 'pointer',
                         borderBottom: '1px solid #f0f0f0',
-                        background: isSelected ? '#e6f4ff' : '#fff',
+                        background: isSelected ? '#e6f4ff' : isPresenting ? '#f0fdf4' : '#fff',
                         borderLeft: isSelected
                           ? '4px solid #1677ff'
-                          : '4px solid transparent',
+                          : isPresenting
+                            ? '4px solid #16a34a'
+                            : '4px solid transparent',
                         transition: 'all 0.2s ease',
                       }}
                     >
@@ -491,41 +572,24 @@ const LiveScoringPage = () => {
                         type="secondary"
                         style={{ fontSize: 13, display: 'block', marginTop: 4 }}
                       >
-                        Leader: {team.leader}
+                        {team.leader}
+                        {team.queueOrder != null && team.queueOrder < 999
+                          ? ` · Thứ tự TT #${team.queueOrder}`
+                          : ''}
                       </Text>
 
                       <div style={{ marginTop: 8 }}>
-                        {isScored ? (
-                          <Tag
-                            color="success"
-                            style={{
-                              margin: 0,
-                              fontWeight: 600,
-                              border: 'none',
-                              background: '#d1fae5',
-                              color: '#047857',
-                            }}
-                          >
-                            Đã hoàn thành
-                          </Tag>
-                        ) : isThisTeamScoring ? (
-                          <Tag
-                            color="warning"
-                            style={{
-                              margin: 0,
-                              fontWeight: 600,
-                              border: 'none',
-                              background: '#fef3c7',
-                              color: '#d97706',
-                            }}
-                          >
-                            Đang chấm...
-                          </Tag>
-                        ) : (
-                          <Tag color="default" style={{ margin: 0 }}>
-                            Chờ chấm
-                          </Tag>
-                        )}
+                        <Tag
+                          style={{
+                            margin: 0,
+                            fontWeight: 600,
+                            border: 'none',
+                            background: queueTag.bg,
+                            color: queueTag.text,
+                          }}
+                        >
+                          {queueTag.label}
+                        </Tag>
                       </div>
                     </div>
                   );
@@ -621,6 +685,11 @@ const LiveScoringPage = () => {
                         <Title level={2} style={{ margin: 0, color: '#0f172a', fontWeight: 800 }}>
                           {selectedTeam.name}
                         </Title>
+                        {selectedTeam.queueOrder != null && selectedTeam.queueOrder < 999 && (
+                          <Text type="secondary" style={{ fontSize: 13 }}>
+                            Thứ tự thuyết trình #{selectedTeam.queueOrder} trên track
+                          </Text>
+                        )}
                       </div>
 
                       {/* Nút Xem bài nộp (PDF) */}
@@ -656,7 +725,9 @@ const LiveScoringPage = () => {
                         level={1}
                         style={{ margin: 0, color: '#f43f5e', fontWeight: 800, lineHeight: 1 }}
                       >
-                        {calculateTotalScore()}
+                        {selectedTeam.status === 'SCORED'
+                          ? selectedTeam.totalScore
+                          : calculateTotalScore()}
                       </Title>
                     </div>
                   </div>
@@ -773,9 +844,16 @@ const LiveScoringPage = () => {
                   {!isFormLocked && (
                     <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end' }}>
                       <Space size="middle">
-                        <Button size="large" style={{ borderRadius: 8, fontWeight: 600 }}>
-                          Lưu Nháp
-                        </Button>
+                        {scoringStatus?.myScored &&
+                          !canAdvanceQueue &&
+                          isPresentingSelected &&
+                          selectedTeam?.status === 'SCORED' && (
+                          <Tag color="success" style={{ padding: '8px 12px', fontSize: 13 }}>
+                            Bạn đã chấm xong — chờ judge khác ({scoringStatus.judgesFullyScored ??
+                              scoringStatus.judgesScored}
+                            /{scoringStatus.judgesAssigned})
+                          </Tag>
+                        )}
                         <Button
                           type="primary"
                           size="large"

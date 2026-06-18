@@ -8,6 +8,13 @@ import {
   findPresentingItem,
   SCORING_OPEN_TIMER_PHASES,
 } from '../services/presentationService';
+import {
+  sortTeamsByPresentationQueue,
+  groupMyScoresBySubmission,
+  isSubmissionFullyScored,
+  computeWeightedTotal,
+  findTeamBySubmissionId,
+} from '../utils/liveScoringUtils';
 
 /**
  * Custom hook quản lý logic phòng chấm thi (Live Scoring)
@@ -31,9 +38,27 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
   const [trackQueue, setTrackQueue] = useState(null);
   const [isTimerActionLoading, setIsTimerActionLoading] = useState(false);
   const [scoringLocked, setScoringLocked] = useState(false);
+  const [savedScoresBySubmission, setSavedScoresBySubmission] = useState({});
+  const [scoringStatus, setScoringStatus] = useState(null);
+  const [isConfirmingScoring, setIsConfirmingScoring] = useState(false);
 
   const scoreType = isCalibration ? 'CALIBRATION' : 'NORMAL';
   const skipPresentationQueue = isFinal && !isCalibration;
+
+  const refreshPresentationScoringStatus = useCallback(async () => {
+    if (!roundId || skipPresentationQueue) {
+      return null;
+    }
+
+    try {
+      const data = await judgeService.getPresentationScoringStatus(roundId, trackId);
+      setScoringStatus(data);
+      return data;
+    } catch (error) {
+      console.warn('Không tải được tiến độ xác nhận chấm:', error);
+      return null;
+    }
+  }, [roundId, trackId, skipPresentationQueue]);
 
   const refreshPresentationQueue = useCallback(async () => {
     if (!roundId || skipPresentationQueue) {
@@ -48,12 +73,14 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
       );
       setPresentingItem(item);
       setTrackQueue(queue);
+      setTeams((prev) => sortTeamsByPresentationQueue(prev, queue));
+      await refreshPresentationScoringStatus();
       return { item, queue };
     } catch (error) {
       console.warn('Không tải được hàng đợi thuyết trình:', error);
       return null;
     }
-  }, [roundId, trackId, skipPresentationQueue]);
+  }, [roundId, trackId, skipPresentationQueue, refreshPresentationScoringStatus]);
 
   useEffect(() => {
     if (!roundId) {
@@ -99,11 +126,57 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
         return {
           id: submissionId,
           submissionId,
-          name: sub.teamName || sub.displayCode || `Bài #${submissionId}`,
-          leader: sub.leaderName || 'Trưởng nhóm',
-          status: sub.status === 'SCORED' || sub.isScoredByMe ? 'SCORED' : 'PENDING',
-          totalScore: sub.totalScore || sub.weightedAverageScore || 0,
+          displayCode: sub.displayCode || `#${submissionId}`,
+          name: sub.displayCode || `Bài #${submissionId}`,
+          leader: sub.trackName || 'Track',
+          status: 'PENDING',
+          totalScore: 0,
           trackId: sub.trackId,
+          submissionStatus: sub.status,
+        };
+      });
+
+      let fetchedCriteria = [];
+      let rawCriteria = [];
+
+      if (isFinal && roundId) {
+        rawCriteria = await criteriaService.listByFinalRound(roundId);
+      } else if (trackId) {
+        rawCriteria = await criteriaService.listByTrack(trackId);
+      }
+
+      fetchedCriteria = Array.isArray(rawCriteria)
+        ? rawCriteria
+        : rawCriteria?.items || rawCriteria?.data || [];
+
+      setCriteria(fetchedCriteria);
+
+      let savedBySubmission = {};
+      if (roundId) {
+        try {
+          const resScores = await judgeService.getMyScores(roundId);
+          const scoreRows = Array.isArray(resScores)
+            ? resScores
+            : resScores?.items || resScores?.data || [];
+          savedBySubmission = groupMyScoresBySubmission(scoreRows);
+          setSavedScoresBySubmission(savedBySubmission);
+        } catch {
+          setSavedScoresBySubmission({});
+        }
+      }
+
+      const criteriaCount = fetchedCriteria.length;
+      const teamsWithScores = mappedTeams.map((team) => {
+        const fullyScored = isSubmissionFullyScored(
+          team.submissionId,
+          savedBySubmission,
+          criteriaCount
+        );
+        const saved = savedBySubmission[team.submissionId];
+        return {
+          ...team,
+          status: fullyScored ? 'SCORED' : 'PENDING',
+          totalScore: fullyScored ? computeWeightedTotal(saved, fetchedCriteria) : 0,
         };
       });
 
@@ -124,53 +197,36 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
         setTeams([calibrationTeam]);
         setSelectedTeam(calibrationTeam);
       } else {
-        setTeams(mappedTeams);
+        let queueResult = null;
+        if (!skipPresentationQueue) {
+          queueResult = await refreshPresentationQueue();
+        }
+
+        const orderedTeams = sortTeamsByPresentationQueue(
+          teamsWithScores,
+          queueResult?.queue || trackQueue
+        );
+        setTeams(orderedTeams);
 
         if (skipPresentationQueue) {
-          if (mappedTeams.length > 0) {
-            setSelectedTeam(mappedTeams[0]);
+          if (orderedTeams.length > 0) {
+            setSelectedTeam(orderedTeams[0]);
           }
         } else {
-          const queueResult = await refreshPresentationQueue();
           const presenting = queueResult?.item;
 
           if (presenting) {
-            const activeTeam = mappedTeams.find(
-              (team) => team.submissionId === presenting.submissionId
-            );
+            const activeTeam = findTeamBySubmissionId(orderedTeams, presenting.submissionId);
             if (activeTeam) {
               setSelectedTeam(activeTeam);
-            } else if (mappedTeams.length > 0) {
-              setSelectedTeam(mappedTeams[0]);
+            } else if (orderedTeams.length > 0) {
+              setSelectedTeam(orderedTeams[0]);
             }
-          } else if (mappedTeams.length > 0) {
-            setSelectedTeam(mappedTeams[0]);
+          } else if (orderedTeams.length > 0) {
+            setSelectedTeam(orderedTeams[0]);
           }
         }
       }
-
-      if (roundId) {
-        judgeService
-          .getMyScores(roundId)
-          .then((resScores) => {
-            console.log('Dữ liệu điểm đã chấm:', resScores);
-          })
-          .catch(() => {});
-      }
-
-      let rawCriteria = [];
-
-      if (isFinal && roundId) {
-        rawCriteria = await criteriaService.listByFinalRound(roundId);
-      } else if (trackId) {
-        rawCriteria = await criteriaService.listByTrack(trackId);
-      }
-
-      const fetchedCriteria = Array.isArray(rawCriteria)
-        ? rawCriteria
-        : rawCriteria?.items || rawCriteria?.data || [];
-
-      setCriteria(fetchedCriteria);
 
       if (fetchedCriteria.length === 0) {
         message.warning('Vòng thi/Bảng đấu này chưa được cấu hình tiêu chí chấm điểm!');
@@ -187,6 +243,23 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
   useEffect(() => {
     fetchScoringData();
   }, [fetchScoringData]);
+
+  useEffect(() => {
+    if (!selectedTeam?.submissionId) {
+      setCurrentScores({});
+      setComment('');
+      return;
+    }
+
+    const saved = savedScoresBySubmission[selectedTeam.submissionId];
+    if (selectedTeam.status === 'SCORED' && saved) {
+      setCurrentScores(saved.scores);
+      setComment(saved.comment || '');
+    } else {
+      setCurrentScores({});
+      setComment('');
+    }
+  }, [selectedTeam?.submissionId, selectedTeam?.status, savedScoresBySubmission]);
 
   useEffect(() => {
     if (!roundId || isLoading || skipPresentationQueue) {
@@ -316,34 +389,40 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
       return;
     }
 
-    const runAdvance = async (acknowledgeIncompleteScoring = false) => {
+    if (!scoringStatus?.canAdvanceQueue) {
+      const solo = (scoringStatus?.judgesAssigned ?? 0) <= 1;
+      message.warning(
+        solo
+          ? 'Chưa chốt điểm đủ tiêu chí cho bài đang thuyết trình — hãy Chốt điểm trước khi bấm Đội tiếp.'
+          : `Chưa đủ judge chấm xong (${scoringStatus?.judgesFullyScored ?? scoringStatus?.judgesScored ?? 0}/${scoringStatus?.judgesAssigned ?? 0}). Mỗi judge cần chấm đủ tiêu chí và Chốt điểm.`
+      );
+      return;
+    }
+
+    const runAdvance = async () => {
       await presentationService.advanceNext(roundId, trackId, {
         currentSubmissionId: presentingItem.submissionId,
-        ...(acknowledgeIncompleteScoring ? { acknowledgeIncompleteScoring: true } : {}),
       });
-      await refreshPresentationQueue();
+      const queueResult = await refreshPresentationQueue();
+      const nextPresenting = queueResult?.item;
+      if (nextPresenting?.submissionId) {
+        setTeams((prevTeams) => {
+          const ordered = sortTeamsByPresentationQueue(prevTeams, queueResult.queue);
+          const nextTeam = findTeamBySubmissionId(ordered, nextPresenting.submissionId);
+          if (nextTeam) {
+            setSelectedTeam(nextTeam);
+          }
+          return ordered;
+        });
+      }
       message.success('Đã chuyển sang đội tiếp theo.');
     };
 
     setIsTimerActionLoading(true);
     try {
-      await runAdvance(false);
+      await runAdvance();
     } catch (error) {
-      const code = error?.code || error?.response?.data?.code;
-      if (code === 'SCORING_INCOMPLETE_BEFORE_NEXT') {
-        const ack = window.confirm(
-          `${error?.message || 'Chưa chấm đủ điểm.'}\n\nChuyển đội tiếp theo anyway?`
-        );
-        if (ack) {
-          try {
-            await runAdvance(true);
-          } catch (retryError) {
-            message.error(retryError?.message || 'Không thể chuyển đội tiếp theo.');
-          }
-        }
-      } else {
-        message.error(error?.message || 'Không thể chuyển đội tiếp theo.');
-      }
+      message.error(error?.message || 'Không thể chuyển đội tiếp theo.');
     } finally {
       setIsTimerActionLoading(false);
     }
@@ -414,6 +493,18 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
         .updateScoringCompletion(assignmentId, 'IN_PROGRESS')
         .catch(() => {});
 
+      const submissionId = selectedTeam.submissionId ?? selectedTeam.id;
+      const savedEntry = {
+        scores: { ...currentScores },
+        comment: comment.trim(),
+      };
+      setSavedScoresBySubmission((prev) => ({
+        ...prev,
+        [submissionId]: savedEntry,
+      }));
+
+      const finalTotal = calculateTotalScore();
+
       message.success('Đã lưu toàn bộ điểm thành công!');
 
       setTeams((prev) =>
@@ -422,15 +513,25 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
             return {
               ...t,
               status: 'SCORED',
-              totalScore: calculateTotalScore(),
+              totalScore: finalTotal,
             };
           }
           return t;
         })
       );
+      setSelectedTeam((prev) =>
+        prev && prev.id === selectedTeam.id
+          ? {
+              ...prev,
+              status: 'SCORED',
+              totalScore: finalTotal,
+            }
+          : prev
+      );
 
       setCurrentScores({});
       setComment('');
+      await refreshPresentationScoringStatus();
     } catch (error) {
       const status = error?.status || error?.response?.status;
       const code = error?.code;
@@ -451,6 +552,38 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
       setIsSubmitting(false);
     }
   };
+
+  const handleConfirmScoring = async () => {
+    const submissionId =
+      selectedTeam?.submissionId ??
+      selectedTeam?.id ??
+      presentingItem?.submissionId;
+    if (!submissionId) {
+      message.warning('Chưa chọn bài đang thuyết trình để xác nhận.');
+      return;
+    }
+
+    setIsConfirmingScoring(true);
+    try {
+      await judgeService.confirmSubmissionScoring(submissionId);
+      message.success('Đã xác nhận chấm xong bài này.');
+      await refreshPresentationScoringStatus();
+    } catch (error) {
+      message.error(error?.message || 'Không thể xác nhận chấm xong.');
+    } finally {
+      setIsConfirmingScoring(false);
+    }
+  };
+
+  const canAdvanceQueue = Boolean(scoringStatus?.canAdvanceQueue);
+  const isPresentingSelected =
+    (selectedTeam?.submissionId ?? selectedTeam?.id) === presentingItem?.submissionId;
+  const canConfirmScoring =
+    !skipPresentationQueue &&
+    !isCalibration &&
+    isPresentingSelected &&
+    selectedTeam?.status === 'SCORED' &&
+    !scoringStatus?.myConfirmed;
 
   return {
     teams,
@@ -480,5 +613,9 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
     refreshPresentationQueue,
     scoringLocked,
     isCalibration,
+    trackQueue,
+    presentingSubmissionId: presentingItem?.submissionId ?? null,
+    scoringStatus,
+    canAdvanceQueue,
   };
 };

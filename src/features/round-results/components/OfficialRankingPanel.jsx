@@ -6,22 +6,36 @@ const { Text } = Typography;
 
 const score = (value) => Number(value || 0).toFixed(2);
 
-const OfficialRankingPanel = ({ ranking, isLoading, error }) => {
+const OfficialRankingPanel = ({
+  ranking,
+  isLoading,
+  error,
+  advancePreviewTeamIds,
+  rejectedWildcardTeamIds,
+  hasAdvanced,
+  isPublished,
+  rosterDecided,
+}) => {
   const [selectedGroup, setSelectedGroup] = useState("all");
-  const activeItems = useMemo(
-    () => ranking.items.filter((item) => item.status === "ACTIVE"),
-    [ranking.items],
+  const previewSet = useMemo(
+    () => advancePreviewTeamIds ?? new Set(),
+    [advancePreviewTeamIds],
   );
+  const rejectedWildcardSet = useMemo(
+    () => rejectedWildcardTeamIds ?? new Set(),
+    [rejectedWildcardTeamIds],
+  );
+  const displayItems = useMemo(() => ranking.items, [ranking.items]);
   const groups = useMemo(
-    () => [...new Set(activeItems.map((item) => item.groupLabel))],
-    [activeItems],
+    () => [...new Set(displayItems.map((item) => item.groupLabel))],
+    [displayItems],
   );
   const items = useMemo(
     () =>
       selectedGroup === "all"
-        ? activeItems
-        : activeItems.filter((item) => item.groupLabel === selectedGroup),
-    [activeItems, selectedGroup],
+        ? displayItems
+        : displayItems.filter((item) => item.groupLabel === selectedGroup),
+    [displayItems, selectedGroup],
   );
 
   const columns = [
@@ -85,16 +99,48 @@ const OfficialRankingPanel = ({ ranking, isLoading, error }) => {
       title: "Trạng thái",
       key: "result",
       width: 190,
-      render: (_, item) =>
-        item.isAdvanced || item.qualificationStatus === "ADVANCED" ? (
-          <Tag color="success" style={{ fontWeight: 600, padding: '4px 12px', borderRadius: 4 }}>
-            Được đề xuất đi tiếp
-          </Tag>
-        ) : (
-          <Tag style={{ padding: '4px 12px', borderRadius: 4 }}>
+      render: (_, item) => {
+        if (item.isAdvanced || item.qualificationStatus === "ADVANCED" || item.participationStatus === "ADVANCED") {
+          return (
+            <Tag color="success" style={{ fontWeight: 600, padding: "4px 12px", borderRadius: 4 }}>
+              Vào Chung kết
+            </Tag>
+          );
+        }
+        if (item.participationStatus === "ELIMINATED" || item.isEliminated) {
+          return (
+            <Tag color="default" style={{ padding: "4px 12px", borderRadius: 4 }}>
+              Bị loại
+            </Tag>
+          );
+        }
+        if (isPublished && previewSet.has(item.teamId)) {
+          return (
+            <Tag color="processing" style={{ fontWeight: 600, padding: "4px 12px", borderRadius: 4 }}>
+              Đề xuất vào CK
+            </Tag>
+          );
+        }
+        if (isPublished && rosterDecided) {
+          if (rejectedWildcardSet.has(item.teamId)) {
+            return (
+              <Tag color="error" style={{ fontWeight: 600, padding: "4px 12px", borderRadius: 4 }}>
+                Wild Card từ chối
+              </Tag>
+            );
+          }
+          return (
+            <Tag color="default" style={{ padding: "4px 12px", borderRadius: 4 }}>
+              Bị loại
+            </Tag>
+          );
+        }
+        return (
+          <Tag style={{ padding: "4px 12px", borderRadius: 4 }}>
             Chờ chốt danh sách
           </Tag>
-        ),
+        );
+      },
     },
   ];
 
@@ -118,7 +164,7 @@ const OfficialRankingPanel = ({ ranking, isLoading, error }) => {
               style={{ fontWeight: 500 }}
             />
             <Tag color="blue" bordered={false} style={{ fontWeight: 600, padding: '2px 8px' }}>
-              {activeItems.length} đội ACTIVE
+              {displayItems.length} đội
             </Tag>
           </Space>
         }

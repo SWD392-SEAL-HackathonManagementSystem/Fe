@@ -5,7 +5,9 @@ import { Typography, Spin, Alert, Segmented } from 'antd';
 import { personBApi, PresentationQueueResponse, QueueTeam, QueueGroup } from '../../../api/personB.api';
 import { presentationService } from '../../judging/services/presentationService';
 import { roundService } from '../../rounds/services/roundService';
+import { trackService } from '../../tracks/services/trackService';
 import PresentationControllerCard from '../components/PresentationControllerCard';
+import PresentationReadinessPanel from '../components/PresentationReadinessPanel';
 import {
   COORD_TIMER_WARN_KEY,
   getPresentationRoleHints,
@@ -13,6 +15,7 @@ import {
   getTimerPhaseBanner,
   shouldWarnShuffleWhenLocked,
 } from '../utils/presentationWorkflow';
+import { countGradableSubmissions } from '../utils/presentationSubmissionUtils';
 import toast from 'react-hot-toast';
 
 const { Title, Text } = Typography;
@@ -64,13 +67,10 @@ const PresentationQueuePage: React.FC = () => {
   }, [roundIdFromUrl]);
 
   const { data: queueData, isLoading, error, refetch } = useQuery<PresentationQueueResponse>({
-    queryKey: ['presentationQueue', roundId, selectedTrackId],
+    queryKey: ['presentationQueue', roundId],
     queryFn: async () => {
       try {
-        return await personBApi.getPresentationQueue(
-          roundId ?? undefined,
-          selectedTrackId ?? undefined
-        );
+        return await personBApi.getPresentationQueue(roundId ?? undefined);
       } catch (err: any) {
         toast.error(`Lỗi tải thứ tự thuyết trình: ${err?.message || 'Không thể lấy dữ liệu'}`);
         throw err;
@@ -78,6 +78,21 @@ const PresentationQueuePage: React.FC = () => {
     },
     enabled: roundId != null,
     retry: false
+  });
+
+  const { data: roundTracks = [] } = useQuery<any[]>({
+    queryKey: ['roundTracks', roundId],
+    queryFn: async () => {
+      const data: any = await trackService.listByRound(roundId!);
+      return Array.isArray(data) ? data : data?.items || [];
+    },
+    enabled: !!roundId,
+  });
+
+  const { data: roundSubmissions = [], refetch: refetchSubmissions } = useQuery({
+    queryKey: ['roundSubmissions', roundId],
+    queryFn: () => personBApi.getRoundSubmissions(roundId!),
+    enabled: !!roundId && isCoordinator,
   });
 
   const { data: roundDetail } = useQuery<RoundDetail>({
@@ -95,23 +110,60 @@ const PresentationQueuePage: React.FC = () => {
     }
   }, [queueData]);
 
+  const trackTabs = useMemo(() => {
+    if (localGroups.length > 0) {
+      return localGroups.filter((g) => g.track_id != null);
+    }
+    return roundTracks.map((track: any) => ({
+      group_name: track.name ?? track.trackName ?? `Track ${track.id}`,
+      track_id: track.id,
+      shuffled: false,
+      teams: [] as QueueTeam[],
+    }));
+  }, [localGroups, roundTracks]);
+
   useEffect(() => {
-    if (!localGroups.length) return;
+    if (!trackTabs.length) return;
     const urlTrack = trackIdFromUrl ? Number(trackIdFromUrl) : null;
-    const fromUrl = localGroups.find((g) => g.track_id === urlTrack);
+    const fromUrl = trackTabs.find((g) => g.track_id === urlTrack);
     if (fromUrl?.track_id) {
       setSelectedTrackId(fromUrl.track_id);
       return;
     }
-    if (!selectedTrackId && localGroups[0]?.track_id) {
-      setSelectedTrackId(localGroups[0].track_id);
+    if (!selectedTrackId && trackTabs[0]?.track_id) {
+      setSelectedTrackId(trackTabs[0].track_id);
     }
-  }, [localGroups, trackIdFromUrl, selectedTrackId]);
+  }, [trackTabs, trackIdFromUrl, selectedTrackId]);
+
+  const gradableOnSelectedTrack = useMemo(() => {
+    if (!selectedTrackId) return 0;
+    return countGradableSubmissions(
+      roundSubmissions.filter((s) => s.track_id === selectedTrackId)
+    );
+  }, [roundSubmissions, selectedTrackId]);
+
+  const trackSegmentOptions = useMemo(
+    () =>
+      trackTabs.map((g) => {
+        const gradable = countGradableSubmissions(
+          roundSubmissions.filter((s) => s.track_id === g.track_id)
+        );
+        const inQueue = g.teams.length;
+        const suffix = isCoordinator
+          ? ` (${gradable} vào queue${inQueue ? ` · ${inQueue} slot` : ''})`
+          : '';
+        return {
+          label: `${g.group_name}${suffix}`,
+          value: g.track_id!,
+        };
+      }),
+    [trackTabs, roundSubmissions, isCoordinator]
+  );
 
   const selectedGroup = useMemo(() => {
-    if (!localGroups.length) return null;
-    return localGroups.find((g) => g.track_id === selectedTrackId) || localGroups[0];
-  }, [localGroups, selectedTrackId]);
+    if (!trackTabs.length) return null;
+    return trackTabs.find((g) => g.track_id === selectedTrackId) || trackTabs[0];
+  }, [trackTabs, selectedTrackId]);
 
   const handleTrackChange = (trackId: number) => {
     setSelectedTrackId(trackId);
@@ -159,11 +211,15 @@ const PresentationQueuePage: React.FC = () => {
 
   const trackIds = useMemo(
     () =>
-      (queueData?.groups || [])
+      trackTabs
         .map((g) => g.track_id)
         .filter((id): id is number => id != null),
-    [queueData?.groups]
+    [trackTabs]
   );
+
+  const handleRefreshAll = async () => {
+    await Promise.all([refetch(), isCoordinator ? refetchSubmissions() : Promise.resolve()]);
+  };
 
   const isQueueShuffled = useMemo(
     () => Boolean(selectedGroup?.shuffled),
@@ -190,7 +246,7 @@ const PresentationQueuePage: React.FC = () => {
     },
     onSuccess: async () => {
       toast.success('Đã xáo trộn hàng đợi thuyết trình.');
-      await refetch();
+      await Promise.all([refetch(), isCoordinator ? refetchSubmissions() : Promise.resolve()]);
     },
     onError: (err: any) => {
       const code = err?.code || err?.response?.data?.error?.code;
@@ -212,13 +268,16 @@ const PresentationQueuePage: React.FC = () => {
     return true;
   }, [isCoordinator, roleHints]);
 
-  const handleShuffleClick = () => {
+  const handleShuffleClick = (shuffleAll = false) => {
     if (shouldWarnShuffleWhenLocked(scoringLocked)) {
       const ok = window.confirm(getShuffleLockedWarning());
       if (!ok) return;
     }
-    shuffleMutation.mutate(selectedTrackId ? [selectedTrackId] : trackIds);
+    const ids = shuffleAll ? trackIds : selectedTrackId ? [selectedTrackId] : trackIds;
+    shuffleMutation.mutate(ids);
   };
+
+  const handleShuffleAllClick = () => handleShuffleClick(true);
 
   const nextMutation = useMutation({
     mutationFn: async (options?: {
@@ -351,10 +410,9 @@ const PresentationQueuePage: React.FC = () => {
     }
   };
 
-  const roomStats = queueData?.room_stats;
-  const total = roomStats?.total ?? flatTeams.length;
-  const done = roomStats?.done ?? flatTeams.filter((t) => t.status === 'DONE').length;
-  const absent = roomStats?.absent ?? flatTeams.filter((t) => t.status === 'ELIMINATED').length;
+  const total = flatTeams.length;
+  const done = flatTeams.filter((t) => t.status === 'DONE').length;
+  const absent = flatTeams.filter((t) => t.status === 'ELIMINATED').length;
   const progressPercent = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
@@ -381,31 +439,60 @@ const PresentationQueuePage: React.FC = () => {
           }}>
             👥 Thứ Tự Thuyết Trình
           </h1>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {roleHints.showShuffle && (
-              <button
-                onClick={handleShuffleClick}
-                disabled={shuffleMutation.isPending || !roundId}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '7px 14px',
-                  border: '1px solid #BBF7D0',
-                  borderRadius: '8px',
-                  background: '#DCFCE7',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: shuffleMutation.isPending ? 'not-allowed' : 'pointer',
-                  color: '#166534',
-                  opacity: shuffleMutation.isPending ? 0.7 : 1,
-                }}
-              >
-                🔀 Xáo trộn
-              </button>
+              <>
+                <button
+                  onClick={() => handleShuffleClick(false)}
+                  disabled={shuffleMutation.isPending || !roundId}
+                  title={
+                    selectedTrackId
+                      ? `Xáo trộn track hiện tại (${gradableOnSelectedTrack} bài đủ điều kiện)`
+                      : 'Xáo trộn track hiện tại'
+                  }
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '7px 14px',
+                    border: '1px solid #BBF7D0',
+                    borderRadius: '8px',
+                    background: '#DCFCE7',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: shuffleMutation.isPending ? 'not-allowed' : 'pointer',
+                    color: '#166534',
+                    opacity: shuffleMutation.isPending ? 0.7 : 1,
+                  }}
+                >
+                  🔀 Xáo trộn track này
+                </button>
+                {trackIds.length > 1 && (
+                  <button
+                    onClick={handleShuffleAllClick}
+                    disabled={shuffleMutation.isPending || !roundId}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '7px 14px',
+                      border: '1px solid #BFDBFE',
+                      borderRadius: '8px',
+                      background: '#EFF6FF',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: shuffleMutation.isPending ? 'not-allowed' : 'pointer',
+                      color: '#1D4ED8',
+                      opacity: shuffleMutation.isPending ? 0.7 : 1,
+                    }}
+                  >
+                    🔀 Xáo trộn tất cả track
+                  </button>
+                )}
+              </>
             )}
             <button 
-            onClick={() => refetch()}
+            onClick={handleRefreshAll}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -431,17 +518,28 @@ const PresentationQueuePage: React.FC = () => {
           Điều hành phòng thuyết trình và theo dõi thời gian trình bày, phản biện.
         </p>
 
-        {localGroups.length > 1 && (
+        {trackTabs.length > 1 && (
           <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: 6 }}>
+              Chọn track để xem hàng đợi và xáo trộn riêng từng phòng:
+            </div>
             <Segmented
+              block
               value={selectedTrackId ?? undefined}
               onChange={(value) => handleTrackChange(Number(value))}
-              options={localGroups.map((g) => ({
-                label: g.group_name,
-                value: g.track_id!,
-              }))}
+              options={trackSegmentOptions}
             />
           </div>
+        )}
+
+        {isCoordinator && trackTabs.length <= 1 && roundTracks.length > 1 && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message="Hackathon có nhiều track"
+            description="Đang tải danh sách track — nếu không thấy tab chuyển track, bấm Làm mới."
+          />
         )}
 
         {roleHints.warningMessage && (
@@ -535,6 +633,28 @@ const PresentationQueuePage: React.FC = () => {
           
           {/* CỘT TRÁI — QUEUE LIST */}
           <div>
+            <PresentationReadinessPanel
+              roundId={roundId}
+              trackId={selectedTrackId}
+              trackName={selectedGroup?.group_name}
+              canReviewLate={isCoordinator}
+              onReviewSuccess={handleRefreshAll}
+            />
+
+            {selectedGroup && selectedGroup.teams.length === 0 && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+                message="Hàng đợi track này chưa được xáo trộn"
+                description={
+                  gradableOnSelectedTrack > 0
+                    ? `Có ${gradableOnSelectedTrack} bài đủ điều kiện — bấm "Xáo trộn track này" để tạo thứ tự thuyết trình.`
+                    : 'Chưa có bài đủ điều kiện (nộp đúng hạn hoặc đã duyệt trễ). Kiểm tra bảng tình trạng bài nộp phía trên.'
+                }
+              />
+            )}
+
             {selectedGroup && (
               <div 
                 key={selectedGroup.group_name}

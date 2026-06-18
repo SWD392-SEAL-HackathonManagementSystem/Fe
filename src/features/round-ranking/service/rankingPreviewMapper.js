@@ -7,6 +7,29 @@ const toNumber = (value, fallback = 0) => {
 
 const normalizeStatus = (status) => String(status || DEFAULT_STATUS).toUpperCase();
 
+export const isRankingItemEliminated = (item = {}) => {
+  const status = normalizeStatus(
+    item.participationStatus ??
+      item.participation_status ??
+      item.status ??
+      item.teamStatus ??
+      item.team_status,
+  );
+  return status === "ELIMINATED";
+};
+
+export const sortRankingItemsByRank = (items = []) =>
+  items
+    .slice()
+    .sort(
+      (a, b) =>
+        a.rank - b.rank || (b.weightedAvgScore ?? -1) - (a.weightedAvgScore ?? -1),
+    );
+
+/** Đội còn thi đấu — thứ tự theo `rank` BE (đã re-rank sau loại đội). */
+export const getActiveRankingItems = (items = []) =>
+  sortRankingItemsByRank(items.filter((item) => !item.isEliminated));
+
 const getScoreValue = (item = {}) => {
   const rawScore = item.weightedAvgScore ?? item.weighted_avg_score ?? item.totalScore;
   return rawScore === undefined || rawScore === null ? null : toNumber(rawScore, null);
@@ -62,7 +85,9 @@ export const mapRankingPreviewItem = (item = {}) => {
   const group = getGroupInfo(item);
   const weightedAvgScore = getScoreValue(item);
   const scoringProgress = getScoringProgress(item);
-  const status = normalizeStatus(item.participationStatus ?? item.participation_status ?? item.status ?? item.teamStatus ?? item.team_status);
+  const participationStatus = normalizeStatus(
+    item.participationStatus ?? item.participation_status ?? item.status ?? item.teamStatus ?? item.team_status,
+  );
 
   return {
     rank: toNumber(item.rank, 0),
@@ -76,8 +101,9 @@ export const mapRankingPreviewItem = (item = {}) => {
     totalScore: weightedAvgScore,
     tiebreakRequired: Boolean(item.tiebreakRequired ?? item.tiebreak_required),
     ...scoringProgress,
-    status,
-    isEliminated: status === "ELIMINATED",
+    status: participationStatus,
+    participationStatus,
+    isEliminated: participationStatus === "ELIMINATED",
     groupKey: group.key,
     groupLabel: group.label,
     groupSortValue: group.sortValue,
@@ -112,9 +138,7 @@ export const groupRankingItems = (items = []) => {
   return Array.from(groupsByKey.values())
     .map((group) => ({
       ...group,
-      items: group.items
-        .slice()
-        .sort((a, b) => a.rank - b.rank || (b.weightedAvgScore ?? -1) - (a.weightedAvgScore ?? -1)),
+      items: sortRankingItemsByRank(group.items),
     }))
     .sort((a, b) => a.sortValue.localeCompare(b.sortValue, "vi"));
 };

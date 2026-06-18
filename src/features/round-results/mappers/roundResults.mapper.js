@@ -62,6 +62,7 @@ export const mapOfficialRankingItem = (item = {}, index = 0) => {
     isAdvanced: Boolean(
       firstDefined(item.isAdvanced, item.is_advanced, participationStatus === "ADVANCED"),
     ),
+    isEliminated: participationStatus === "ELIMINATED" || status === "ELIMINATED",
     ...group,
   };
 };
@@ -69,12 +70,11 @@ export const mapOfficialRankingItem = (item = {}, index = 0) => {
 export const mapOfficialRanking = (response) => {
   const items = asArray(response, ["rankings", "items", "teams", "leaderboard"])
     .map(mapOfficialRankingItem)
-    .filter((item) => item.status === "ACTIVE")
     .sort(
       (left, right) =>
         left.groupLabel.localeCompare(right.groupLabel, "vi") ||
-        right.weightedAvgScore - left.weightedAvgScore ||
-        left.rank - right.rank,
+        left.rank - right.rank ||
+        right.weightedAvgScore - left.weightedAvgScore,
     );
 
   return {
@@ -127,6 +127,7 @@ export const mapWildcardConfig = (response) => ({
     firstDefined(
       response?.hackathonWildcardEnabled,
       response?.hackathon_wildcard_enabled,
+      response?.hackathonWildcardEnabled,
       response?.globalWildcardEnabled,
       response?.global_wildcard_enabled,
       response?.wildcardEnabled,
@@ -145,24 +146,80 @@ export const mapWildcardConfig = (response) => ({
   availableSlots: Number(
     firstDefined(response?.availableSlots, response?.available_slots, response?.slots, 0),
   ) || 0,
-});
-
-export const mapWildcardCandidates = (response) => ({
-  config: mapWildcardConfig(response),
-  items: asArray(response, ["items", "candidates", "wildcardCandidates", "wildcard_candidates"]).map(
-    (item, index) => ({
-      ...mapOfficialRankingItem(item, index),
-      reviewId: firstDefined(item?.reviewId, item?.review_id, item?.wildcardReviewId, item?.id),
-      candidateRank: Number(
-        firstDefined(item?.candidateRank, item?.candidate_rank, item?.globalRank, item?.global_rank, index + 1),
-      ),
-      coordinatorApproved: firstDefined(
-        item?.coordinatorApproved,
-        item?.coordinator_approved,
-        item?.approved,
-        null,
-      ),
-      coordinatorNote: firstDefined(item?.coordinatorNote, item?.coordinator_note, item?.note, ""),
-    }),
+  autoAdvancedCount: Number(
+    firstDefined(response?.autoAdvancedCount, response?.auto_advanced_count, 0),
+  ) || 0,
+  approvedCount: Number(
+    firstDefined(response?.approvedCount, response?.approved_count, 0),
+  ) || 0,
+  decisionsFinalized: Boolean(
+    firstDefined(response?.decisionsFinalized, response?.decisions_finalized, false),
   ),
 });
+
+export const mapWildcardCandidates = (response) => {
+  const payload = response && !Array.isArray(response) ? response : null;
+  const itemsSource = payload?.candidates ?? payload?.items ?? response;
+
+  return {
+    config: mapWildcardConfig(payload ?? {}),
+    decisionsFinalized: Boolean(
+      firstDefined(payload?.decisionsFinalized, payload?.decisions_finalized, false),
+    ),
+    items: asArray(itemsSource, ["candidates", "items", "wildcardCandidates", "wildcard_candidates"]).map(
+      (item, index) => ({
+        ...mapOfficialRankingItem(item, index),
+        reviewId: firstDefined(item?.reviewId, item?.review_id, item?.wildcardReviewId, item?.id),
+        candidateRank: Number(
+          firstDefined(item?.candidateRank, item?.candidate_rank, item?.globalRank, item?.global_rank, index + 1),
+        ),
+        coordinatorApproved: firstDefined(
+          item?.coordinatorApproved,
+          item?.coordinator_approved,
+          item?.approved,
+          null,
+        ),
+        coordinatorNote: firstDefined(item?.coordinatorNote, item?.coordinator_note, item?.note, ""),
+        reason: firstDefined(item?.reason, ""),
+      }),
+    ),
+  };
+};
+
+export const enrichWildcardFromRound = (wildcard, round, ranking) => {
+  if (!round) return wildcard;
+
+  const topN = Number(round.top_n_advance ?? round.topNAdvance ?? 0);
+  const minFinal = Number(round.min_teams_final ?? round.minTeamsFinal ?? 0);
+  let autoAdvanced = wildcard?.config?.autoAdvancedCount ?? 0;
+
+  if (!autoAdvanced && topN > 0 && ranking?.items?.length) {
+    const byGroup = {};
+    ranking.items.forEach((item) => {
+      const key = item.groupLabel || item.groupKey || "default";
+      if (!byGroup[key]) byGroup[key] = [];
+      byGroup[key].push(item);
+    });
+    autoAdvanced = Object.values(byGroup).reduce((sum, groupItems) => {
+      return sum + groupItems.filter((team) => team.rank <= topN && !team.isEliminated).length;
+    }, 0);
+  }
+
+  const availableSlots =
+    wildcard?.config?.availableSlots ||
+    (minFinal > 0 ? Math.max(0, minFinal - autoAdvanced) : 0);
+
+  return {
+    ...wildcard,
+    config: {
+      hackathonEnabled: wildcard?.config?.hackathonEnabled ?? Boolean(round.wildcard_enabled ?? round.wildcardEnabled),
+      roundEnabled: wildcard?.config?.roundEnabled ?? Boolean(round.wildcard_enabled ?? round.wildcardEnabled),
+      availableSlots,
+      autoAdvancedCount: autoAdvanced,
+      approvedCount: wildcard?.config?.approvedCount ?? 0,
+      decisionsFinalized: Boolean(
+        wildcard?.decisionsFinalized ?? wildcard?.config?.decisionsFinalized,
+      ),
+    },
+  };
+};

@@ -107,7 +107,7 @@ const RoundRankingPreviewPage = ({
         type="info"
         showIcon
         message="Đây là bảng xếp hạng tạm thời"
-        description="Điểm và thứ hạng có thể tiếp tục thay đổi cho đến khi Coordinator khóa chấm. Cảnh báo đồng điểm ở màn này chưa phải kết quả tiebreak chính thức."
+        description="Điểm và thứ hạng có thể tiếp tục thay đổi cho đến khi Coordinator khóa chấm. Đội bị loại vi phạm được xếp cuối bảng; các đội còn lại được cập nhật hạng tự động. Cảnh báo đồng điểm ở màn này chưa phải kết quả tiebreak chính thức."
       />
 
       {error && (

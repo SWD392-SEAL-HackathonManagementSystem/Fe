@@ -1,6 +1,7 @@
 import { Card, Typography, theme } from "antd";
 import { motion } from "framer-motion";
 import { Crown, Medal, Trophy } from "lucide-react";
+import { getActiveRankingItems } from "../service/rankingPreviewMapper";
 import RankingMovementTag from "./RankingMovementTag";
 import { getTopStepMeta } from "./rankingTone";
 
@@ -59,8 +60,9 @@ const RankingTopStepCard = ({ item, movement, index }) => {
 };
 
 const RankingTopSteps = ({ items = [], movements = {} }) => {
+  const activeTop = getActiveRankingItems(items).slice(0, 3);
   const topItems = topOrder
-    .map((rank) => items.find((item) => item.rank === rank && !item.isEliminated))
+    .map((rank) => activeTop.find((item) => item.rank === rank))
     .filter(Boolean);
 
   if (!topItems.length) return null;

@@ -11,10 +11,12 @@ const PeopleManagementPage = ({ hackathonId }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [inviteForm] = Form.useForm();
   const [mentorForm] = Form.useForm();
-  const [judgeForm] = Form.useForm();
+  const [prelimJudgeForm] = Form.useForm();
+  const [finalJudgeForm] = Form.useForm();
 
   const selectedMentorTrackId = Form.useWatch('track_id', mentorForm);
-  const selectedJudgeTrackId = Form.useWatch('track_id', judgeForm);
+  const selectedPrelimJudgeTrackId = Form.useWatch('track_id', prelimJudgeForm);
+  const selectedFinalJudgeTrackId = Form.useWatch('track_id', finalJudgeForm);
 
   const {
     mentors,
@@ -55,9 +57,13 @@ const PeopleManagementPage = ({ hackathonId }) => {
   const renderJudgeRole = (role) => {
     switch (role) {
       case 'HEAD':
-        return <Tag color="red">Trưởng ban</Tag>;
+        return <Tag color="red">Trưởng ban (HEAD)</Tag>;
+      case 'FINAL_EXTERNAL':
+        return <Tag color="purple">Giám khảo CK (FINAL_EXTERNAL)</Tag>;
       case 'CALIBRATION':
         return <Tag color="gold">Chấm chéo</Tag>;
+      case 'NORMAL':
+        return <Tag color="blue">Giám khảo (NORMAL)</Tag>;
       default:
         return <Tag color="blue">Giám khảo</Tag>;
     }
@@ -230,9 +236,13 @@ const PeopleManagementPage = ({ hackathonId }) => {
             <Card type="inner" style={{ marginBottom: 24, background: '#fafafa', borderRadius: 8 }}>
               <Form
                 layout="inline"
-                form={judgeForm}
-                initialValues={{ assignment_type: 'FINAL_EXTERNAL' }}
-                onFinish={(vals) => assignJudge(vals, () => judgeForm.resetFields())}
+                form={prelimJudgeForm}
+                initialValues={{ assignment_type: 'NORMAL' }}
+                onFinish={(vals) =>
+                  assignJudge({ ...vals, is_final_assignment: false }, () =>
+                    prelimJudgeForm.resetFields(['person_id', 'track_id'])
+                  )
+                }
               >
                 <Form.Item name="track_id" rules={[{ required: true, message: 'Chọn bảng đấu' }]}>
                   <Select placeholder="Chọn bảng đấu" style={{ width: 220 }} showSearch optionFilterProp="children">
@@ -250,15 +260,16 @@ const PeopleManagementPage = ({ hackathonId }) => {
                     style={{ width: 220 }}
                     showSearch
                     optionFilterProp="children"
-                    disabled={!selectedJudgeTrackId}
+                    disabled={!selectedPrelimJudgeTrackId}
                   >
-                    {judgeOptionsForTrack(selectedJudgeTrackId)}
+                    {judgeOptionsForTrack(selectedPrelimJudgeTrackId)}
                   </Select>
                 </Form.Item>
 
-                <Form.Item name="assignment_type">
-                  <Select style={{ width: 130 }}>
-                    <Option value="FINAL_EXTERNAL">FINAL_EXTERNAL</Option>
+                <Form.Item name="assignment_type" rules={[{ required: true, message: 'Chọn vai trò' }]}>
+                  <Select style={{ width: 150 }} placeholder="Vai trò">
+                    <Option value="NORMAL">NORMAL</Option>
+                    <Option value="HEAD">HEAD</Option>
                   </Select>
                 </Form.Item>
 
@@ -267,7 +278,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
                 </Button>
               </Form>
               <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 12 }}>
-                Giai đoạn này chỉ gán giám khảo Sơ loại theo bảng. Giám khảo Chung kết sẽ gán ở giai đoạn sau.
+                Vòng Sơ loại chỉ gán <strong>NORMAL</strong> hoặc <strong>HEAD</strong> theo bảng đấu. Không dùng FINAL_EXTERNAL ở giai đoạn này.
               </Text>
             </Card>
 
@@ -312,9 +323,13 @@ const PeopleManagementPage = ({ hackathonId }) => {
             <Card type="inner" style={{ marginBottom: 24, background: '#fafafa', borderRadius: 8 }}>
               <Form
                 layout="inline"
-                form={judgeForm}
+                form={finalJudgeForm}
                 initialValues={{ assignment_type: 'FINAL_EXTERNAL', is_final_assignment: true }}
-                onFinish={(vals) => assignJudge(vals, () => judgeForm.resetFields())}
+                onFinish={(vals) =>
+                  assignJudge(vals, () =>
+                    finalJudgeForm.resetFields(['person_id', 'track_id', 'round_id'])
+                  )
+                }
               >
                 {finalTracks.length > 0 ? (
                   <Form.Item name="track_id" rules={[{ required: true, message: 'Chọn bảng đấu CK' }]}>
@@ -343,16 +358,17 @@ const PeopleManagementPage = ({ hackathonId }) => {
                     style={{ width: 240 }}
                     showSearch
                     optionFilterProp="children"
-                    disabled={!selectedJudgeTrackId && finalTracks.length > 0}
+                    disabled={!selectedFinalJudgeTrackId && finalTracks.length > 0}
                   >
-                    {judgeOptionsForTrack(selectedJudgeTrackId)}
+                    {judgeOptionsForTrack(selectedFinalJudgeTrackId)}
                   </Select>
                 </Form.Item>
                 <Form.Item name="is_final_assignment" hidden>
                   <Input />
                 </Form.Item>
-                <Form.Item name="assignment_type">
-                  <Select style={{ width: 130 }}>
+                <Form.Item name="assignment_type" rules={[{ required: true, message: 'Chọn vai trò' }]}>
+                  <Select style={{ width: 170 }} placeholder="Vai trò">
+                    <Option value="HEAD">HEAD</Option>
                     <Option value="FINAL_EXTERNAL">FINAL_EXTERNAL</Option>
                   </Select>
                 </Form.Item>
@@ -360,6 +376,9 @@ const PeopleManagementPage = ({ hackathonId }) => {
                   Gán giám khảo CK
                 </Button>
               </Form>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 12 }}>
+                Vòng Chung kết chỉ gán <strong>HEAD</strong> (trưởng ban) hoặc <strong>FINAL_EXTERNAL</strong> (giám khảo khách).
+              </Text>
             </Card>
             <Table
               dataSource={finalJudgeAssignments}

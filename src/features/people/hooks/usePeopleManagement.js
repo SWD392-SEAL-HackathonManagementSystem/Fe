@@ -243,19 +243,27 @@ export const usePeopleManagement = (hackathonId) => {
       const isFinalFlow = Boolean(values.is_final_assignment) || isFinalTrack || Boolean(finalRoundIdFromForm);
 
       if (isFinalFlow && finalRoundId) {
+        if (!['HEAD', 'FINAL_EXTERNAL'].includes(assignmentType)) {
+          message.error('Vòng Chung kết chỉ gán HEAD hoặc FINAL_EXTERNAL.');
+          return;
+        }
         await peopleService.assignFinalRoundJudge({
           roundId: finalRoundId,
           judgeId: values.person_id,
-          assignmentType: 'FINAL_EXTERNAL',
+          assignmentType,
         });
-        message.success('Đã gán giám khảo Chung kết (FINAL_EXTERNAL).');
+        message.success(`Đã gán giám khảo Chung kết (${assignmentType}).`);
       } else {
+        if (!['NORMAL', 'HEAD'].includes(assignmentType)) {
+          message.error('Vòng Sơ loại chỉ gán NORMAL hoặc HEAD.');
+          return;
+        }
         await peopleService.assignJudge({
           judgeId: values.person_id,
           trackId: trackId || undefined,
           assignmentType,
         });
-        message.success('Đã gán giám khảo cho bảng đấu.');
+        message.success(`Đã gán giám khảo Sơ loại (${assignmentType}).`);
       }
       await fetchBaseData();
       if (onSuccess) onSuccess();

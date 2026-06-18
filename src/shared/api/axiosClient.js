@@ -32,6 +32,10 @@ axiosClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
+    // FormData: để browser/axios tự gắn boundary — gửi tay "multipart/form-data" làm hỏng file
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
     return config;
   },
   function (error) {

@@ -5,10 +5,36 @@ import { CheckOutlined, CloseOutlined, StarOutlined } from "@ant-design/icons";
 const { Text } = Typography;
 const { TextArea } = Input;
 
-const WildcardPanel = ({ wildcard, error, decidingReviewId, onDecide }) => {
+const WildcardPanel = ({ wildcard, error, decidingReviewId, onDecide, readOnly = false }) => {
   const [decision, setDecision] = useState(null);
   const [note, setNote] = useState("");
   const enabled = wildcard.config.hackathonEnabled && wildcard.config.roundEnabled;
+  const slots = wildcard.config.availableSlots ?? 0;
+  const approvedCount =
+    wildcard.config.approvedCount ??
+    wildcard.items.filter((item) => item.coordinatorApproved === true).length;
+  const poolFinalized =
+    wildcard.decisionsFinalized ??
+    wildcard.config?.decisionsFinalized ??
+    (wildcard.items.length > 0 &&
+      wildcard.items.every(
+        (item) => item.coordinatorApproved === true || item.coordinatorApproved === false,
+      ));
+  const tiedAtCutoff = enabled && slots > 0 && wildcard.items.length > slots;
+  const isDecided = (candidate) =>
+    candidate.coordinatorApproved === true || candidate.coordinatorApproved === false;
+
+  const canApprove = (candidate) =>
+    enabled &&
+    candidate.reviewId &&
+    !poolFinalized &&
+    !isDecided(candidate) &&
+    approvedCount < slots;
+
+  const canReject = (candidate) =>
+    enabled && candidate.reviewId && !poolFinalized && !isDecided(candidate);
+
+  const showActions = enabled && !readOnly && !poolFinalized;
 
   const closeModal = () => {
     setDecision(null);
@@ -38,9 +64,29 @@ const WildcardPanel = ({ wildcard, error, decidingReviewId, onDecide }) => {
 
       <Alert
         showIcon
-        type={enabled ? "info" : "warning"}
-        message={<Text strong>{enabled ? "Wild Card đang khả dụng" : "Chưa thể xét Wild Card"}</Text>}
-        description={<Text type="secondary">Chức năng này cần được bật cấu hình Vé vớt ở cả cấp độ Hackathon và Vòng thi. Hệ thống sẽ tự động so sánh chéo điểm số giữa các bảng để đưa ra đề xuất.</Text>}
+        type={enabled ? (poolFinalized ? "success" : tiedAtCutoff ? "warning" : "info") : "warning"}
+        message={
+          <Text strong>
+            {poolFinalized
+              ? "Đã chốt quyết định vé vớt"
+              : enabled
+                ? tiedAtCutoff
+                  ? `Đồng điểm vé vớt — chọn ${slots} đội (đã duyệt ${approvedCount}/${slots})`
+                  : "Wild Card đang khả dụng"
+                : "Chưa thể xét Wild Card"}
+          </Text>
+        }
+        description={
+          <Text type="secondary">
+            {poolFinalized
+              ? "Mỗi đội chỉ được quyết định một lần. Các đội còn lại đã tự động từ chối khi đủ suất."
+              : enabled
+                ? tiedAtCutoff
+                  ? "Duyệt đủ số suất — hệ thống tự từ chối các đội còn lại. Không thể đổi quyết định sau khi chốt."
+                  : "Hệ thống so sánh chéo điểm các đội ngoài Top N mỗi bảng để đề xuất bù suất Chung kết."
+                : "Bật Vé vớt ở cấp Hackathon và Vòng Sơ loại để duyệt / từ chối đề xuất."}
+          </Text>
+        }
         style={{ borderRadius: 8 }}
       />
 
@@ -98,37 +144,54 @@ const WildcardPanel = ({ wildcard, error, decidingReviewId, onDecide }) => {
             {
               title: "Trạng thái",
               dataIndex: "coordinatorApproved",
+              width: 130,
               render: (approved) =>
-                approved === true ? <Tag color="success" style={{ fontWeight: 600, padding: '4px 10px' }}>Đã duyệt</Tag> : approved === false ? <Tag color="error" style={{ fontWeight: 600, padding: '4px 10px' }}>Đã từ chối</Tag> : <Tag color="processing" style={{ fontWeight: 600, padding: '4px 10px' }}>Chờ duyệt</Tag>,
+                approved === true ? (
+                  <Tag color="success" style={{ fontWeight: 600, padding: "4px 10px" }}>Đã duyệt</Tag>
+                ) : approved === false ? (
+                  <Tag color="error" style={{ fontWeight: 600, padding: "4px 10px" }}>Đã từ chối</Tag>
+                ) : (
+                  <Tag color="processing" style={{ fontWeight: 600, padding: "4px 10px" }}>Chờ duyệt</Tag>
+                ),
             },
             {
-              title: "Thao tác",
-              key: "actions",
-              width: 210,
-              render: (_, candidate) => (
-                <Space>
-                  <Button
-                    type="primary"
-                    ghost
-                    icon={<CheckOutlined />}
-                    disabled={!enabled || !candidate.reviewId}
-                    loading={decidingReviewId === candidate.reviewId}
-                    onClick={() => setDecision({ candidate, approved: true })}
-                  >
-                    Duyệt
-                  </Button>
-                  <Button
-                    danger
-                    icon={<CloseOutlined />}
-                    disabled={!enabled || !candidate.reviewId}
-                    loading={decidingReviewId === candidate.reviewId}
-                    onClick={() => setDecision({ candidate, approved: false })}
-                  >
-                    Từ chối
-                  </Button>
-                </Space>
-              ),
+              title: "Ghi chú",
+              dataIndex: "reason",
+              ellipsis: true,
+              render: (value) => <Text type="secondary">{value || "—"}</Text>,
             },
+            ...(showActions
+              ? [
+                  {
+                    title: "Thao tác",
+                    key: "actions",
+                    width: 210,
+                    render: (_, candidate) => (
+                      <Space>
+                        <Button
+                          type="primary"
+                          ghost
+                          icon={<CheckOutlined />}
+                          disabled={!canApprove(candidate)}
+                          loading={decidingReviewId === candidate.reviewId}
+                          onClick={() => setDecision({ candidate, approved: true })}
+                        >
+                          Duyệt
+                        </Button>
+                        <Button
+                          danger
+                          icon={<CloseOutlined />}
+                          disabled={!canReject(candidate)}
+                          loading={decidingReviewId === candidate.reviewId}
+                          onClick={() => setDecision({ candidate, approved: false })}
+                        >
+                          Từ chối
+                        </Button>
+                      </Space>
+                    ),
+                  },
+                ]
+              : []),
           ]}
         />
       </Card>
@@ -147,7 +210,13 @@ const WildcardPanel = ({ wildcard, error, decidingReviewId, onDecide }) => {
             type={decision?.approved ? "info" : "warning"}
             showIcon
             message={decision?.candidate?.teamName}
-            description="Quyết định này sẽ được lưu vào Wildcard Review và Audit Log."
+            description={
+              decision?.approved
+                ? approvedCount + 1 >= slots
+                  ? "Sau khi duyệt, các đội còn lại sẽ tự động bị từ chối. Quyết định không thể hoàn tác."
+                  : "Quyết định duyệt không thể thay đổi sau khi xác nhận."
+                : "Quyết định từ chối không thể thay đổi sau khi xác nhận."
+            }
           />
           <Text strong>Ghi chú của Coordinator</Text>
           <TextArea

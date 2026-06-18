@@ -44,7 +44,9 @@ const RankingPreviewPanel = ({
             onChange={onGroupChange}
           />
           <Text type="secondary">
-            {summary.totalTeams} đội · {summary.groupCount} bảng · {summary.incompleteTeams} chưa chấm đủ · {summary.tiebreakCount} nguy cơ đồng điểm
+            {summary.totalTeams} đội · {summary.groupCount} bảng
+            {summary.eliminatedTeams > 0 ? ` · ${summary.eliminatedTeams} đã loại` : ""}
+            {` · ${summary.incompleteTeams} chưa chấm đủ · ${summary.tiebreakCount} nguy cơ đồng điểm`}
           </Text>
         </div>
 

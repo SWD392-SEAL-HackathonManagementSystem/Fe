@@ -20,6 +20,22 @@ const submissionSchema = z.object({
     .refine((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'), {
       message: 'Chỉ chấp nhận file PDF',
     })
+    .refine(
+      async (f) => {
+        const header = new Uint8Array(await f.slice(0, 4).arrayBuffer());
+        return (
+          header.length === 4 &&
+          header[0] === 0x25 &&
+          header[1] === 0x50 &&
+          header[2] === 0x44 &&
+          header[3] === 0x46
+        );
+      },
+      {
+        message:
+          'File không phải PDF thật. Hãy xuất PDF từ PowerPoint/Google Slides (Tải xuống dạng PDF), không đổi đuôi file.',
+      }
+    )
     .optional(),
   late_reason: z.string().optional(),
 });
@@ -396,8 +412,8 @@ const StudentSubmissionPage: React.FC = () => {
               }}>
                 <span style={{ color: '#16A34A', fontSize: '14px', marginTop: '1px' }}>ℹ️</span>
                 <span style={{ fontSize: '12px', color: darkMode ? '#4ADE80' : '#15803D', lineHeight: '1.5' }}>
-                  <strong>Lưu ý:</strong> Tải lên file PDF slide thuyết trình (theo quy định v4.1).
-                  Có thể nộp lại khi vòng chưa khóa chấm điểm.
+                  <strong>Lưu ý:</strong> Tải file PDF thật (xuất &quot;Save as PDF&quot; / &quot;Tải xuống dạng PDF&quot;).
+                  Không đổi đuôi .pptx/.docx thành .pdf.
                 </span>
               </div>
             </div>

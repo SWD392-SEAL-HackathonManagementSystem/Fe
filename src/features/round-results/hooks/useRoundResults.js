@@ -3,6 +3,7 @@ import { message } from "antd";
 import { roundResultsService } from "../services/roundResults.service";
 import { roundService } from "../../rounds/services/roundService";
 import { mapRoundToFE } from "../../rounds/mappers/roundMapper";
+import { enrichWildcardFromRound } from "../mappers/roundResults.mapper";
 
 const emptyRanking = { items: [], topNAdvance: 0, isPublished: false, roundName: "Vòng Sơ loại" };
 const emptyWildcard = {
@@ -35,14 +36,27 @@ export const useRoundResults = (roundId) => {
       ]);
 
       const nextErrors = {};
-      if (rankingResult.status === "fulfilled") setRanking(rankingResult.value);
-      else nextErrors.ranking = rankingResult.reason;
+      let nextRanking = emptyRanking;
+      let nextRound = null;
+      let nextWildcard = emptyWildcard;
+
+      if (rankingResult.status === "fulfilled") {
+        nextRanking = rankingResult.value;
+        setRanking(nextRanking);
+      } else nextErrors.ranking = rankingResult.reason;
+
       if (tiebreakResult.status === "fulfilled") setTiebreaks(tiebreakResult.value);
       else nextErrors.tiebreak = tiebreakResult.reason;
-      if (wildcardResult.status === "fulfilled") setWildcard(wildcardResult.value);
-      else nextErrors.wildcard = wildcardResult.reason;
-      if (roundResult.status === "fulfilled") setRound(mapRoundToFE(roundResult.value));
-      else nextErrors.round = roundResult.reason;
+
+      if (roundResult.status === "fulfilled") {
+        nextRound = mapRoundToFE(roundResult.value);
+        setRound(nextRound);
+      } else nextErrors.round = roundResult.reason;
+
+      if (wildcardResult.status === "fulfilled") {
+        nextWildcard = enrichWildcardFromRound(wildcardResult.value, nextRound, nextRanking);
+        setWildcard(nextWildcard);
+      } else nextErrors.wildcard = wildcardResult.reason;
 
       setErrors(nextErrors);
       setIsLoading(false);
@@ -116,18 +130,99 @@ export const useRoundResults = (roundId) => {
   const scoringLocked = Boolean(round?.scoring_locked ?? round?.scoringLocked);
   const isPublished = Boolean(round?.is_published ?? ranking.isPublished);
 
+  const hasAdvanced = useMemo(
+    () => ranking.items.some((item) => item.isAdvanced || item.participationStatus === "ADVANCED"),
+    [ranking.items],
+  );
+
+  const wildcardDecisionsReady = useMemo(() => {
+    const pool = wildcard.items;
+    if (pool.length === 0 || !wildcard.config.roundEnabled) return true;
+    return Boolean(
+      wildcard.decisionsFinalized ??
+        wildcard.config?.decisionsFinalized ??
+        pool.every(
+          (item) => item.coordinatorApproved === true || item.coordinatorApproved === false,
+        ),
+    );
+  }, [wildcard]);
+
+  const advancePreview = useMemo(() => {
+    const { advancedTeamIds, eliminatedTeamIds } = buildAdvancePayload();
+    const byId = new Map(ranking.items.map((item) => [item.teamId, item]));
+    const advancedTeams = advancedTeamIds
+      .map((teamId) => byId.get(teamId))
+      .filter(Boolean);
+    return {
+      advancedTeamIds,
+      advancedTeamIdSet: new Set(advancedTeamIds),
+      advancedTeams,
+      eliminatedCount: eliminatedTeamIds.length,
+    };
+  }, [buildAdvancePayload, ranking.items]);
+
+  const rejectedWildcardTeamIdSet = useMemo(
+    () =>
+      new Set(
+        wildcard.items
+          .filter((item) => item.coordinatorApproved === false)
+          .map((item) => item.teamId)
+          .filter(Boolean),
+      ),
+    [wildcard.items],
+  );
+
+  const rosterDecided = useMemo(
+    () => wildcard.items.length === 0 || wildcardDecisionsReady,
+    [wildcard.items.length, wildcardDecisionsReady],
+  );
+
   const canPublish = useMemo(
     () => scoringLocked && !isPublished && !errors.ranking && ranking.items.length > 0,
     [scoringLocked, isPublished, errors.ranking, ranking.items.length],
   );
 
   const canAdvance = useMemo(
-    () => scoringLocked && isPublished && !errors.ranking && ranking.items.length > 0,
-    [scoringLocked, isPublished, errors.ranking, ranking.items.length],
+    () =>
+      scoringLocked &&
+      isPublished &&
+      !hasAdvanced &&
+      wildcardDecisionsReady &&
+      !errors.ranking &&
+      ranking.items.length > 0,
+    [
+      scoringLocked,
+      isPublished,
+      hasAdvanced,
+      wildcardDecisionsReady,
+      errors.ranking,
+      ranking.items.length,
+    ],
   );
 
+  const publishDisabledReason = useMemo(() => {
+    if (!scoringLocked) return "Cần khóa chấm điểm trước.";
+    if (isPublished) return "Kết quả đã được công bố. Bấm «Chốt chuyển vòng» để xác nhận đội vào Chung kết.";
+    if (errors.ranking) return "Chưa tải được bảng xếp hạng.";
+    if (ranking.items.length === 0) return "Chưa có dữ liệu xếp hạng.";
+    return "";
+  }, [scoringLocked, isPublished, errors.ranking, ranking.items.length]);
+
+  const advanceDisabledReason = useMemo(() => {
+    if (!scoringLocked) return "Cần khóa chấm điểm trước.";
+    if (!isPublished) return "Cần công bố kết quả trước khi chốt chuyển vòng.";
+    if (hasAdvanced) return "Danh sách chuyển vòng đã được chốt.";
+    if (!wildcardDecisionsReady) return "Cần duyệt xong Wild Card trước khi chốt chuyển vòng.";
+    if (errors.ranking) return "Chưa tải được bảng xếp hạng.";
+    return "";
+  }, [scoringLocked, isPublished, hasAdvanced, wildcardDecisionsReady, errors.ranking]);
+
   const publishRound = async () => {
-    if (!roundId || !canPublish) return false;
+    if (!roundId) return false;
+    if (!canPublish) {
+      message.info(publishDisabledReason || "Không thể công bố kết quả lúc này.");
+      return false;
+    }
     setIsPublishing(true);
     try {
       await roundResultsService.publishRound(roundId);
@@ -143,7 +238,11 @@ export const useRoundResults = (roundId) => {
   };
 
   const advanceTeams = async (payload) => {
-    if (!roundId || !canAdvance) return false;
+    if (!roundId) return false;
+    if (!canAdvance) {
+      message.info(advanceDisabledReason || "Không thể chốt chuyển vòng lúc này.");
+      return false;
+    }
     setIsAdvancing(true);
     try {
       await roundResultsService.advanceTeams(roundId, payload || buildAdvancePayload());
@@ -181,8 +280,15 @@ export const useRoundResults = (roundId) => {
     decidingReviewId,
     scoringLocked,
     isPublished,
+    hasAdvanced,
+    wildcardDecisionsReady,
+    rosterDecided,
+    rejectedWildcardTeamIdSet,
+    advancePreview,
     canPublish,
     canAdvance,
+    publishDisabledReason,
+    advanceDisabledReason,
     buildAdvancePayload,
     fetchResults,
     decideWildcard,

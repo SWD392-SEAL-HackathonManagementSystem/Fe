@@ -12,10 +12,14 @@ export const useRankMovement = (items = []) => {
 
     items.forEach((item) => {
       const teamKey = String(item.teamId);
-      const previousRank = previousRanksRef.current.get(teamKey);
       nextRanks.set(teamKey, item.rank);
 
-      if (!previousRank || !item.rank || previousRank === item.rank) return;
+      if (item.isEliminated || !previousRanksRef.current.get(teamKey)) {
+        return;
+      }
+
+      const previousRank = previousRanksRef.current.get(teamKey);
+      if (!item.rank || previousRank === item.rank) return;
 
       nextMovements[teamKey] = {
         direction: item.rank < previousRank ? "up" : "down",
