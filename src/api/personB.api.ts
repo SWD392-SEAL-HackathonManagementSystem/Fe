@@ -153,17 +153,22 @@ export interface SubmissionRequest {
 }
 
 export interface SubmissionResponse {
-  status: 'ON_TIME' | 'LATE_PENDING' | 'REJECTED';
+  status: 'ON_TIME' | 'LATE_PENDING' | 'REJECTED' | 'INCOMPLETE';
+  submission_id?: number | string;
   submitted_at?: string;
   repo_url?: string;
   demo_url?: string;
   slide_url?: string;
   slide_file?: string;
   slide_download_path?: string;
+  has_slide?: boolean;
 }
 
 /** Shape BE trả về sau POST /submissions (axios interceptor đã unwrap `data`). */
 interface BeSubmissionRecord {
+  id?: number;
+  submissionId?: number;
+  submission_id?: number;
   status?: string;
   submittedAt?: string;
   submitted_at?: string;
