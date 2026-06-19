@@ -7,6 +7,8 @@ import { motion } from 'framer-motion';
 import TeamMemberManager from './TeamMemberManager';
 import TeamOverviewCard from './TeamOverviewCard';
 import FinalSubmissionPanel from '../../submission/components/FinalSubmissionPanel';
+import RoundProblemPanel from '../../round/components/RoundProblemPanel';
+import FinalRoundProblemPanel from '../../round/components/FinalRoundProblemPanel';
 
 const StudentTeamDashboard = ({ 
   selectedTeam, 
@@ -49,6 +51,18 @@ const StudentTeamDashboard = ({
               }}
             />
             {selectedTeam?.id && (hackathonId || selectedTeam?.hackathonId) && (
+              <RoundProblemPanel
+                team={selectedTeam}
+                hackathonId={hackathonId || selectedTeam.hackathonId}
+              />
+            )}
+            {selectedTeam?.id && (hackathonId || selectedTeam?.hackathonId) && (
+              <FinalRoundProblemPanel
+                teamId={selectedTeam.id}
+                hackathonId={hackathonId || selectedTeam.hackathonId}
+              />
+            )}
+            {selectedTeam?.id && (hackathonId || selectedTeam?.hackathonId) && (
               <FinalSubmissionPanel
                 teamId={selectedTeam.id}
                 hackathonId={hackathonId || selectedTeam.hackathonId}
@@ -59,7 +73,11 @@ const StudentTeamDashboard = ({
 
         <Col xs={24} lg={9} xl={8}>
           <div style={{ position: 'sticky', top: 24 }}>
-            <TeamOverviewCard team={selectedTeam} onConfirmFormation={confirmTeamFormation} />
+            <TeamOverviewCard
+              team={selectedTeam}
+              onConfirmFormation={confirmTeamFormation}
+              actionLoading={isActionLoading}
+            />
           </div>
         </Col>
       </Row>

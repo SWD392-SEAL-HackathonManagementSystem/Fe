@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { message } from 'antd';
 import { judgeService } from '../services/judgeService';
 import { criteriaService } from '../../criteria/services/criteriaService';
@@ -14,6 +14,10 @@ import {
   isSubmissionFullyScored,
   computeWeightedTotal,
   findTeamBySubmissionId,
+  loadScoreDraft,
+  saveScoreDraft,
+  clearScoreDraft,
+  mergeSavedAndDraftScores,
 } from '../utils/liveScoringUtils';
 
 /**
@@ -41,6 +45,9 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
   const [savedScoresBySubmission, setSavedScoresBySubmission] = useState({});
   const [scoringStatus, setScoringStatus] = useState(null);
   const [isConfirmingScoring, setIsConfirmingScoring] = useState(false);
+  const draftSaveTimerRef = useRef(null);
+  const autosaveTimerRef = useRef(null);
+  const pendingAutosaveRef = useRef(null);
 
   const scoreType = isCalibration ? 'CALIBRATION' : 'NORMAL';
   const skipPresentationQueue = isFinal && !isCalibration;
@@ -251,15 +258,62 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
       return;
     }
 
-    const saved = savedScoresBySubmission[selectedTeam.submissionId];
+    const submissionId = selectedTeam.submissionId;
+    const saved = savedScoresBySubmission[submissionId];
+    const draft = loadScoreDraft(assignmentId, submissionId);
+
     if (selectedTeam.status === 'SCORED' && saved) {
       setCurrentScores(saved.scores);
       setComment(saved.comment || '');
+      clearScoreDraft(assignmentId, submissionId);
+      return;
+    }
+
+    const merged = mergeSavedAndDraftScores(saved, draft);
+    if (Object.keys(merged.scores).length > 0 || merged.comment) {
+      setCurrentScores(merged.scores);
+      setComment(merged.comment);
     } else {
       setCurrentScores({});
       setComment('');
     }
-  }, [selectedTeam?.submissionId, selectedTeam?.status, savedScoresBySubmission]);
+  }, [assignmentId, selectedTeam?.submissionId, selectedTeam?.status, savedScoresBySubmission]);
+
+  const persistScoreDraft = useCallback(
+    (scores, draftComment) => {
+      const submissionId = selectedTeam?.submissionId ?? selectedTeam?.id;
+      if (!submissionId || selectedTeam?.status === 'SCORED') {
+        return;
+      }
+
+      saveScoreDraft(assignmentId, submissionId, {
+        scores,
+        comment: draftComment,
+      });
+    },
+    [assignmentId, selectedTeam?.submissionId, selectedTeam?.id, selectedTeam?.status]
+  );
+
+  useEffect(() => {
+    const submissionId = selectedTeam?.submissionId ?? selectedTeam?.id;
+    if (!submissionId || selectedTeam?.status === 'SCORED') {
+      return undefined;
+    }
+
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+    }
+
+    draftSaveTimerRef.current = setTimeout(() => {
+      persistScoreDraft(currentScores, comment);
+    }, 300);
+
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+      }
+    };
+  }, [currentScores, comment, persistScoreDraft, selectedTeam?.submissionId, selectedTeam?.id, selectedTeam?.status]);
 
   useEffect(() => {
     if (!roundId || isLoading || skipPresentationQueue) {
@@ -320,6 +374,90 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
   }, [isCalibration, skipPresentationQueue, scoringLocked, roundId, trackQueue, presentingItem, timerPhase, selectedTeam]);
 
   const canScore = !scoringLocked && !scoringBlockReason;
+
+  const autosaveScoresToServer = useCallback(async () => {
+    const submissionId = selectedTeam?.submissionId ?? selectedTeam?.id;
+    if (!submissionId || isCalibration || selectedTeam?.status === 'SCORED' || !canScore) {
+      return;
+    }
+
+    const payloadScores = pendingAutosaveRef.current?.scores ?? currentScores;
+    const payloadComment = pendingAutosaveRef.current?.comment ?? comment;
+    const entries = Object.entries(payloadScores).filter(([criterionId, value]) => {
+      const numeric = Number(value);
+      return !Number.isNaN(numeric) && numeric >= 0 && numeric < 10;
+    });
+
+    if (!entries.length) {
+      return;
+    }
+
+    try {
+      await Promise.all(
+        entries.map(([criterionId, scoreValue]) =>
+          judgeService.submitScore({
+            submissionId,
+            criterionId: Number(criterionId),
+            scoreValue: Number(scoreValue),
+            comment: payloadComment.trim(),
+            scoreType,
+          })
+        )
+      );
+
+      const nextSavedEntry = {
+        scores: { ...(savedScoresBySubmission[submissionId]?.scores ?? {}), ...payloadScores },
+        comment: payloadComment.trim(),
+      };
+
+      setSavedScoresBySubmission((prev) => ({
+        ...prev,
+        [submissionId]: nextSavedEntry,
+      }));
+    } catch (error) {
+      console.warn('Không thể tự động lưu điểm nháp:', error);
+    }
+  }, [
+    selectedTeam,
+    isCalibration,
+    canScore,
+    currentScores,
+    comment,
+    scoreType,
+    savedScoresBySubmission,
+  ]);
+
+  useEffect(() => {
+    const submissionId = selectedTeam?.submissionId ?? selectedTeam?.id;
+    if (!submissionId || selectedTeam?.status === 'SCORED' || isCalibration || !canScore) {
+      return undefined;
+    }
+
+    pendingAutosaveRef.current = { scores: currentScores, comment };
+
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    autosaveTimerRef.current = setTimeout(() => {
+      autosaveScoresToServer();
+    }, 800);
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [
+    currentScores,
+    comment,
+    canScore,
+    isCalibration,
+    autosaveScoresToServer,
+    selectedTeam?.submissionId,
+    selectedTeam?.id,
+    selectedTeam?.status,
+  ]);
 
   const handleScoreChange = (criteriaId, value) => {
     setCurrentScores((prev) => ({
@@ -529,6 +667,7 @@ export const useLiveScoring = (assignmentId, roundId, trackId, isFinal, options 
           : prev
       );
 
+      clearScoreDraft(assignmentId, submissionId);
       setCurrentScores({});
       setComment('');
       await refreshPresentationScoringStatus();

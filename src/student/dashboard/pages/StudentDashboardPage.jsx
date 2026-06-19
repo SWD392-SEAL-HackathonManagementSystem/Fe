@@ -7,6 +7,7 @@ import HackathonTimeline from '../components/HackathonTimeline';
 import TeamOverviewWidget from '../components/TeamOverviewWidget';
 import LiveCountdownWidget from '../components/LiveCountdownWidget';
 import FinalSubmissionPanel from '../../features/submission/components/FinalSubmissionPanel';
+import FinalRoundProblemPanel from '../../features/round/components/FinalRoundProblemPanel';
 import HackathonRegistrationPanel from '../../features/hackathon/components/HackathonRegistrationPanel';
 
 const { Text, Title } = Typography;
@@ -20,7 +21,10 @@ const STATUS_LABEL = {
 const getDisplayName = (user) => user?.fullName || user?.email || 'Sinh viên';
 
 const getHackathonName = (hackathon, selectedTeam) =>
-  hackathon?.name || hackathon?.hackathonName || selectedTeam?.hackathonName || 'Chưa có hackathon đang mở';
+  selectedTeam?.hackathonName ||
+  hackathon?.name ||
+  hackathon?.hackathonName ||
+  'Chưa đăng ký hackathon';
 
 const getMissionState = (user, selectedTeam) => {
   if (user?.status !== 'APPROVED') {
@@ -60,6 +64,7 @@ const StudentDashboardPage = () => {
     selectedTeam,
     isLoading: isDashboardLoading,
     isTeamLoading,
+    refreshHackathonAndTeam,
   } = useStudentDashboard();
   const mission = getMissionState(user, selectedTeam);
   const MissionIcon = mission.icon;
@@ -87,7 +92,10 @@ const StudentDashboardPage = () => {
       <ProfileStatusBanner user={user} />
 
       {user?.status === 'APPROVED' && (
-        <HackathonRegistrationPanel hasTeam={Boolean(selectedTeam)} />
+        <HackathonRegistrationPanel
+          hasTeam={Boolean(selectedTeam)}
+          onRegistrationChange={() => refreshHackathonAndTeam(user)}
+        />
       )}
 
       <motion.section
@@ -259,6 +267,10 @@ const StudentDashboardPage = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
+          <FinalRoundProblemPanel
+            teamId={selectedTeam.id}
+            hackathonId={activeHackathon?.id || selectedTeam.hackathonId}
+          />
           <FinalSubmissionPanel
             teamId={selectedTeam.id}
             hackathonId={activeHackathon?.id || selectedTeam.hackathonId}

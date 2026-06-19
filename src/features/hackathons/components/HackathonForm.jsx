@@ -1,6 +1,7 @@
 import React from 'react';
 import { Form, Input, DatePicker, Select, Switch, Row, Col, Typography } from 'antd';
 import dayjs from 'dayjs';
+import HackathonBannerUpload from './HackathonBannerUpload';
 
 const { TextArea } = Input;
 const { Option } = Select;
@@ -81,14 +82,13 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
         <Col span={12}>
           <Form.Item
             name="season"
-            label="Mùa"
+            label="Mùa (FPT)"
             rules={[{ required: true, message: 'Vui lòng chọn mùa' }]}
           >
             <Select placeholder="Chọn mùa">
-              <Option value="Spring">Xuân</Option>
-              <Option value="Summer">Hạ</Option>
-              <Option value="Fall">Thu</Option>
-              <Option value="Winter">Đông</Option>
+              <Option value="Spring">Spring — Xuân</Option>
+              <Option value="Summer">Summer — Hạ</Option>
+              <Option value="Fall">Fall — Thu</Option>
             </Select>
           </Form.Item>
         </Col>
@@ -112,11 +112,13 @@ const HackathonForm = ({ form, onFinish, initialValues }) => {
       </Form.Item>
 
       <Form.Item
-        name="banner_url"
-        label="Link ảnh Banner"
-        extra={fieldHint('BE hiện lưu banner dưới dạng URL. Vui lòng dùng link ảnh công khai.')}
+        label="Ảnh Banner"
+        extra={fieldHint('Upload ảnh JPG/PNG/WebP (tối đa 5MB). Ảnh hiển thị trên trang cấu hình sự kiện.')}
+        name="banner_file"
+        valuePropName="fileList"
+        getValueFromEvent={(event) => (Array.isArray(event) ? event : event?.fileList)}
       >
-        <Input placeholder="https://example.com/banner.jpg" />
+        <HackathonBannerUpload />
       </Form.Item>
 
       <Row gutter={24}>

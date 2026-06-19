@@ -13,6 +13,41 @@ interface PresentationControllerCardProps {
   canGrant?: boolean;
 }
 
+interface ControllerInfo {
+  judgeId?: number;
+  judge_id?: number;
+  judgeName?: string;
+  judge_name?: string;
+  source?: string;
+}
+
+const resolveControllerLabel = (controller: ControllerInfo | null | undefined, mode: 'track' | 'round') => {
+  if (!controller) {
+    return '';
+  }
+
+  const judgeName = controller.judgeName ?? controller.judge_name;
+  const judgeId = controller.judgeId ?? controller.judge_id;
+
+  if (judgeName && judgeId) {
+    if (controller.source === 'HEAD_DEFAULT') {
+      return `${judgeName} (HEAD judge mặc định)`;
+    }
+    if (controller.source === 'OVERRIDE') {
+      return `${judgeName} (Coordinator chỉ định)`;
+    }
+    return `${judgeName} (ID: ${judgeId})`;
+  }
+
+  if (controller.source === 'UNASSIGNED') {
+    return mode === 'track'
+      ? 'Chưa có HEAD judge — Coordinator chọn judge giữ timer bên dưới.'
+      : 'Chưa có judge giữ timer — Coordinator chọn judge bên dưới.';
+  }
+
+  return 'Chưa có controller.';
+};
+
 const PresentationControllerCard: React.FC<PresentationControllerCardProps> = ({
   trackId,
   roundId,
@@ -24,7 +59,7 @@ const PresentationControllerCard: React.FC<PresentationControllerCardProps> = ({
   const scopeId = mode === 'round' ? roundId : trackId;
   const enabled = Boolean(scopeId);
 
-  const { data: controller, isLoading: loadingController } = useQuery({
+  const { data: controller, isLoading: loadingController } = useQuery<ControllerInfo | null>({
     queryKey: ['presentationController', mode, scopeId],
     queryFn: async () => {
       if (!scopeId) return null;
@@ -36,20 +71,26 @@ const PresentationControllerCard: React.FC<PresentationControllerCardProps> = ({
   });
 
   const { data: judges = [], isLoading: loadingJudges } = useQuery({
-    queryKey: ['trackJudges', trackId],
+    queryKey: ['presentationJudges', mode, scopeId],
     queryFn: async () => {
-      if (!trackId || mode !== 'track') return [];
-      const data = await presentationService.listTrackJudges(trackId);
+      if (!scopeId) return [];
+      const data =
+        mode === 'round'
+          ? await presentationService.listRoundJudges(scopeId)
+          : await presentationService.listTrackJudges(scopeId);
       return Array.isArray(data) ? data : data?.items || data?.data || [];
     },
-    enabled: Boolean(trackId) && mode === 'track',
+    enabled,
   });
 
   useEffect(() => {
-    if (controller?.judgeId) {
-      setSelectedJudgeId(controller.judgeId);
+    const controllerJudgeId = controller?.judgeId ?? controller?.judge_id;
+    if (controllerJudgeId) {
+      setSelectedJudgeId(controllerJudgeId);
+    } else {
+      setSelectedJudgeId(null);
     }
-  }, [controller?.judgeId]);
+  }, [controller?.judgeId, controller?.judge_id]);
 
   const grantMutation = useMutation({
     mutationFn: async (judgeId: number) => {
@@ -70,6 +111,9 @@ const PresentationControllerCard: React.FC<PresentationControllerCardProps> = ({
 
   if (!enabled) return null;
 
+  const controllerLabel = resolveControllerLabel(controller, mode);
+  const showJudgePicker = canGrant;
+
   return (
     <div
       style={{
@@ -86,18 +130,17 @@ const PresentationControllerCard: React.FC<PresentationControllerCardProps> = ({
       {loadingController ? (
         <Spin size="small" />
       ) : (
-        <Text type="secondary" style={{ display: 'block', marginBottom: canGrant ? 10 : 0 }}>
-          {controller?.judgeName
-            ? `${controller.judgeName} (ID: ${controller.judgeId})`
-            : 'Chưa có controller — HEAD judge mặc định trên BE.'}
+        <Text type="secondary" style={{ display: 'block', marginBottom: showJudgePicker ? 10 : 0 }}>
+          {controllerLabel}
         </Text>
       )}
-      {canGrant && mode === 'track' && (
+      {showJudgePicker && (
         <Select
           style={{ width: '100%' }}
-          placeholder="Chọn judge"
+          placeholder={mode === 'track' ? 'Chọn judge giữ timer' : 'Chọn judge giữ timer vòng CK'}
           loading={loadingJudges || grantMutation.isPending}
           value={selectedJudgeId ?? undefined}
+          allowClear={false}
           onChange={(value) => {
             setSelectedJudgeId(value);
             grantMutation.mutate(value);

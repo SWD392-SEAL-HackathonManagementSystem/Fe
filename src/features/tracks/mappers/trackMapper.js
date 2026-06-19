@@ -8,6 +8,8 @@ export const mapTrackToFE = (beData) => {
     min_team_size: beData.minTeamSize,
     max_team_size: beData.maxTeamSize,
     round_id: beData.roundId,
+    problem_statement_url: beData.problemStatementUrl,
+    problem_statement_filename: beData.problemStatementFilename,
   };
 };
 

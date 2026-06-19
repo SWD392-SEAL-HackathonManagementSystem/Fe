@@ -1,16 +1,14 @@
 // src/features/teams/hooks/useLotteryManagement.js
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { message } from 'antd';
-import dayjs from 'dayjs';
 import { teamService } from '../services/teamService';
 import { trackService } from '../../tracks/services/trackService';
 import { roundService } from '../../rounds/services/roundService';
 import { hackathonService } from '../../hackathons/services/hackathonService';
 import { mapHackathonToFE } from '../../hackathons/mappers/hackathonMapper';
+import { getLotteryGateReason } from '../../hackathons/utils/hackathonRegistrationRules';
 import { getTeamErrorMessage } from '../../../shared/constants/teamErrors';
 import { mapTrackToBE } from '../../tracks/mappers/trackMapper';
-
-const isTeamLocked = (team) => !!(team?.isLocked ?? team?.is_locked);
 
 export const useLotteryManagement = (hackathonId) => {
   const [rounds, setRounds] = useState([]);
@@ -55,41 +53,8 @@ export const useLotteryManagement = (hackathonId) => {
   }, [fetchLotteryData]);
 
   const lotteryGate = useMemo(() => {
-    if (hackathon?.status && hackathon.status !== 'ONGOING') {
-      return {
-        allowed: false,
-        reason: 'Bốc thăm chỉ thực hiện khi hackathon đã ONGOING (sau bước Mở đăng ký ở tab Đánh giá).',
-      };
-    }
-
-    const regEnd = hackathon?.registration_end
-      ? dayjs(hackathon.registration_end).startOf('day')
-      : null;
-
-    if (!regEnd) {
-      return { allowed: false, reason: 'Chưa có ngày kết thúc đăng ký.' };
-    }
-
-    if (!dayjs().startOf('day').isAfter(regEnd)) {
-      return {
-        allowed: false,
-        reason: 'Khóa đội và bốc thăm chỉ từ ngày hôm sau khi kết thúc đăng ký.',
-      };
-    }
-
-    if (activeTeams.length === 0) {
-      return { allowed: false, reason: 'Chưa có đội ACTIVE được duyệt để bốc thăm.' };
-    }
-
-    const unlockedTeams = activeTeams.filter((t) => !isTeamLocked(t));
-    if (unlockedTeams.length > 0) {
-      return {
-        allowed: false,
-        reason: `Còn ${unlockedTeams.length} đội chưa bị khóa (is_locked). Hệ thống khóa sau ngày đăng ký.`,
-      };
-    }
-
-    return { allowed: true, reason: '' };
+    const reason = getLotteryGateReason(hackathon, activeTeams);
+    return { allowed: !reason, reason };
   }, [hackathon, activeTeams]);
 
   const handleAssignTopic = async (trackId, newTopic, currentTrackData) => {

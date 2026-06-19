@@ -1,9 +1,12 @@
-import React, { useEffect, useMemo } from 'react';
-import { Modal, Form, Input, InputNumber, Row, Col, Select, DatePicker, Switch, Tooltip, Alert } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Modal, Form, Input, InputNumber, Row, Col, Select, DatePicker, Switch, Tooltip, Alert, Button, message } from 'antd';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   buildRoundScheduleContext,
+  getMinFinalExamMoment,
+  getPrelimExamDay,
+  getPreliminaryGradingEndMoment,
   getRoundExamDisabledTime,
   getRoundScheduleHint,
   getRoundSubmissionDeadlineDisabledTime,
@@ -18,6 +21,8 @@ import {
   getAdvancementFieldMode,
   validateAdvancementConfig,
 } from '../utils/roundAdvancementRules';
+import RoundProblemPdfUpload from './RoundProblemPdfUpload';
+import { roundService } from '../services/roundService';
 
 const { Option } = Select;
 
@@ -39,6 +44,7 @@ const RoundFormModal = ({
   const submissionOpenWatch = Form.useWatch('submission_open', form);
   const topNWatch = Form.useWatch('top_n_advance', form);
   const minFinalWatch = Form.useWatch('min_teams_final', form);
+  const [viewingProblem, setViewingProblem] = useState(false);
   const hasPrelimRound = existingRounds.some((r) => !r.is_final);
   const advancementMode = getAdvancementFieldMode(hackathon, existingRounds);
 
@@ -123,6 +129,29 @@ const RoundFormModal = ({
   );
 
   const scheduleHint = getRoundScheduleHint(scheduleCtx);
+
+  const handleViewProblemPdf = async () => {
+    if (!initialValues?.id) return;
+    setViewingProblem(true);
+    try {
+      const blob = await roundService.getProblemStatement(initialValues.id);
+      const file = new Blob([blob], { type: 'application/pdf' });
+      const fileUrl = URL.createObjectURL(file);
+      const opened = window.open(fileUrl, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        URL.revokeObjectURL(fileUrl);
+        message.warning('Trình duyệt chặn cửa sổ mới. Vui lòng cho phép popup để xem PDF.');
+      }
+    } catch {
+      message.error('Không thể mở file đề bài. Vui lòng thử lại.');
+    } finally {
+      setViewingProblem(false);
+    }
+  };
+
+  const hasProblemFile = Boolean(
+    initialValues?.problem_statement_filename || initialValues?.problem_statement_url,
+  );
 
   const handleSubmit = () => {
     form.validateFields()
@@ -281,27 +310,24 @@ const RoundFormModal = ({
                     if (!isFinal || !value || !prelimRoundForSchedule) {
                       return Promise.resolve();
                     }
-                    const prelimExam = prelimRoundForSchedule.exam_at
-                      ? dayjs(prelimRoundForSchedule.exam_at)
-                      : null;
-                    if (!prelimExam) {
+                    const minFinal = getMinFinalExamMoment(prelimRoundForSchedule);
+                    const gradingEnd = getPreliminaryGradingEndMoment(prelimRoundForSchedule);
+                    const prelimDay = getPrelimExamDay(prelimRoundForSchedule);
+                    if (!minFinal || !gradingEnd || !prelimDay) {
                       return Promise.resolve();
                     }
-                    const prelimEnd = prelimExam.add(
-                      Math.max(prelimRoundForSchedule.coding_duration_hours || 0, 0),
-                      'hour'
-                    );
-                    const minFinal = prelimEnd.add(1, 'hour');
-                    const maxFinal = prelimEnd.add(2, 'hour');
-                    if (
-                      dayjs(value).isBefore(minFinal) ||
-                      dayjs(value).isAfter(maxFinal)
-                    ) {
+                    if (!dayjs(value).isSame(prelimDay, 'day')) {
                       return Promise.reject(
                         new Error(
-                          `Chung kết phải cách Sơ loại 1-2 giờ (${minFinal.format(
-                            'DD/MM HH:mm'
-                          )} - ${maxFinal.format('DD/MM HH:mm')})`
+                          `Chung kết phải cùng ngày Sơ loại (${prelimDay.format('DD/MM/YYYY')}).`
+                        )
+                      );
+                    }
+                    if (dayjs(value).isBefore(minFinal)) {
+                      return Promise.reject(
+                        new Error(
+                          `Khóa trước ${gradingEnd.format('DD/MM HH:mm')} (chấm Sơ loại). ` +
+                            `Chỉ chọn từ ${minFinal.format('DD/MM HH:mm')} trở đi.`
                         )
                       );
                     }
@@ -409,15 +435,54 @@ const RoundFormModal = ({
         </Row>
 
         <Row gutter={24}>
-          <Col span={12}>
+          {isFinal && (
+          <Col span={24}>
+            {initialValues?.problem_statement_filename && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`Đề bài hiện tại: ${initialValues.problem_statement_filename}`}
+                description={
+                  hasProblemFile ? (
+                    <Button
+                      type="link"
+                      style={{ padding: 0, height: 'auto' }}
+                      loading={viewingProblem}
+                      onClick={handleViewProblemPdf}
+                    >
+                      Xem PDF
+                    </Button>
+                  ) : null
+                }
+              />
+            )}
             <Form.Item
-              name="problem_statement_url"
-              label="Link Đề bài"
+              label="File đề bài (PDF)"
+              extra="Upload PDF đề bài Chung kết (tối đa 25MB). Có thể upload trước khi phát đề."
+              name="problem_file"
+              valuePropName="fileList"
+              getValueFromEvent={(event) => (Array.isArray(event) ? event : event?.fileList)}
             >
-              <Input placeholder="https://example.com/problem" />
+              <RoundProblemPdfUpload disabled={Boolean(initialValues?.problem_released_at)} />
             </Form.Item>
           </Col>
+          )}
         </Row>
+
+        {!isFinal && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Đề bài Sơ loại"
+            description={
+              <span style={{ fontSize: 12 }}>
+                Mỗi bảng đấu có đề riêng — upload PDF tại mục Quản lý bảng đấu, không upload tại vòng Sơ loại.
+              </span>
+            }
+          />
+        )}
 
         <Form.Item name="late_submission_policy" hidden>
           <Input />
@@ -446,8 +511,8 @@ const RoundFormModal = ({
                   name="top_n_advance"
                   label={
                     advancementMode === 'estimate'
-                      ? 'Vào CK mỗi bảng (dự tính)'
-                      : 'Vào CK mỗi bảng'
+                      ? 'Vào chung kết mỗi bảng (dự tính)'
+                      : 'Vào chung kết mỗi bảng'
                   }
                   dependencies={['min_teams_final']}
                   validateTrigger={['onChange', 'onBlur']}
@@ -483,8 +548,8 @@ const RoundFormModal = ({
                   name="min_teams_final"
                   label={
                     advancementMode === 'estimate'
-                      ? 'Tối thiểu vào CK (dự tính)'
-                      : 'Tối thiểu vào CK'
+                      ? 'Tối đa vào chung kết (dự tính)'
+                      : 'Tối đa vào chung kết'
                   }
                   dependencies={['top_n_advance']}
                   validateTrigger={['onChange', 'onBlur']}

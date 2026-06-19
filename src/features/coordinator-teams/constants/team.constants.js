@@ -68,6 +68,8 @@ export const TEAM_ERROR_CODES = {
   TEAM_HAS_PENDING_MEMBERS: 'TEAM_HAS_PENDING_MEMBERS',
   USER_IN_ANOTHER_TEAM: 'USER_IN_ANOTHER_TEAM',
   REGISTRATION_CLOSED: 'REGISTRATION_CLOSED',
+  TEAM_HAS_PENDING_MEMBERS: 'TEAM_HAS_PENDING_MEMBERS',
+  TEAM_FORMATION_NOT_SUBMITTED: 'TEAM_FORMATION_NOT_SUBMITTED',
   HACKATHON_NOT_ONGOING: 'HACKATHON_NOT_ONGOING',
   FORBIDDEN: 'FORBIDDEN',
 };
@@ -85,6 +87,9 @@ export const TEAM_ERROR_MESSAGES = {
   [TEAM_ERROR_CODES.TEAM_HAS_PENDING_MEMBERS]: 'Đội vẫn còn lời mời PENDING, cần xử lý trước khi duyệt.',
   [TEAM_ERROR_CODES.USER_IN_ANOTHER_TEAM]: 'Có thành viên đã thuộc đội khác trong Hackathon này.',
   [TEAM_ERROR_CODES.REGISTRATION_CLOSED]: 'Đã hết hạn đăng ký đội cho Hackathon này.',
+  [TEAM_ERROR_CODES.TEAM_HAS_PENDING_MEMBERS]: 'Đội vẫn còn lời mời PENDING, cần xử lý trước khi duyệt.',
+  [TEAM_ERROR_CODES.TEAM_FORMATION_NOT_SUBMITTED]:
+    'Trưởng nhóm chưa xác nhận thành lập đội. Chỉ duyệt sau khi leader bấm xác nhận.',
   [TEAM_ERROR_CODES.HACKATHON_NOT_ONGOING]: 'Hackathon không ở trạng thái ONGOING.',
   [TEAM_ERROR_CODES.FORBIDDEN]: 'Bạn không có quyền thực hiện thao tác này.',
 };

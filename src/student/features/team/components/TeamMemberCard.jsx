@@ -2,7 +2,7 @@
  * Component: TeamMemberCard
  * Chức năng: Card hiển thị thông tin của một thành viên trong đội (Avatar, Vai trò, Trạng thái) và các nút hành động (Xóa, Hủy mời).
  */
-import { Button, Space, Tag, Typography, theme, Avatar } from 'antd';
+import { Button, Modal, Space, Tag, Typography, theme, Avatar } from 'antd';
 import { DeleteOutlined, CrownOutlined, ClockCircleOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -38,6 +38,28 @@ const TeamMemberCard = ({ member, teamId, canCancelInvite, canKickMember, loadin
       case 'REJECTED': return <CloseCircleOutlined />;
       default: return null;
     }
+  };
+
+  const handleKickMember = () => {
+    const memberLabel = member.fullName || member.email || 'thành viên này';
+    Modal.confirm({
+      title: 'Mời thành viên rời đội?',
+      content: (
+        <>
+          Bạn sắp mời <strong>{memberLabel}</strong> rời khỏi đội.
+          {' '}Họ sẽ không còn là thành viên và cần lời mời mới nếu muốn tham gia lại.
+        </>
+      ),
+      okText: 'Mời rời đội',
+      okButtonProps: { danger: true },
+      cancelText: 'Hủy',
+      onOk: async () => {
+        const success = await onKickMember(teamId, member.userId);
+        if (!success) {
+          return Promise.reject();
+        }
+      },
+    });
   };
 
   return (
@@ -123,7 +145,7 @@ const TeamMemberCard = ({ member, teamId, canCancelInvite, canKickMember, loadin
             size="small"
             icon={<DeleteOutlined />}
             loading={loading}
-            onClick={() => onKickMember(teamId, member.userId)}
+            onClick={handleKickMember}
             style={{ width: '100%', borderRadius: 6, fontWeight: 600 }}
           >
             Mời rời đội

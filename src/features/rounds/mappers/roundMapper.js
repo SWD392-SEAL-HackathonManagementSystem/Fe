@@ -10,6 +10,22 @@ export const sortRoundsByExamAt = (rounds) => {
   );
 };
 
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL !== undefined
+    ? import.meta.env.VITE_API_BASE_URL
+    : 'http://localhost:8080';
+
+export const resolveProblemStatementUrl = (round) => {
+  if (!round?.id) return null;
+  const raw = round.problem_statement_url ?? round.problemStatementUrl;
+  if (!raw) return null;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    return raw;
+  }
+  const path = raw.startsWith('/api/') ? raw : `/api/v1/rounds/${round.id}/problem-statement`;
+  return `${API_BASE}${path}`;
+};
+
 export const mapRoundToFE = (beData) => {
   if (!beData) return null;
   return {
@@ -22,6 +38,7 @@ export const mapRoundToFE = (beData) => {
     submission_deadline: beData.submissionDeadline,
     coding_duration_hours: beData.codingDurationHours,
     problem_statement_url: beData.problemStatementUrl,
+    problem_statement_filename: beData.problemStatementFilename,
     problem_released_at: beData.problemReleasedAt,
     top_n_advance: beData.topNAdvance,
     wildcard_enabled: beData.wildcardEnabled,
@@ -50,7 +67,6 @@ export const mapRoundToBE = (feData) => {
     codingDurationHours: feData.coding_duration_hours
       ? parseFloat(feData.coding_duration_hours)
       : null,
-    problemStatementUrl: feData.problem_statement_url || null,
     wildcardEnabled: !!feData.wildcard_enabled,
     tiebreakRule: feData.tiebreak_rule || 'PENALTY_SCORE',
   };

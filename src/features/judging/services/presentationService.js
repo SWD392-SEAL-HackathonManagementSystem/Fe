@@ -54,6 +54,9 @@ export const presentationService = {
 
   listTrackJudges: (trackId) =>
     axiosClient.get(`/api/v1/tracks/${trackId}/judges`),
+
+  listRoundJudges: (roundId) =>
+    axiosClient.get(`/api/v1/rounds/${roundId}/judges`),
 };
 
 export const findPresentingItem = (queueData, trackId) => {

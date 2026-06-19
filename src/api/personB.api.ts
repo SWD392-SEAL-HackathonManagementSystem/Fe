@@ -1,9 +1,10 @@
 import axiosClient from '../shared/api/axiosClient';
 import { studentSubmissionService } from '../student/features/submission/services/studentSubmission.service';
 
-const mapSubmissionStatusToFe = (beStatus?: string): 'ON_TIME' | 'LATE_PENDING' | 'REJECTED' | 'NONE' => {
+const mapSubmissionStatusToFe = (beStatus?: string): 'ON_TIME' | 'LATE_PENDING' | 'REJECTED' | 'INCOMPLETE' | 'NONE' => {
   if (!beStatus) return 'NONE';
-  if (['SUBMITTED', 'LATE', 'ACCEPTED', 'LATE_APPROVED'].includes(beStatus)) {
+  if (beStatus === 'INCOMPLETE') return 'INCOMPLETE';
+  if (['SUBMITTED', 'LATE', 'ACCEPTED', 'LATE_APPROVED', 'ON_TIME'].includes(beStatus)) {
     return 'ON_TIME';
   }
   if (beStatus === 'LATE_PENDING') return 'LATE_PENDING';
@@ -179,13 +180,15 @@ interface BeSubmissionRecord {
 }
 
 export interface SubmissionStatusResponse {
-  status: 'ON_TIME' | 'LATE_PENDING' | 'REJECTED' | 'NONE';
+  status: 'ON_TIME' | 'LATE_PENDING' | 'REJECTED' | 'INCOMPLETE' | 'NONE';
+  submission_id?: number | string;
   submitted_at?: string;
   repo_url?: string;
   demo_url?: string;
   slide_url?: string;
   slide_file?: string;
   slide_download_path?: string;
+  has_slide?: boolean;
 }
 
 export interface DeadlineResponse {
@@ -335,12 +338,14 @@ export const personBApi = {
 
       return {
         status: mapSubmissionStatusToFe(submission.status),
+        submission_id: submission.submissionId ?? submission.submission_id ?? submission.id,
         submitted_at: submission.submittedAt ?? submission.submitted_at,
         repo_url: submission.repoUrl ?? submission.repo_url,
         demo_url: submission.demoUrl ?? submission.demo_url,
         slide_url: submission.slideUrl ?? submission.slide_url,
         slide_file: submission.slideFile ?? submission.slide_file,
         slide_download_path: submission.slideDownloadPath ?? submission.slide_download_path,
+        has_slide: submission.hasSlide ?? submission.has_slide,
       };
     } catch (err: any) {
       if (err?.status === 404) return { status: 'NONE' };
@@ -381,17 +386,19 @@ export const personBApi = {
       slideFile: data.slide_file,
     };
 
-    if (!payload.slideFile) {
-      throw new Error('Vui lòng tải lên file slide PDF.');
-    }
-
     const res = (await studentSubmissionService.submitMultipart(
       payload
     )) as unknown as BeSubmissionRecord;
+
+    if (!res.slideFile && !res.slide_file && !res.slideDownloadPath && !res.slide_download_path) {
+      throw new Error('Nộp file slide thất bại — vui lòng chọn file PDF và thử lại.');
+    }
+
     const mapped = mapSubmissionStatusToFe(res.status);
 
     return {
       status: mapped === 'NONE' ? 'ON_TIME' : mapped,
+      submission_id: res.id ?? res.submissionId ?? res.submission_id,
       submitted_at: res.submittedAt ?? res.submitted_at,
       repo_url: res.repoUrl ?? res.repo_url,
       demo_url: res.demoUrl ?? res.demo_url,

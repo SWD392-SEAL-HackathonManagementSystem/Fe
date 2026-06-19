@@ -26,7 +26,17 @@ export const hackathonService = {
     return axiosClient.get(ENDPOINTS.HACKATHONS.READINESS(id), { params: { target: targetStatus } });
   },
 
+  uploadBanner: async (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axiosClient.post(ENDPOINTS.HACKATHONS.BANNER(id), formData);
+  },
+
   updateStatus: async (id, status, note = '') => {
     return axiosClient.patch(ENDPOINTS.HACKATHONS.STATUS(id), { status, note });
-  }
+  },
+
+  closeRegistrationEarly: async (id) => {
+    return axiosClient.post(ENDPOINTS.HACKATHONS.CLOSE_REGISTRATION_EARLY(id));
+  },
 };

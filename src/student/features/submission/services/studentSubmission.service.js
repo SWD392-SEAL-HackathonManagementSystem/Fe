@@ -29,4 +29,15 @@ export const studentSubmissionService = {
 
     return axiosClient.post('/api/v1/submissions', formData);
   },
+
+  getSubmissionSlide: async (submissionId) =>
+    axiosClient.get(`/api/v1/submissions/${submissionId}/slide`, {
+      responseType: 'blob',
+    }),
+
+  downloadSubmissionSlide: async (submissionId) =>
+    axiosClient.get(`/api/v1/submissions/${submissionId}/slide`, {
+      params: { download: true },
+      responseType: 'blob',
+    }),
 };

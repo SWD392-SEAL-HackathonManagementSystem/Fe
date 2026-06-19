@@ -16,10 +16,12 @@ export const ENDPOINTS = {
     DETAIL: (id) => `/api/v1/hackathons/${id}`,
     READINESS: (id) => `/api/v1/hackathons/${id}/readiness`,
     STATUS: (id) => `/api/v1/hackathons/${id}/status`,
+    BANNER: (id) => `/api/v1/hackathons/${id}/banner`,
     ROUNDS: (hackathonId) => `/api/v1/hackathons/${hackathonId}/rounds`,
     TRACKS: (hackathonId) => `/api/v1/hackathons/${hackathonId}/tracks`,
     EVENTS: (hackathonId) => `/api/v1/hackathons/${hackathonId}/events`,
     LOTTERY: (hackathonId) => `/api/v1/hackathons/${hackathonId}/lottery`,
+    CLOSE_REGISTRATION_EARLY: (id) => `/api/v1/hackathons/${id}/close-registration-early`,
   },
   TEAMS: {
     BASE: '/api/v1/teams',
@@ -28,6 +30,7 @@ export const ENDPOINTS = {
     STATUS: (teamId) => `/api/v1/teams/${teamId}/status`,
     APPROVE: (teamId) => `/api/v1/teams/${teamId}/approve`,
     TRANSFER_LEADER: (teamId) => `/api/v1/teams/${teamId}/transfer-leader`,
+    CONFIRM_FORMATION: (teamId) => `/api/v1/teams/${teamId}/confirm-formation`,
     
     INVITE_MEMBER: (teamId) => `/api/v1/teams/${teamId}/members/invite`,
     MEMBER_DETAIL: (teamId, userId) => `/api/v1/teams/${teamId}/members/${userId}`,
@@ -59,6 +62,7 @@ export const ENDPOINTS = {
     CRITERIA_CLONE: (roundId) => `/api/v1/rounds/${roundId}/criteria/clone`,
     ACTIVATE: (id) => `/api/v1/rounds/${id}/activate`,
     RELEASE_PROBLEM: (id) => `/api/v1/rounds/${id}/release-problem`,
+    PROBLEM_STATEMENT: (id) => `/api/v1/rounds/${id}/problem-statement`,
     SCORING_PROGRESS: (id) => `/api/v1/rounds/${id}/scoring-progress`,
     PUBLISH: (id) => `/api/v1/rounds/${id}/publish`,
     ADVANCE: (id) => `/api/v1/rounds/${id}/advance`,
@@ -66,6 +70,7 @@ export const ENDPOINTS = {
   TRACKS: {
     BASE: '/api/v1/tracks',
     DETAIL: (id) => `/api/v1/tracks/${id}`,
+    PROBLEM_STATEMENT: (id) => `/api/v1/tracks/${id}/problem-statement`,
     CRITERIA: (trackId) => `/api/v1/tracks/${trackId}/criteria`,
     CRITERIA_CLONE: (trackId) => `/api/v1/tracks/${trackId}/criteria/clone`,
   },

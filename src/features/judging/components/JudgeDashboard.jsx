@@ -101,9 +101,11 @@ const JudgeDashboard = ({ user }) => {
               trackName: item.trackName || item.track_name || 'Bảng Sơ loại',
               roundName: item.roundName || item.round_name || 'Vòng Sơ Loại',
               roundStatus: rStatus,
-              progress: item.progress || 0,
-              totalTeams: item.totalTeams || 0,
-              scoredTeams: item.scoredTeams || 0,
+              progress: item.totalTeams > 0
+                ? Math.round(((item.scoredTeams || 0) / item.totalTeams) * 100)
+                : (item.progress || 0),
+              totalTeams: item.totalTeams ?? item.total_teams ?? 0,
+              scoredTeams: item.scoredTeams ?? item.scored_teams ?? 0,
               roundId: item.roundId || item.round_id,
               trackId: item.trackId || item.track_id,
               isFinal: false
@@ -125,9 +127,11 @@ const JudgeDashboard = ({ user }) => {
             trackName: 'Tất cả các bảng',
             roundName: item.roundName || item.round_name || 'Vòng Chung Kết',
             roundStatus: rStatus,
-            progress: item.progress || 0,
-            totalTeams: item.totalTeams || 0,
-            scoredTeams: item.scoredTeams || 0,
+            progress: item.totalTeams > 0
+              ? Math.round(((item.scoredTeams || 0) / item.totalTeams) * 100)
+              : (item.progress || 0),
+            totalTeams: item.totalTeams ?? item.total_teams ?? 0,
+            scoredTeams: item.scoredTeams ?? item.scored_teams ?? 0,
             roundId: item.roundId || item.round_id,
             trackId: null,
             isFinal: true

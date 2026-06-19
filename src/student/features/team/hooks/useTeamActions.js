@@ -207,16 +207,14 @@ export const useTeamActions = ({ teams, fetchTeams, refreshSelectedTeam, setHack
   const confirmTeamFormation = async (teamId) => {
     setIsActionLoading(true);
     try {
-      const detail = refreshSelectedTeam ? await refreshSelectedTeam(teamId) : null;
-      if (detail?.status === 'ACTIVE') {
-        message.info('Đội đã được Coordinator duyệt trước đó.');
-        return true;
+      await studentTeamService.confirmFormation(teamId);
+      await fetchTeams();
+      if (refreshSelectedTeam) {
+        await refreshSelectedTeam(teamId);
       }
-      message.info('Đội ở trạng thái PENDING đã được xem là đang chờ Coordinator duyệt theo BE.');
-      return true;
-    } catch {
-      message.error('Không thể tải trạng thái đội lúc này.');
-      return false;
+      return { success: true };
+    } catch (error) {
+      return { success: false, error };
     } finally {
       setIsActionLoading(false);
     }

@@ -5,6 +5,15 @@ import { peopleService } from '../services/peopleService';
 import { trackService } from '../../tracks/services/trackService';
 import { roundService } from '../../rounds/services/roundService';
 import { getTeamErrorMessage } from '../../../shared/constants/teamErrors';
+import {
+  buildFinalJudgePool,
+  buildPrelimJudgePool,
+  findPersonById,
+  resolveFinalAssignmentType,
+  resolvePrelimAssignmentType,
+  isEligibleForFinalJudge,
+  isEligibleForPrelimJudge,
+} from '../utils/peoplePersonnelRules';
 
 export const usePeopleManagement = (hackathonId) => {
   const [mentors, setMentors] = useState([]);
@@ -167,6 +176,16 @@ export const usePeopleManagement = (hackathonId) => {
     fetchBaseData();
   }, [fetchBaseData]);
 
+  const prelimJudgePool = useMemo(
+    () => buildPrelimJudgePool(mentors, judges),
+    [mentors, judges]
+  );
+
+  const finalJudgePool = useMemo(
+    () => buildFinalJudgePool(judges, tempJudges),
+    [judges, tempJudges]
+  );
+
   const mentorIdsByTrack = useMemo(() => {
     const map = new Map();
     trackMentors.forEach((row) => {
@@ -235,16 +254,25 @@ export const usePeopleManagement = (hackathonId) => {
     try {
       const trackId = values.track_id ? parseInt(values.track_id, 10) : null;
       const selectedTrack = trackId ? tracks.find((item) => item.id === trackId) : null;
-      const assignmentType = values.assignment_type || 'NORMAL';
       const finalRoundIdFromTrack = selectedTrack?.roundId || selectedTrack?.round_id;
       const finalRoundIdFromForm = values.round_id ? parseInt(values.round_id, 10) : null;
       const finalRoundId = finalRoundIdFromTrack || finalRoundIdFromForm;
       const isFinalTrack = Boolean(selectedTrack?.isFinal ?? selectedTrack?.is_final);
       const isFinalFlow = Boolean(values.is_final_assignment) || isFinalTrack || Boolean(finalRoundIdFromForm);
 
+      const person = findPersonById(values.person_id, [prelimJudgePool, finalJudgePool, mentors, judges, tempJudges]);
+      if (!person) {
+        message.error('Không tìm thấy thông tin giám khảo đã chọn.');
+        return;
+      }
+
+      const assignmentType = isFinalFlow
+        ? resolveFinalAssignmentType(person)
+        : resolvePrelimAssignmentType(person);
+
       if (isFinalFlow && finalRoundId) {
-        if (!['HEAD', 'FINAL_EXTERNAL'].includes(assignmentType)) {
-          message.error('Vòng Chung kết chỉ gán HEAD hoặc FINAL_EXTERNAL.');
+        if (!isEligibleForFinalJudge(person)) {
+          message.error('Chung kết chỉ gán giám khảo EXTERNAL hoặc trưởng ban (HEAD).');
           return;
         }
         await peopleService.assignFinalRoundJudge({
@@ -254,8 +282,8 @@ export const usePeopleManagement = (hackathonId) => {
         });
         message.success(`Đã gán giám khảo Chung kết (${assignmentType}).`);
       } else {
-        if (!['NORMAL', 'HEAD'].includes(assignmentType)) {
-          message.error('Vòng Sơ loại chỉ gán NORMAL hoặc HEAD.');
+        if (!isEligibleForPrelimJudge(person)) {
+          message.error('Sơ loại chỉ gán giám khảo/mentor INTERNAL hoặc trưởng ban (HEAD).');
           return;
         }
         await peopleService.assignJudge({
@@ -308,6 +336,8 @@ export const usePeopleManagement = (hackathonId) => {
     removeMentor,
     assignJudge,
     removeJudge,
+    prelimJudgePool,
+    finalJudgePool,
     isMentorBlockedForTrack,
     isJudgeBlockedForTrack,
   };

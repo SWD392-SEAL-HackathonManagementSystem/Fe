@@ -90,7 +90,7 @@ export const buildPartitionStats = (teams = [], tracks = [], { requireLocked = f
   });
 };
 
-/** Tính theo bảng đấu (track): 3 bảng × 1 đội/bảng = 3 đội vào CK. */
+/** Tính theo bảng đấu (track): 3 bảng × 1 đội/bảng = 3 đội vào chung kết. */
 export const computeAdvancementCapacity = (partitions, topNAdvance) => {
   const topN = Number(topNAdvance);
   const trackSummary = buildTrackTeamSummary(partitions);
@@ -134,7 +134,7 @@ export const validateAdvancementConfig = ({
   }
 
   if (!topN || topN < 1) {
-    errors.push('Vui lòng nhập số đội vào Chung kết mỗi bảng (≥ 1).');
+    errors.push('Vui lòng nhập số đội vào chung kết mỗi bảng (≥ 1).');
     return { valid: false, errors, warnings, capacity: null };
   }
 
@@ -152,7 +152,7 @@ export const validateAdvancementConfig = ({
 
   if (minFinal && minFinal > capacity.maxAdvanceTotal) {
     errors.push(
-      `Tối thiểu vào Chung kết (${minFinal}) vượt tổng tối đa có thể đi tiếp (${capacity.maxAdvanceTotal} đội).`
+      `Tối đa vào chung kết (${minFinal}) vượt tổng tối đa có thể đi tiếp (${capacity.maxAdvanceTotal} đội).`
     );
   }
 
@@ -201,7 +201,7 @@ export const getAdvancementFieldHint = (mode, validation, { partitions = [], top
       const topN = Number(topNAdvance) || 1;
       return (
         `${totalTeams} đội · ${trackSummary.length} bảng đấu · ` +
-        `chọn ${topN} đội/bảng sau chấm → tối đa ${maxAdvanceTotal} đội vào CK.`
+        `chọn ${topN} đội/bảng sau chấm → tối đa ${maxAdvanceTotal} đội vào chung kết.`
       );
     }
     return 'Kiểm tra lại theo số đội thực tế trước khi mở thi.';

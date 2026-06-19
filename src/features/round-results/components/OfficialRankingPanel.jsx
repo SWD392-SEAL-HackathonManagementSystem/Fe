@@ -117,7 +117,7 @@ const OfficialRankingPanel = ({
         if (isPublished && previewSet.has(item.teamId)) {
           return (
             <Tag color="processing" style={{ fontWeight: 600, padding: "4px 12px", borderRadius: 4 }}>
-              Đề xuất vào CK
+              Đề xuất vào chung kết
             </Tag>
           );
         }

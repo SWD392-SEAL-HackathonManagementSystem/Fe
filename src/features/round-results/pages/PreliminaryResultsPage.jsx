@@ -33,7 +33,7 @@ const PreliminaryResultsPage = ({ roundId: roundIdProp }) => {
             {results.wildcard.items.length > 0 ? " + vé Wild Card đã duyệt" : ""} sẽ vào Chung kết.
           </p>
           <p>
-            <strong>{payload.advancedTeamIds.length}</strong> đội vào CK ·{" "}
+            <strong>{payload.advancedTeamIds.length}</strong> đội vào chung kết ·{" "}
             <strong>{payload.eliminatedTeamIds.length}</strong> đội loại
           </p>
           {teamLines.length > 0 && (

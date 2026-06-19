@@ -83,7 +83,7 @@ const MatchmakingBoardPage = () => {
             <Spin size="large" />
           </div>
         ) : !hackathonId ? (
-          <Empty description="Chưa có hackathon đang mở" />
+          <Empty description="Chưa đăng ký hackathon — hãy đăng ký sự kiện trước khi xem bảng ghép đội" />
         ) : teams.length === 0 ? (
           <Empty description="Hiện không có đội nào đang tìm thành viên" />
         ) : (

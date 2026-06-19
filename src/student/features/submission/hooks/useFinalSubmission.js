@@ -195,13 +195,23 @@ export const useFinalSubmission = (teamId, hackathonId) => {
     }
 
     if (!payload.slideFile) {
-      message.error('Vui lòng tải lên file slide PDF.');
-      return false;
+      const hasExistingSlide = Boolean(
+        existingSubmission?.hasSlide ??
+          existingSubmission?.has_slide ??
+          existingSubmission?.slideFile ??
+          existingSubmission?.slide_file ??
+          existingSubmission?.slideDownloadPath ??
+          existingSubmission?.slide_download_path
+      );
+      if (!hasExistingSlide) {
+        message.error('Vui lòng tải lên file slide PDF.');
+        return false;
+      }
     }
 
     setIsSubmitting(true);
     try {
-      await studentSubmissionService.submitMultipart({
+      const res = await studentSubmissionService.submitMultipart({
         teamId,
         roundId: finalRound.id,
         repoUrl: payload.repoUrl,
@@ -209,6 +219,19 @@ export const useFinalSubmission = (teamId, hackathonId) => {
         slideFile: payload.slideFile,
         lateReason: payload.lateReason,
       });
+      const slideSaved = Boolean(
+        res?.slideFile ??
+          res?.slide_file ??
+          res?.slideDownloadPath ??
+          res?.slide_download_path ??
+          res?.data?.slideFile ??
+          res?.data?.slideDownloadPath
+      );
+      if (!slideSaved) {
+        message.error('Nộp file slide thất bại — vui lòng chọn file PDF và thử lại.');
+        await fetchSubmissionData();
+        return false;
+      }
       message.success('Nộp bài Chung kết thành công!');
       await fetchSubmissionData();
       return true;

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Card, Table, Button, Space, Select, Typography, Tag, Modal, Input, Form, Alert, theme, message } from 'antd';
 import { Shuffle, Edit, Repeat, LayoutGrid } from 'lucide-react';
 import { useLotteryManagement } from '../hooks/useLotteryManagement';
+import { isRegistrationClosedEarly } from '../../hackathons/utils/hackathonRegistrationRules';
 
 
 const { Title, Text } = Typography;
@@ -20,10 +21,17 @@ const LotteryManagementPage = ({ hackathonId }) => {
   const [trackForm] = Form.useForm();
 
   const {
-    rounds, tracks, activeTeams, isLoading,
+    rounds, tracks, activeTeams, hackathon, isLoading,
     selectedRoundId, setSelectedRoundId, lotteryGate,
     handleAssignTopic, handleRunAutoLottery, handleChangeTrack
   } = useLotteryManagement(hackathonId);
+
+  const closedEarly = isRegistrationClosedEarly(hackathon);
+  const lotteryHelpText = lotteryGate.allowed
+    ? closedEarly
+      ? 'Đăng ký đã kết thúc sớm và đội ACTIVE đã khóa — có thể bốc thăm tự động để phân track và bắt đầu vòng Sơ loại (GĐ3).'
+      : 'Giai đoạn đăng ký đã kết thúc và đội đã khóa — bốc thăm để phân track (PATCH /lottery), sau đó kích hoạt vòng Sơ loại.'
+    : lotteryGate.reason || 'Sau khi kết thúc đăng ký (hoặc kết thúc sớm) và khóa đội, Coordinator mới bốc thăm.';
 
   // Lọc Bảng đấu theo vòng đang chọn
   const currentTracks = tracks.filter(t => (t.round_id || t.roundId) === selectedRoundId);
@@ -150,8 +158,8 @@ const LotteryManagementPage = ({ hackathonId }) => {
           >
             <Alert
               message="Hệ thống chỉ liệt kê các Đội thi đã được duyệt (Trạng thái: ACTIVE)."
-              description={lotteryGate.reason || 'Sau ngày kết thúc đăng ký, hệ thống khóa đội rồi Coordinator mới bốc thăm (PATCH /lottery).'}
-              type={lotteryGate.allowed ? 'info' : 'warning'}
+              description={lotteryHelpText}
+              type={lotteryGate.allowed ? 'success' : 'warning'}
               showIcon
               style={{ marginBottom: 16 }}
             />

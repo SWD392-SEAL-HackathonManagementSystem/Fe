@@ -36,8 +36,25 @@ export const roundService = {
     return axiosClient.patch(`/api/v1/rounds/${id}/lock-scoring`, payload);
   },
 
-  releaseProblem: async (id, problemStatementUrl) => {
-    return axiosClient.patch(ENDPOINTS.ROUNDS.RELEASE_PROBLEM(id), { problemStatementUrl });
+  releaseProblem: async (id, file) => {
+    if (file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      return axiosClient.patch(ENDPOINTS.ROUNDS.RELEASE_PROBLEM(id), formData);
+    }
+    return axiosClient.patch(ENDPOINTS.ROUNDS.RELEASE_PROBLEM(id), {});
+  },
+
+  uploadProblemStatement: async (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axiosClient.post(ENDPOINTS.ROUNDS.PROBLEM_STATEMENT(id), formData);
+  },
+
+  getProblemStatement: async (id) => {
+    return axiosClient.get(ENDPOINTS.ROUNDS.PROBLEM_STATEMENT(id), {
+      responseType: 'blob',
+    });
   },
 
   getScoringProgress: async (id) => {

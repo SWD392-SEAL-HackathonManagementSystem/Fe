@@ -19,6 +19,8 @@ import {
 import dayjs from 'dayjs';
 import LiveCodingMonitor from '../components/LiveCodingMonitor';
 import ScoringProgressCard from '../components/ScoringProgressCard';
+import PrelimReleaseChecklist from '../components/PrelimReleaseChecklist';
+import FinalReleaseChecklist from '../components/FinalReleaseChecklist';
 
 const { Title, Text } = Typography;
 
@@ -56,8 +58,9 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
 
   const [isReleaseModalVisible, setIsReleaseModalVisible] = useState(false);
   const [releasingRound, setReleasingRound] = useState(null);
-  const [problemUrl, setProblemUrl] = useState('');
   const [isReleasing, setIsReleasing] = useState(false);
+  const [prelimReleaseReady, setPrelimReleaseReady] = useState(false);
+  const [finalReleaseReady, setFinalReleaseReady] = useState(false);
   const [progressRoundId, setProgressRoundId] = useState(null);
 
   const activeRounds = rounds.filter((r) => r.is_active);
@@ -231,15 +234,24 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
   };
 
   const handleReleaseProblem = async () => {
-    if (!problemUrl.trim()) {
-      return message.warning('Vui lòng nhập URL đề bài.');
+    const isFinal = Boolean(releasingRound?.is_final);
+    if (isFinal && !finalReleaseReady) {
+      return message.warning('Vui lòng upload PDF đề Chung kết trước khi phát.');
+    }
+    if (!isFinal && !prelimReleaseReady) {
+      return message.warning('Mọi bảng đấu phải có PDF đề bài trước khi phát.');
     }
     setIsReleasing(true);
     try {
-      await roundService.releaseProblem(releasingRound.id, problemUrl.trim());
-      message.success(`Đã phát đề cho ${releasingRound.name}.`);
+      await roundService.releaseProblem(releasingRound.id, null);
+      message.success(
+        isFinal
+          ? `Đã phát đề Chung kết cho ${releasingRound.name}. Sinh viên vào trang đội để tải đề.`
+          : `Đã phát đề Sơ loại — mỗi đội nhận đề theo bảng đấu của mình.`,
+      );
       setIsReleaseModalVisible(false);
-      setProblemUrl('');
+      setPrelimReleaseReady(false);
+      setFinalReleaseReady(false);
       fetchRounds();
     } catch (error) {
       message.error(error?.message || 'Không thể phát đề. Vui lòng thử lại.');
@@ -368,7 +380,8 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
         values.sequenceOrder = rounds.length + 1;
       }
 
-      const payload = mapRoundToBE(values);
+      const { problem_file: problemFileListValue, ...roundValues } = values;
+      const payload = mapRoundToBE(roundValues);
       let roundId = editingRound?.id;
       let createdOrUpdatedRound;
 
@@ -380,7 +393,16 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
         roundId = createdOrUpdatedRound.id;
       }
 
-      if (values.is_active && (!editingRound || !editingRound.is_active)) {
+      const problemFile = problemFileListValue?.[0]?.originFileObj ?? problemFileListValue?.[0];
+      if (problemFile && roundId && !editingRound?.problem_released_at && roundValues.is_final) {
+        try {
+          await roundService.uploadProblemStatement(roundId, problemFile);
+        } catch (uploadError) {
+          message.warning(uploadError?.message || 'Đã lưu vòng thi nhưng chưa upload được file đề bài.');
+        }
+      }
+
+      if (roundValues.is_active && (!editingRound || !editingRound.is_active)) {
         try {
           await roundService.activate(roundId, { note: 'Kích hoạt từ giao diện cấu hình' });
           message.success(editingRound ? 'Đã cập nhật và kích hoạt vòng thi thành công' : 'Đã tạo và kích hoạt vòng thi thành công');
@@ -496,7 +518,7 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
 
         // Nếu vòng thi ĐANG HOẠT ĐỘNG
         if (record.is_active) {
-          const hasReleasedProblem = Boolean(record.problem_released_at || record.problem_statement_url);
+          const hasReleasedProblem = Boolean(record.problem_released_at);
           return (
             <Space size="middle">
               <Tooltip title="Xếp hạng tạm">
@@ -516,7 +538,8 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
                     icon={<FileText size={16} />}
                     onClick={() => {
                       setReleasingRound(record);
-                      setProblemUrl(record.problem_statement_url || '');
+                      setPrelimReleaseReady(false);
+                      setFinalReleaseReady(false);
                       setIsReleaseModalVisible(true);
                     }}
                   />
@@ -827,26 +850,36 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
         onOk={handleReleaseProblem}
         onCancel={() => {
           setIsReleaseModalVisible(false);
-          setProblemUrl('');
+          setPrelimReleaseReady(false);
+          setFinalReleaseReady(false);
         }}
         confirmLoading={isReleasing}
-        okText="Phát đề"
+        okText="Phát đề cho sinh viên"
         cancelText="Hủy"
+        okButtonProps={{
+          disabled:
+            releasingRound &&
+            ((releasingRound.is_final && !finalReleaseReady) ||
+              (!releasingRound.is_final && !prelimReleaseReady)),
+        }}
+        width={720}
       >
         <div style={{ marginBottom: 16 }}>
           <Text>
-            Phát đề cho vòng: <strong>{releasingRound?.name}</strong>. Thao tác one-way — không sửa URL sau khi phát.
+            Phát đề cho vòng: <strong>{releasingRound?.name}</strong> (vòng đã kích hoạt).
           </Text>
         </div>
-        <div>
-          <Text strong>URL đề bài (problemStatementUrl) <span style={{ color: 'red' }}>*</span></Text>
-          <Input
-            placeholder="https://example.com/debai.pdf"
-            value={problemUrl}
-            onChange={(e) => setProblemUrl(e.target.value)}
-            style={{ marginTop: 8 }}
+        {releasingRound?.is_final ? (
+          <FinalReleaseChecklist
+            roundId={releasingRound?.id}
+            onReadyChange={setFinalReleaseReady}
           />
-        </div>
+        ) : (
+          <PrelimReleaseChecklist
+            roundId={releasingRound?.id}
+            onReadyChange={setPrelimReleaseReady}
+          />
+        )}
       </Modal>
     </div>
   );

@@ -5,6 +5,7 @@
 import axiosClient from '../../../../shared/api/axiosClient';
 import { ENDPOINTS } from '../../../../shared/api/endpoints';
 import { mapTeamToInvitation } from '../mapper/studentInvitation.mapper';
+import { studentHackathonService } from '../../hackathon/services/studentHackathon.service';
 
 const unwrapList = (res) => {
   if (Array.isArray(res)) return res;
@@ -15,11 +16,7 @@ const unwrapList = (res) => {
 };
 
 export const studentInvitationService = {
-  getActiveHackathon: async () => {
-    const res = await axiosClient.get('/api/v1/hackathons/active', { params: { size: 1 } });
-    const items = res?.data?.items || res?.data?.data?.items || res?.items || [];
-    return items.length > 0 ? items[0] : null;
-  },
+  getActiveHackathon: async () => studentHackathonService.getPrimaryRegisteredHackathon(),
 
   getInvitations: async ({ hackathonId, status } = {}) => {
     const res = await axiosClient.get(ENDPOINTS.TEAMS.BASE, {

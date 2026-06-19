@@ -25,7 +25,7 @@ export const TEAM_ERROR_MESSAGES = {
   INVITATION_RESEND_AFTER_KICKOFF_CUTOFF: 'Chỉ được gửi lại lời mời trước khi sự kiện Khai mạc diễn ra 48 giờ.',
   
   TEAM_LOCKED: 'Hệ thống đã khóa danh sách đội thi do quá hạn đăng ký.',
-  TEAM_NOT_LOCKED: 'Chưa thể bốc thăm: đội thi chưa bị khóa. Khóa đội từ ngày hôm sau khi kết thúc đăng ký.',
+  TEAM_NOT_LOCKED: 'Chưa thể bốc thăm: đội thi chưa bị khóa. Khóa sau khi kết thúc đăng ký hoặc dùng «Kết thúc đăng ký sớm».',
   JUDGE_FINAL_AT_PHASE1: 'Không thể gán Giám khảo Chung kết ở GĐ1. Chỉ gán judge Sơ loại theo Bảng đấu (NORMAL).',
   EVENT_ORDER_VIOLATION: 'Thứ tự sự kiện không hợp lệ: tạo KICKOFF trước WORKSHOP; trên lịch Workshop phải trước Khai mạc và khác ngày.',
   INVALID_SLIDE_FORMAT: 'Link slide phải trỏ tới file PDF (.pdf).',

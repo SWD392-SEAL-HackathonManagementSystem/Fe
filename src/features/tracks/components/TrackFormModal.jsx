@@ -1,10 +1,22 @@
-import React, { useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Row, Col, Select } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Modal, Form, Input, InputNumber, Row, Col, Select, Alert, Button, message } from 'antd';
+import RoundProblemPdfUpload from '../../rounds/components/RoundProblemPdfUpload';
+import { trackService } from '../services/trackService';
 
 const { TextArea } = Input;
 
-const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title, rounds, isEditing }) => {
+const TrackFormModal = ({
+  visible,
+  onCancel,
+  onFinish,
+  initialValues,
+  title,
+  rounds,
+  isEditing,
+  problemReleased = false,
+}) => {
   const [form] = Form.useForm();
+  const [viewingProblem, setViewingProblem] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -15,6 +27,29 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title, rou
       }
     }
   }, [visible, initialValues, form]);
+
+  const handleViewProblemPdf = async () => {
+    if (!initialValues?.id) return;
+    setViewingProblem(true);
+    try {
+      const blob = await trackService.getProblemStatement(initialValues.id);
+      const file = new Blob([blob], { type: 'application/pdf' });
+      const fileUrl = URL.createObjectURL(file);
+      const opened = window.open(fileUrl, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        URL.revokeObjectURL(fileUrl);
+        message.warning('Trình duyệt chặn cửa sổ mới. Vui lòng cho phép popup để xem PDF.');
+      }
+    } catch {
+      message.error('Không thể mở file đề bài. Vui lòng thử lại.');
+    } finally {
+      setViewingProblem(false);
+    }
+  };
+
+  const hasProblemFile = Boolean(
+    initialValues?.problem_statement_filename || initialValues?.problem_statement_url,
+  );
 
   const handleSubmit = () => {
     form.validateFields()
@@ -107,6 +142,37 @@ const TrackFormModal = ({ visible, onCancel, onFinish, initialValues, title, rou
             </Form.Item>
           </Col>
         </Row>
+
+        {initialValues?.problem_statement_filename && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message={`Đề bài hiện tại: ${initialValues.problem_statement_filename}`}
+            description={
+              hasProblemFile ? (
+                <Button
+                  type="link"
+                  style={{ padding: 0, height: 'auto' }}
+                  loading={viewingProblem}
+                  onClick={handleViewProblemPdf}
+                >
+                  Xem PDF
+                </Button>
+              ) : null
+            }
+          />
+        )}
+
+        <Form.Item
+          label="File đề bài (PDF)"
+          extra="Mỗi bảng đấu một đề riêng (tối đa 25MB). Upload trước khi phát đề Sơ loại."
+          name="problem_file"
+          valuePropName="fileList"
+          getValueFromEvent={(event) => (Array.isArray(event) ? event : event?.fileList)}
+        >
+          <RoundProblemPdfUpload disabled={problemReleased} />
+        </Form.Item>
 
         <Form.Item name="status" label="Trạng thái">
           <Select>

@@ -1,4 +1,4 @@
-const MAX_TEAM_MEMBERS = 5;
+const DEFAULT_MAX_TEAM_MEMBERS = 5;
 
 export const getLeaderEmail = (team) => {
   if (!team?.members?.length) return '';
@@ -12,7 +12,8 @@ export const mapMatchmakingTeam = (be) => {
     teamId: be.id ?? be.teamId,
     teamName: be.teamName,
     memberCount: be.acceptedMemberCount ?? be.currentMemberCount ?? 0,
-    maxMembers: MAX_TEAM_MEMBERS,
+    maxMembers: be.maxTeamSize ?? DEFAULT_MAX_TEAM_MEMBERS,
+    minMembers: be.minTeamSize ?? 3,
     leaderId: be.leaderId,
     leaderName: be.leaderName,
     leaderEmail: be.leaderEmail || getLeaderEmail(be),

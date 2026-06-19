@@ -45,9 +45,9 @@ export const useStudentTeam = () => {
     try {
       let currentHackathonId = hackathonId;
       if (!currentHackathonId) {
-        const activeHackathon = await studentTeamService.getActiveHackathon();
-        if (activeHackathon && activeHackathon.id) {
-          currentHackathonId = activeHackathon.id;
+        const registeredHackathon = await studentTeamService.getRegisteredHackathon();
+        if (registeredHackathon?.id) {
+          currentHackathonId = registeredHackathon.id;
           setHackathonId(currentHackathonId);
         }
       }

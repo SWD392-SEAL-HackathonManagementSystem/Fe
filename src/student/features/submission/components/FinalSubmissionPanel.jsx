@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Form, Input, Button, Typography, Tag, Space, Alert, Row, Col, Spin, Upload } from 'antd';
+import { Card, Form, Input, Button, Typography, Tag, Space, Alert, Row, Col, Spin, Upload, Modal, message } from 'antd';
 import {
   CloudUploadOutlined,
   LockOutlined,
@@ -8,9 +8,11 @@ import {
   FilePdfOutlined,
   LinkOutlined,
   ClockCircleOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import { useFinalSubmission } from '../hooks/useFinalSubmission';
 import { criteriaService } from '../../../../features/criteria/services/criteriaService';
+import { studentSubmissionService } from '../services/studentSubmission.service';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -25,6 +27,9 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
   const [slideFile, setSlideFile] = useState(null);
   const [criteria, setCriteria] = useState([]);
   const [criteriaLoading, setCriteriaLoading] = useState(false);
+  const [isSlideModalVisible, setIsSlideModalVisible] = useState(false);
+  const [slideBlobUrl, setSlideBlobUrl] = useState(null);
+  const [isLoadingSlide, setIsLoadingSlide] = useState(false);
 
   const {
     finalRound,
@@ -119,8 +124,63 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
     return null;
   }
 
-  const isSubmitted = !!existingSubmission;
+  const submissionIncomplete = existingSubmission?.status === 'INCOMPLETE';
+  const hasSavedSlide = Boolean(
+    existingSubmission?.hasSlide ??
+      existingSubmission?.has_slide ??
+      existingSubmission?.slideFile ??
+      existingSubmission?.slide_file ??
+      existingSubmission?.slideDownloadPath ??
+      existingSubmission?.slide_download_path
+  );
+  const isSubmitted = Boolean(existingSubmission && !submissionIncomplete && hasSavedSlide);
   const deadline = finalRound.submissionDeadline || finalRound.submission_deadline;
+  const submittedSlideName =
+    existingSubmission?.slideFile || existingSubmission?.slide_file || 'slide.pdf';
+  const submissionId =
+    existingSubmission?.submissionId ??
+    existingSubmission?.submission_id ??
+    existingSubmission?.id ??
+    null;
+
+  const handleViewSubmittedSlide = async () => {
+    if (!submissionId) {
+      message.error('Không xác định được bài nộp để xem file.');
+      return;
+    }
+
+    setIsSlideModalVisible(true);
+    setIsLoadingSlide(true);
+    setSlideBlobUrl(null);
+
+    try {
+      const blob = await studentSubmissionService.getSubmissionSlide(submissionId);
+      const fileUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      setSlideBlobUrl(fileUrl);
+    } catch {
+      message.error('Không thể mở file slide. Vui lòng thử lại sau.');
+      setIsSlideModalVisible(false);
+    } finally {
+      setIsLoadingSlide(false);
+    }
+  };
+
+  const handleCloseSlideModal = () => {
+    setIsSlideModalVisible(false);
+    if (slideBlobUrl) {
+      URL.revokeObjectURL(slideBlobUrl);
+      setSlideBlobUrl(null);
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (slideBlobUrl) {
+        URL.revokeObjectURL(slideBlobUrl);
+      }
+    },
+    [slideBlobUrl]
+  );
 
   const handleFinish = async (values) => {
     await submitFinalWork({
@@ -214,6 +274,16 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
         />
       )}
 
+      {submissionIncomplete && !isLocked && (
+        <Alert
+          message="Nộp file thất bại — cần nộp lại"
+          description="File slide PDF chưa được lưu thành công. Vui lòng chọn file PDF hợp lệ và nộp lại."
+          type="warning"
+          showIcon
+          style={{ marginBottom: 24, borderRadius: 8 }}
+        />
+      )}
+
       <Row gutter={48}>
         <Col xs={24} lg={8}>
           <div
@@ -288,9 +358,21 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
                   Chọn file PDF
                 </Button>
               </Upload>
-              {(existingSubmission?.slideFile || existingSubmission?.slide_file) && (
+              {(existingSubmission?.slideFile || existingSubmission?.slide_file || hasSavedSlide) && (
                 <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-                  Đã nộp: {existingSubmission.slideFile || existingSubmission.slide_file}
+                  Đã nộp: {submittedSlideName}
+                  {hasSavedSlide && submissionId && (
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<EyeOutlined />}
+                      loading={isLoadingSlide}
+                      onClick={handleViewSubmittedSlide}
+                      style={{ marginLeft: 4, padding: 0, height: 'auto' }}
+                    >
+                      Xem file đã nộp
+                    </Button>
+                  )}
                 </Text>
               )}
             </Form.Item>
@@ -340,6 +422,53 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
           </Form>
         </Col>
       </Row>
+
+      <Modal
+        title={
+          <Space>
+            <FilePdfOutlined style={{ color: '#ff4d4f' }} />
+            <span>Slide đã nộp: {submittedSlideName}</span>
+          </Space>
+        }
+        open={isSlideModalVisible}
+        onCancel={handleCloseSlideModal}
+        width={1000}
+        style={{ top: 20 }}
+        footer={[
+          <Button key="close" onClick={handleCloseSlideModal}>
+            Đóng
+          </Button>,
+        ]}
+      >
+        <div
+          style={{
+            height: '75vh',
+            width: '100%',
+            position: 'relative',
+            background: '#f0f2f5',
+            borderRadius: 8,
+            overflow: 'hidden',
+          }}
+        >
+          {isLoadingSlide ? (
+            <div style={{ textAlign: 'center', paddingTop: '30vh' }}>
+              <Spin size="large" tip="Đang tải file slide..." />
+            </div>
+          ) : slideBlobUrl ? (
+            <iframe
+              src={`${slideBlobUrl}#toolbar=0`}
+              title="PDF Viewer"
+              width="100%"
+              height="100%"
+              style={{ border: 'none' }}
+            />
+          ) : (
+            <div style={{ textAlign: 'center', paddingTop: '30vh', color: '#ff4d4f' }}>
+              Không thể hiển thị file PDF.
+            </div>
+          )}
+        </div>
+      </Modal>
     </Card>
   );
 };

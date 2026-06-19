@@ -2,6 +2,12 @@ import dayjs from 'dayjs';
 
 const MIN_DAYS_FROM_REG_END = 5;
 
+/** Dự trù thời gian chấm Sơ loại sau khi hết giờ làm bài */
+export const GRADING_BUFFER_HOURS_AFTER_PRELIM = 2;
+
+/** Khoảng cách tối thiểu giữa lúc chấm xong Sơ loại và giờ thi Chung kết */
+export const FINAL_EXAM_GAP_AFTER_GRADING_HOURS = 1;
+
 const buildDisabledTimeForMin = (minMoment) => {
   if (!minMoment) return {};
   return {
@@ -83,6 +89,26 @@ export const getPreliminaryEndMoment = (prelimRound) => {
   return exam;
 };
 
+/** Hết mốc chấm Sơ loại = kết thúc làm bài + buffer chấm điểm */
+export const getPreliminaryGradingEndMoment = (prelimRound) => {
+  const prelimEnd = getPreliminaryEndMoment(prelimRound);
+  if (!prelimEnd) return null;
+  return prelimEnd.add(GRADING_BUFFER_HOURS_AFTER_PRELIM, 'hour');
+};
+
+/** Giờ thi Chung kết sớm nhất = sau khi chấm xong + 1h nghỉ */
+export const getMinFinalExamMoment = (prelimRound) => {
+  const gradingEnd = getPreliminaryGradingEndMoment(prelimRound);
+  if (!gradingEnd) return null;
+  return gradingEnd.add(FINAL_EXAM_GAP_AFTER_GRADING_HOURS, 'hour');
+};
+
+/** Ngày thi Sơ loại — Chung kết chỉ được chọn cùng ngày này */
+export const getPrelimExamDay = (prelimRound) => {
+  if (!prelimRound?.exam_at) return null;
+  return dayjs(prelimRound.exam_at).startOf('day');
+};
+
 export const buildRoundScheduleContext = ({
   hackathon,
   prelimRound,
@@ -117,12 +143,9 @@ export const isRoundDateDisabled = (current, ctx) => {
   if (current.isBefore(minDate, 'day')) return true;
 
   if (ctx.isFinal && ctx.prelimRound?.exam_at) {
-    const prelimEnd = getPreliminaryEndMoment(ctx.prelimRound);
-    if (prelimEnd) {
-      const minFinalStart = prelimEnd.add(1, 'hour');
-      const maxFinalStart = prelimEnd.add(2, 'hour');
-      if (current.isBefore(minFinalStart.startOf('day'), 'day')) return true;
-      if (current.isAfter(maxFinalStart.endOf('day'), 'day')) return true;
+    const prelimDay = getPrelimExamDay(ctx.prelimRound);
+    if (prelimDay && !current.isSame(prelimDay, 'day')) {
+      return true;
     }
   }
 
@@ -146,26 +169,12 @@ export const getRoundExamDisabledTime = (current, ctx) => {
     minMoment = ctx.now;
   }
 
-  if (ctx.isFinal && ctx.prelimRound) {
-    const prelimEnd = getPreliminaryEndMoment(ctx.prelimRound);
-    if (prelimEnd) {
-      const minFinalStart = prelimEnd.add(1, 'hour');
-      const maxFinalStart = prelimEnd.add(2, 'hour');
-      if (current.isSame(minFinalStart, 'day')) {
-        if (!minMoment || minFinalStart.isAfter(minMoment)) {
-          minMoment = minFinalStart;
-        }
-      }
-      if (current.isSame(maxFinalStart, 'day')) {
-        maxMoment = maxFinalStart;
-      }
-    } else if (ctx.prelimRound.exam_at) {
-      const prelimExam = dayjs(ctx.prelimRound.exam_at);
-      if (current.isSame(prelimExam, 'day')) {
-        const afterPrelim = prelimExam.add(1, 'minute');
-        if (!minMoment || afterPrelim.isAfter(minMoment)) {
-          minMoment = afterPrelim;
-        }
+  if (ctx.isFinal && ctx.prelimRound?.exam_at) {
+    const prelimDay = getPrelimExamDay(ctx.prelimRound);
+    const minFinalStart = getMinFinalExamMoment(ctx.prelimRound);
+    if (prelimDay && current.isSame(prelimDay, 'day') && minFinalStart) {
+      if (!minMoment || minFinalStart.isAfter(minMoment)) {
+        minMoment = minFinalStart;
       }
     }
   }
@@ -234,13 +243,17 @@ export const getRoundSubmissionDeadlineDisabledTime = (current, ctx) => {
 
 export const getRoundScheduleHint = (ctx) => {
   if (ctx.isFinal) {
+    const prelimDay = ctx.prelimRound ? getPrelimExamDay(ctx.prelimRound) : null;
     const prelimEnd = ctx.prelimRound ? getPreliminaryEndMoment(ctx.prelimRound) : null;
-    if (prelimEnd) {
-      return `Vòng Chung kết phải bắt đầu trong khoảng ${prelimEnd
-        .add(1, 'hour')
-        .format('DD/MM/YYYY HH:mm')} đến ${prelimEnd
-        .add(2, 'hour')
-        .format('DD/MM/YYYY HH:mm')} (cách Sơ loại 1-2 giờ).`;
+    const gradingEnd = ctx.prelimRound ? getPreliminaryGradingEndMoment(ctx.prelimRound) : null;
+    const minFinal = ctx.prelimRound ? getMinFinalExamMoment(ctx.prelimRound) : null;
+    if (prelimDay && prelimEnd && gradingEnd && minFinal) {
+      return (
+        `Chung kết cùng ngày Sơ loại (${prelimDay.format('DD/MM/YYYY')}). ` +
+        `Khóa trước ${gradingEnd.format('HH:mm')} ` +
+        `(gồm ${GRADING_BUFFER_HOURS_AFTER_PRELIM}h chấm sau ${prelimEnd.format('HH:mm')}). ` +
+        `Chỉ chọn giờ từ ${minFinal.format('HH:mm')} trở đi.`
+      );
     }
     if (ctx.prelimRound?.exam_at) {
       return `Vòng Chung kết phải diễn ra sau ngày giờ thi Sơ loại (${dayjs(ctx.prelimRound.exam_at).format('DD/MM/YYYY HH:mm')}).`;
@@ -249,7 +262,7 @@ export const getRoundScheduleHint = (ctx) => {
   }
 
   if (ctx.finalRound?.exam_at) {
-    return `Vòng Sơ loại phải kết thúc trước Chung kết (${dayjs(ctx.finalRound.exam_at).format('DD/MM/YYYY HH:mm')}). Cùng ngày thì không chọn giờ trùng hoặc sau giờ CK.`;
+    return `Vòng Sơ loại phải kết thúc trước Chung kết (${dayjs(ctx.finalRound.exam_at).format('DD/MM/YYYY HH:mm')}). Cùng ngày thì không chọn giờ trùng hoặc sau giờ chung kết.`;
   }
 
   if (ctx.hackathon?.registration_end) {

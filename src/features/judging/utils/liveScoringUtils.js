@@ -72,3 +72,67 @@ export const computeWeightedTotal = (savedEntry, criteria = []) => {
 
 export const findTeamBySubmissionId = (teams, submissionId) =>
   teams.find((t) => (t.submissionId ?? t.id) === submissionId) ?? null;
+
+const SCORE_DRAFT_PREFIX = 'seal-hackathon:score-draft';
+
+export const buildScoreDraftKey = (assignmentId, submissionId) =>
+  `${SCORE_DRAFT_PREFIX}:${assignmentId ?? 'na'}:${submissionId ?? 'na'}`;
+
+export const loadScoreDraft = (assignmentId, submissionId) => {
+  if (!submissionId) return null;
+
+  try {
+    const raw = localStorage.getItem(buildScoreDraftKey(assignmentId, submissionId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return {
+      scores: parsed.scores && typeof parsed.scores === 'object' ? parsed.scores : {},
+      comment: typeof parsed.comment === 'string' ? parsed.comment : '',
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const saveScoreDraft = (assignmentId, submissionId, draft) => {
+  if (!submissionId) return;
+
+  try {
+    localStorage.setItem(
+      buildScoreDraftKey(assignmentId, submissionId),
+      JSON.stringify({
+        scores: draft?.scores ?? {},
+        comment: draft?.comment ?? '',
+        updatedAt: Date.now(),
+      })
+    );
+  } catch {
+    // Ignore quota / private mode errors.
+  }
+};
+
+export const clearScoreDraft = (assignmentId, submissionId) => {
+  if (!submissionId) return;
+
+  try {
+    localStorage.removeItem(buildScoreDraftKey(assignmentId, submissionId));
+  } catch {
+    // Ignore storage errors.
+  }
+};
+
+export const mergeSavedAndDraftScores = (savedEntry, draftEntry) => {
+  const apiScores = savedEntry?.scores ?? {};
+  const draftScores = draftEntry?.scores ?? {};
+  const mergedScores = { ...apiScores, ...draftScores };
+  const mergedComment =
+    draftEntry?.comment !== undefined && draftEntry?.comment !== ''
+      ? draftEntry.comment
+      : savedEntry?.comment ?? draftEntry?.comment ?? '';
+
+  return {
+    scores: mergedScores,
+    comment: mergedComment,
+  };
+};

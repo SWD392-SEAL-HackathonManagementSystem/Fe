@@ -3,6 +3,10 @@ import React, { useState } from 'react';
 import { Card, Tabs, Button, Table, Form, Input, Modal, Select, Tag, Popconfirm, Alert, Typography, message } from 'antd';
 import { UserPlus, Trash2 } from 'lucide-react';
 import { usePeopleManagement } from '../hooks/usePeopleManagement';
+import {
+  resolveFinalAssignmentType,
+  resolvePrelimAssignmentType,
+} from '../utils/peoplePersonnelRules';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -15,6 +19,9 @@ const PeopleManagementPage = ({ hackathonId }) => {
   const [finalJudgeForm] = Form.useForm();
 
   const selectedMentorTrackId = Form.useWatch('track_id', mentorForm);
+  const selectedPrelimPersonId = Form.useWatch('person_id', prelimJudgeForm);
+  const selectedFinalPersonId = Form.useWatch('person_id', finalJudgeForm);
+
   const selectedPrelimJudgeTrackId = Form.useWatch('track_id', prelimJudgeForm);
   const selectedFinalJudgeTrackId = Form.useWatch('track_id', finalJudgeForm);
 
@@ -27,6 +34,8 @@ const PeopleManagementPage = ({ hackathonId }) => {
     trackMentors,
     judgeAssignments,
     finalJudgeAssignments,
+    prelimJudgePool,
+    finalJudgePool,
     isLoading,
     createTempJudge,
     assignMentor,
@@ -82,16 +91,38 @@ const PeopleManagementPage = ({ hackathonId }) => {
         );
       });
 
-  const judgeOptionsForTrack = (trackId) =>
-    judges.map((p) => {
+  const prelimJudgeOptionsForTrack = (trackId) =>
+    prelimJudgePool.map((p) => {
       const blocked = trackId && isJudgeBlockedForTrack(p.id, trackId);
+      const roleLabel = resolvePrelimAssignmentType(p);
       return (
         <Option key={p.id} value={p.id} disabled={blocked}>
           {p.fullName || p.full_name || p.name}
-          {blocked ? ' (đang là mentor cùng bảng)' : ''}
+          {blocked ? ' (đang là mentor cùng bảng)' : ` — ${roleLabel}`}
         </Option>
       );
     });
+
+  const finalJudgeOptionsForTrack = (trackId) =>
+    finalJudgePool.map((p) => {
+      const blocked = trackId && isJudgeBlockedForTrack(p.id, trackId);
+      const roleLabel = resolveFinalAssignmentType(p);
+      return (
+        <Option key={p.id} value={p.id} disabled={blocked}>
+          {p.fullName || p.full_name || p.name}
+          {blocked ? ' (đang là mentor cùng bảng)' : ` — ${roleLabel}`}
+        </Option>
+      );
+    });
+
+  const selectedPrelimPerson = prelimJudgePool.find((p) => p.id === selectedPrelimPersonId);
+  const selectedFinalPerson = finalJudgePool.find((p) => p.id === selectedFinalPersonId);
+  const prelimRolePreview = selectedPrelimPerson
+    ? resolvePrelimAssignmentType(selectedPrelimPerson)
+    : null;
+  const finalRolePreview = selectedFinalPerson
+    ? resolveFinalAssignmentType(selectedFinalPerson)
+    : null;
 
   return (
     <div>
@@ -237,7 +268,6 @@ const PeopleManagementPage = ({ hackathonId }) => {
               <Form
                 layout="inline"
                 form={prelimJudgeForm}
-                initialValues={{ assignment_type: 'NORMAL' }}
                 onFinish={(vals) =>
                   assignJudge({ ...vals, is_final_assignment: false }, () =>
                     prelimJudgeForm.resetFields(['person_id', 'track_id'])
@@ -262,15 +292,16 @@ const PeopleManagementPage = ({ hackathonId }) => {
                     optionFilterProp="children"
                     disabled={!selectedPrelimJudgeTrackId}
                   >
-                    {judgeOptionsForTrack(selectedPrelimJudgeTrackId)}
+                    {prelimJudgeOptionsForTrack(selectedPrelimJudgeTrackId)}
                   </Select>
                 </Form.Item>
 
-                <Form.Item name="assignment_type" rules={[{ required: true, message: 'Chọn vai trò' }]}>
-                  <Select style={{ width: 150 }} placeholder="Vai trò">
-                    <Option value="NORMAL">NORMAL</Option>
-                    <Option value="HEAD">HEAD</Option>
-                  </Select>
+                <Form.Item label="Vai trò">
+                  {prelimRolePreview ? (
+                    renderJudgeRole(prelimRolePreview)
+                  ) : (
+                    <Text type="secondary">Chọn giám khảo để hiện vai trò</Text>
+                  )}
                 </Form.Item>
 
                 <Button type="primary" htmlType="submit" loading={isLoading} disabled={!prelimTracks.length}>
@@ -278,7 +309,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
                 </Button>
               </Form>
               <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 12 }}>
-                Vòng Sơ loại chỉ gán <strong>NORMAL</strong> hoặc <strong>HEAD</strong> theo bảng đấu. Không dùng FINAL_EXTERNAL ở giai đoạn này.
+                Chỉ hiện giám khảo/mentor <strong>INTERNAL</strong> hoặc <strong>trưởng ban</strong>. Vai trò gán tự lấy từ hồ sơ (HEAD / NORMAL).
               </Text>
             </Card>
 
@@ -324,7 +355,7 @@ const PeopleManagementPage = ({ hackathonId }) => {
               <Form
                 layout="inline"
                 form={finalJudgeForm}
-                initialValues={{ assignment_type: 'FINAL_EXTERNAL', is_final_assignment: true }}
+                initialValues={{ is_final_assignment: true }}
                 onFinish={(vals) =>
                   assignJudge(vals, () =>
                     finalJudgeForm.resetFields(['person_id', 'track_id', 'round_id'])
@@ -360,24 +391,25 @@ const PeopleManagementPage = ({ hackathonId }) => {
                     optionFilterProp="children"
                     disabled={!selectedFinalJudgeTrackId && finalTracks.length > 0}
                   >
-                    {judgeOptionsForTrack(selectedFinalJudgeTrackId)}
+                    {finalJudgeOptionsForTrack(selectedFinalJudgeTrackId)}
                   </Select>
                 </Form.Item>
                 <Form.Item name="is_final_assignment" hidden>
                   <Input />
                 </Form.Item>
-                <Form.Item name="assignment_type" rules={[{ required: true, message: 'Chọn vai trò' }]}>
-                  <Select style={{ width: 170 }} placeholder="Vai trò">
-                    <Option value="HEAD">HEAD</Option>
-                    <Option value="FINAL_EXTERNAL">FINAL_EXTERNAL</Option>
-                  </Select>
+                <Form.Item label="Vai trò">
+                  {finalRolePreview ? (
+                    renderJudgeRole(finalRolePreview)
+                  ) : (
+                    <Text type="secondary">Chọn giám khảo để hiện vai trò</Text>
+                  )}
                 </Form.Item>
                 <Button type="primary" htmlType="submit" loading={isLoading} disabled={!finalTracks.length && !finalRounds.length}>
                   Gán giám khảo CK
                 </Button>
               </Form>
               <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 12 }}>
-                Vòng Chung kết chỉ gán <strong>HEAD</strong> (trưởng ban) hoặc <strong>FINAL_EXTERNAL</strong> (giám khảo khách).
+                Chỉ hiện giám khảo <strong>EXTERNAL</strong> hoặc <strong>trưởng ban</strong>. Mentor và INTERNAL thường không được chấm Chung kết. Vai trò tự lấy từ hồ sơ.
               </Text>
             </Card>
             <Table

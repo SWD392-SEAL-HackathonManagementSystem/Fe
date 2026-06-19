@@ -95,6 +95,7 @@ const HackathonSetupPage = () => {
         <HackathonGeneralConfig
           hackathon={hackathon}
           onUpdated={refreshHackathon}
+          onGoToLottery={() => setActiveTab('lottery')}
         />
       ),
     },
@@ -204,7 +205,13 @@ const HackathonSetupPage = () => {
         style={{ borderRadius: 12, border: '1px solid #e8edf5', boxShadow: '0 1px 6px rgba(15,61,138,0.05)', marginBottom: activeTab === 'final-config' ? 0 : undefined }}
         bodyStyle={{ padding: '0 24px' }}
       >
-        <Tabs destroyInactiveTabPane={true} defaultActiveKey="rounds" items={items} onChange={setActiveTab} className="hackathon-setup-tabs"/>
+        <Tabs
+          destroyInactiveTabPane
+          activeKey={activeTab}
+          items={items}
+          onChange={setActiveTab}
+          className="hackathon-setup-tabs"
+        />
       </Card>
       {activeTab === 'final-config' && <FinalRoundConfigPage />}
     </div>

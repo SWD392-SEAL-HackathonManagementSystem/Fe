@@ -81,14 +81,31 @@ const TrackManagementPage = ({ hackathonId }) => {
   const handleModalFinish = async (values) => {
     try {
       setLoading(true);
-      const payload = mapTrackToBE(values);
+      const { problem_file: problemFileListValue, ...trackValues } = values;
+      const payload = mapTrackToBE(trackValues);
+      let trackId = editingTrack?.id;
+
       if (editingTrack) {
         await trackService.update(editingTrack.id, payload);
+        trackId = editingTrack.id;
         message.success('Đã cập nhật bảng đấu');
       } else {
-        await trackService.createByRound(values.round_id, payload);
+        const created = await trackService.createByRound(values.round_id, payload);
+        trackId = created.id;
         message.success('Đã thêm bảng đấu');
       }
+
+      const problemFile = problemFileListValue?.[0]?.originFileObj ?? problemFileListValue?.[0];
+      const roundId = editingTrack?.round_id ?? values.round_id;
+      const roundReleased = rounds.find((r) => r.id === roundId)?.problem_released_at;
+      if (problemFile && trackId && !roundReleased) {
+        try {
+          await trackService.uploadProblemStatement(trackId, problemFile);
+        } catch (uploadError) {
+          message.warning(uploadError?.message || 'Đã lưu bảng đấu nhưng chưa upload được file đề bài.');
+        }
+      }
+
       setIsModalVisible(false);
       await fetchData();
     } catch (error) {
@@ -124,6 +141,16 @@ const TrackManagementPage = ({ hackathonId }) => {
       title: 'Thành viên / đội',
       key: 'team_size',
       render: (_, record) => `${record.min_team_size || '-'} - ${record.max_team_size || '-'} người`,
+    },
+    {
+      title: 'Đề bài',
+      key: 'problem',
+      render: (_, record) =>
+        record.problem_statement_filename ? (
+          <span style={{ fontSize: 12 }}>{record.problem_statement_filename}</span>
+        ) : (
+          <span style={{ color: '#999' }}>Chưa upload</span>
+        ),
     },
     {
       title: 'Trạng thái',
@@ -168,7 +195,7 @@ const TrackManagementPage = ({ hackathonId }) => {
         showIcon
         style={{ marginBottom: 16 }}
         message="Bảng đấu (chủ đề thi)"
-        description={<span style={{ fontSize: 12 }}>Chỉ thêm trong vòng Sơ loại. Mỗi bảng đấu cần bộ tiêu chí riêng.</span>}
+        description={<span style={{ fontSize: 12 }}>Chỉ thêm trong vòng Sơ loại. Mỗi bảng đấu cần bộ tiêu chí riêng và file PDF đề bài riêng.</span>}
       />
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
         <Button 
@@ -201,6 +228,9 @@ const TrackManagementPage = ({ hackathonId }) => {
           initialValues={editingTrack}
           rounds={prelimRounds}
           isEditing={!!editingTrack}
+          problemReleased={Boolean(
+            rounds.find((r) => r.id === editingTrack?.round_id)?.problem_released_at,
+          )}
           onCancel={() => setIsModalVisible(false)}
           onFinish={handleModalFinish}
         />

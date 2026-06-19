@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Modal, notification } from 'antd';
 import { userService } from '../../../features/auth/services/userService';
 import { studentTeamService } from '../../features/team/services/studentTeam.service';
+import { studentHackathonService } from '../../features/hackathon/services/studentHackathon.service';
 
 const getStoredUser = () => {
   try {
@@ -85,19 +86,29 @@ export const useStudentDashboard = () => {
 
     setIsTeamLoading(true);
     try {
-      const hackathon = await studentTeamService.getActiveHackathon();
-      setActiveHackathon(hackathon);
+      const nextTeams = (await studentTeamService.getMyTeams()).filter(
+        (team) =>
+          team.currentMember?.isAccepted &&
+          team.status !== 'REJECTED' &&
+          team.status !== 'ELIMINATED'
+      );
 
-      if (!hackathon?.id) {
+      let primaryHackathonId = nextTeams[0]?.hackathonId;
+      if (!primaryHackathonId) {
+        const registered = await studentHackathonService.getRegisteredHackathons('ONGOING');
+        primaryHackathonId = registered[0]?.id;
+      }
+
+      if (!primaryHackathonId) {
+        setActiveHackathon(null);
         setTeams([]);
         return;
       }
 
-      const nextTeams = await studentTeamService.getMyTeams({ hackathonId: hackathon.id });
+      const hackathon = await studentHackathonService.getHackathonDetail(primaryHackathonId);
+      setActiveHackathon(hackathon);
       setTeams(
-        nextTeams.filter(
-          (team) => team.currentMember?.isAccepted && team.status !== 'REJECTED' && team.status !== 'ELIMINATED'
-        )
+        nextTeams.filter((team) => Number(team.hackathonId) === Number(primaryHackathonId))
       );
     } catch {
       setTeams([]);

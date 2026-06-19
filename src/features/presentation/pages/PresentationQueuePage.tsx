@@ -102,6 +102,7 @@ const PresentationQueuePage: React.FC = () => {
   });
 
   const scoringLocked = Boolean(roundDetail?.scoringLocked ?? roundDetail?.scoring_locked);
+  const isFinalRound = Boolean(roundDetail?.isFinal ?? roundDetail?.is_final);
 
   // Keep local groups in sync with query data
   useEffect(() => {
@@ -182,10 +183,12 @@ const PresentationQueuePage: React.FC = () => {
   }, [selectedGroup]);
 
   const { data: controllerInfo } = useQuery<PresentationControllerInfo>({
-    queryKey: ['trackController', selectedTrackId],
+    queryKey: ['presentationController', isFinalRound ? 'round' : 'track', isFinalRound ? roundId : selectedTrackId],
     queryFn: () =>
-      presentationService.getTrackController(selectedTrackId!) as Promise<PresentationControllerInfo>,
-    enabled: !!selectedTrackId,
+      (isFinalRound
+        ? presentationService.getRoundController(roundId!)
+        : presentationService.getTrackController(selectedTrackId!)) as Promise<PresentationControllerInfo>,
+    enabled: isFinalRound ? !!roundId : !!selectedTrackId,
   });
 
   const controllerJudgeId = controllerInfo?.judgeId ?? controllerInfo?.judge_id;
@@ -917,6 +920,7 @@ const PresentationQueuePage: React.FC = () => {
             <PresentationControllerCard
               trackId={selectedTrackId}
               roundId={roundId}
+              mode={isFinalRound ? 'round' : 'track'}
               canGrant={isCoordinator}
             />
 

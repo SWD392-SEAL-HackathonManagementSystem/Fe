@@ -3,10 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Spin, theme } from 'antd';
+import { Spin, theme, Modal, Button, message } from 'antd';
+import { FilePdfOutlined, EyeOutlined } from '@ant-design/icons';
 import { personBApi, SubmissionRequest, SubmissionStatusResponse, DeadlineResponse } from '../../../../api/personB.api';
 import toast from 'react-hot-toast';
 import { useAppContext } from '../../../../app/AppContext';
+import { studentSubmissionService } from '../services/studentSubmission.service';
 
 // ─── Zod Validation Schema ────────────────────────────────────────────────────
 const submissionSchema = z.object({
@@ -42,6 +44,16 @@ const submissionSchema = z.object({
 
 type SubmissionFormValues = z.infer<typeof submissionSchema>;
 
+const resolveSubmissionId = (data?: SubmissionStatusResponse | null): number | null => {
+  if (!data) return null;
+  const rawId = data.submission_id;
+  if (rawId != null && rawId !== '') return Number(rawId);
+  const path = data.slide_download_path;
+  if (!path) return null;
+  const match = path.match(/\/submissions\/(\d+)\/slide/);
+  return match ? Number(match[1]) : null;
+};
+
 // ─── Status config ─────────────────────────────────────────────────────────────
 const getStatusConfig = (status?: string, darkMode?: boolean) => {
   switch (status) {
@@ -71,6 +83,15 @@ const getStatusConfig = (status?: string, darkMode?: boolean) => {
         label: 'Bị từ chối',
         sub: 'Bài nộp của bạn đã bị từ chối. Vui lòng liên hệ BTC.',
         progress: 0,
+      };
+    case 'INCOMPLETE':
+      return {
+        dot: '#DC2626',
+        bg: darkMode ? 'rgba(220, 38, 38, 0.1)' : '#FFF1F2',
+        border: darkMode ? 'rgba(220, 38, 38, 0.3)' : '#FECDD3',
+        label: 'Nộp file thất bại — cần nộp lại',
+        sub: 'File slide PDF chưa được lưu thành công. Vui lòng chọn file PDF và nộp lại.',
+        progress: 25,
       };
     default:
       return {
@@ -155,11 +176,17 @@ const StudentSubmissionPage: React.FC = () => {
     },
     onError: (err: any) => {
       toast.error(`Lỗi nộp bài: ${err?.message || 'Không thể kết nối máy chủ'}`);
+      queryClient.invalidateQueries({ queryKey: ['studentSubmission', studentId] });
     },
   });
 
   const onSubmit = (values: SubmissionFormValues) => {
-    if (!values.slide_file && !submissionData?.slide_file && !submissionData?.slide_download_path) {
+    const hasExistingSlide = Boolean(
+      submissionData?.slide_file ||
+        submissionData?.slide_download_path ||
+        submissionData?.has_slide
+    );
+    if (!values.slide_file && !hasExistingSlide) {
       toast.error('Vui lòng tải lên file slide PDF.');
       return;
     }
@@ -202,6 +229,58 @@ const StudentSubmissionPage: React.FC = () => {
   const hasApiError = !!(subError || deadlineError);
   const statusConfig = getStatusConfig(submissionData?.status, darkMode);
   const isSubmitting = mutation.isPending || isSubLoading;
+  const [isSlideModalVisible, setIsSlideModalVisible] = useState(false);
+  const [slideBlobUrl, setSlideBlobUrl] = useState<string | null>(null);
+  const [isLoadingSlide, setIsLoadingSlide] = useState(false);
+
+  const submittedSlideName = submissionData?.slide_file || 'slide.pdf';
+  const canViewSubmittedSlide = Boolean(
+    submissionData?.has_slide ||
+      submissionData?.slide_file ||
+      submissionData?.slide_download_path
+  );
+
+  const handleViewSubmittedSlide = async () => {
+    const submissionId = resolveSubmissionId(submissionData);
+    if (!submissionId) {
+      message.error('Không xác định được bài nộp để xem file.');
+      return;
+    }
+
+    setIsSlideModalVisible(true);
+    setIsLoadingSlide(true);
+    setSlideBlobUrl(null);
+
+    try {
+      const blobData = (await studentSubmissionService.getSubmissionSlide(
+        submissionId
+      )) as unknown as Blob;
+      const fileUrl = URL.createObjectURL(blobData);
+      setSlideBlobUrl(fileUrl);
+    } catch {
+      message.error('Không thể mở file slide. Vui lòng thử lại sau.');
+      setIsSlideModalVisible(false);
+    } finally {
+      setIsLoadingSlide(false);
+    }
+  };
+
+  const handleCloseSlideModal = () => {
+    setIsSlideModalVisible(false);
+    if (slideBlobUrl) {
+      URL.revokeObjectURL(slideBlobUrl);
+      setSlideBlobUrl(null);
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (slideBlobUrl) {
+        URL.revokeObjectURL(slideBlobUrl);
+      }
+    },
+    [slideBlobUrl]
+  );
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
@@ -384,18 +463,20 @@ const StudentSubmissionPage: React.FC = () => {
                   {errors.slide_file.message}
                 </span>
               )}
-              {(submissionData?.slide_file || submissionData?.slide_download_path) && (
+              {(canViewSubmittedSlide || submissionData?.slide_file) && (
                 <div style={{ fontSize: '12px', color: token.colorTextDescription, marginTop: '6px' }}>
-                  Đã nộp: {submissionData.slide_file || 'slide.pdf'}
-                  {submissionData.slide_download_path && (
-                    <a
-                      href={submissionData.slide_download_path}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ marginLeft: '8px', color: '#6366F1' }}
+                  Đã nộp: {submittedSlideName}
+                  {canViewSubmittedSlide && (
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<EyeOutlined />}
+                      loading={isLoadingSlide}
+                      onClick={handleViewSubmittedSlide}
+                      style={{ marginLeft: 4, padding: 0, height: 'auto' }}
                     >
-                      Tải xuống
-                    </a>
+                      Xem file đã nộp
+                    </Button>
                   )}
                 </div>
               )}
@@ -671,6 +752,70 @@ const StudentSubmissionPage: React.FC = () => {
 
         </div>
       </div>
+
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <FilePdfOutlined style={{ color: '#ff4d4f', fontSize: 20 }} />
+            <span>Slide đã nộp: {submittedSlideName}</span>
+          </div>
+        }
+        open={isSlideModalVisible}
+        onCancel={handleCloseSlideModal}
+        width={1000}
+        style={{ top: 20 }}
+        footer={[
+          <Button key="close" onClick={handleCloseSlideModal}>
+            Đóng
+          </Button>,
+        ]}
+      >
+        <div
+          style={{
+            height: '75vh',
+            width: '100%',
+            position: 'relative',
+            background: '#f0f2f5',
+            borderRadius: 8,
+            overflow: 'hidden',
+          }}
+        >
+          {isLoadingSlide ? (
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                textAlign: 'center',
+              }}
+            >
+              <Spin size="large" />
+              <div style={{ marginTop: 16, color: '#8c8c8c' }}>Đang tải file slide...</div>
+            </div>
+          ) : slideBlobUrl ? (
+            <iframe
+              src={`${slideBlobUrl}#toolbar=0`}
+              title="PDF Viewer"
+              width="100%"
+              height="100%"
+              style={{ border: 'none' }}
+            />
+          ) : (
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                color: '#ff4d4f',
+              }}
+            >
+              Không thể hiển thị file PDF.
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 };
