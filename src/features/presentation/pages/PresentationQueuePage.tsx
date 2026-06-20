@@ -220,6 +220,23 @@ const PresentationQueuePage: React.FC = () => {
     [trackTabs]
   );
 
+  // =========================================================
+  // LOGIC THÊM VÀO THEO YÊU CẦU: Khóa chỉnh sửa Hàng đợi
+  // =========================================================
+  const hasScoringStarted = useMemo(() => {
+    const isQueueRunning = localGroups.some(g => 
+      g.teams.some(t => t.status === 'PRESENTING' || t.status === 'DONE')
+    );
+    const isSubmissionGraded = roundSubmissions.some(s => 
+      s.status === 'GRADED' || s.status === 'SCORING'
+    );
+    return isQueueRunning || isSubmissionGraded;
+  }, [localGroups, roundSubmissions]);
+
+  // isQueueConfigLocked = Chỉ dùng để cấm xáo trộn và cấm duyệt bài trễ.
+  const isQueueConfigLocked = scoringLocked || hasScoringStarted;
+  // =========================================================
+
   const handleRefreshAll = async () => {
     await Promise.all([refetch(), isCoordinator ? refetchSubmissions() : Promise.resolve()]);
   };
@@ -272,6 +289,11 @@ const PresentationQueuePage: React.FC = () => {
   }, [isCoordinator, roleHints]);
 
   const handleShuffleClick = (shuffleAll = false) => {
+    // KHÓA XÁO TRỘN NẾU QUÁ TRÌNH CHẤM/THUYẾT TRÌNH ĐÃ BẮT ĐẦU
+    if (isQueueConfigLocked) {
+      toast.error('Quá trình chấm thi đang diễn ra, không thể xáo trộn hàng đợi.');
+      return;
+    }
     if (shouldWarnShuffleWhenLocked(scoringLocked)) {
       const ok = window.confirm(getShuffleLockedWarning());
       if (!ok) return;
@@ -447,25 +469,25 @@ const PresentationQueuePage: React.FC = () => {
               <>
                 <button
                   onClick={() => handleShuffleClick(false)}
-                  disabled={shuffleMutation.isPending || !roundId}
+                  disabled={shuffleMutation.isPending || !roundId || isQueueConfigLocked}
                   title={
-                    selectedTrackId
-                      ? `Xáo trộn track hiện tại (${gradableOnSelectedTrack} bài đủ điều kiện)`
-                      : 'Xáo trộn track hiện tại'
+                    isQueueConfigLocked 
+                      ? 'Hàng đợi đã bị khóa do vòng thi đang diễn ra' 
+                      : (selectedTrackId ? `Xáo trộn track hiện tại (${gradableOnSelectedTrack} bài đủ điều kiện)` : 'Xáo trộn track hiện tại')
                   }
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
                     padding: '7px 14px',
-                    border: '1px solid #BBF7D0',
+                    border: isQueueConfigLocked ? '1px solid #E5E7EB' : '1px solid #BBF7D0',
                     borderRadius: '8px',
-                    background: '#DCFCE7',
+                    background: isQueueConfigLocked ? '#F3F4F6' : '#DCFCE7',
                     fontSize: '13px',
                     fontWeight: 600,
-                    cursor: shuffleMutation.isPending ? 'not-allowed' : 'pointer',
-                    color: '#166534',
-                    opacity: shuffleMutation.isPending ? 0.7 : 1,
+                    cursor: (shuffleMutation.isPending || isQueueConfigLocked) ? 'not-allowed' : 'pointer',
+                    color: isQueueConfigLocked ? '#9CA3AF' : '#166534',
+                    opacity: (shuffleMutation.isPending || isQueueConfigLocked) ? 0.7 : 1,
                   }}
                 >
                   🔀 Xáo trộn track này
@@ -473,20 +495,21 @@ const PresentationQueuePage: React.FC = () => {
                 {trackIds.length > 1 && (
                   <button
                     onClick={handleShuffleAllClick}
-                    disabled={shuffleMutation.isPending || !roundId}
+                    disabled={shuffleMutation.isPending || !roundId || isQueueConfigLocked}
+                    title={isQueueConfigLocked ? 'Hàng đợi đã bị khóa do vòng thi đang diễn ra' : 'Xáo trộn tất cả track'}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '6px',
                       padding: '7px 14px',
-                      border: '1px solid #BFDBFE',
+                      border: isQueueConfigLocked ? '1px solid #E5E7EB' : '1px solid #BFDBFE',
                       borderRadius: '8px',
-                      background: '#EFF6FF',
+                      background: isQueueConfigLocked ? '#F3F4F6' : '#EFF6FF',
                       fontSize: '13px',
                       fontWeight: 600,
-                      cursor: shuffleMutation.isPending ? 'not-allowed' : 'pointer',
-                      color: '#1D4ED8',
-                      opacity: shuffleMutation.isPending ? 0.7 : 1,
+                      cursor: (shuffleMutation.isPending || isQueueConfigLocked) ? 'not-allowed' : 'pointer',
+                      color: isQueueConfigLocked ? '#9CA3AF' : '#1D4ED8',
+                      opacity: (shuffleMutation.isPending || isQueueConfigLocked) ? 0.7 : 1,
                     }}
                   >
                     🔀 Xáo trộn tất cả track
@@ -560,6 +583,17 @@ const PresentationQueuePage: React.FC = () => {
             showIcon
             message="Round đã khóa chấm điểm"
             description="Xáo trộn/timer vẫn có thể thử — BE là gate cuối."
+            style={{ marginBottom: 12 }}
+          />
+        )}
+
+        {/* THÔNG BÁO VÒNG THI ĐANG DIỄN RA -> KHÓA HÀNG ĐỢI */}
+        {hasScoringStarted && !scoringLocked && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Quá trình chấm thi đang diễn ra"
+            description="Hàng đợi thuyết trình đã được khóa để đảm bảo tính đồng bộ. Không thể xáo trộn hay duyệt thêm bài nộp trễ."
             style={{ marginBottom: 12 }}
           />
         )}
@@ -640,7 +674,7 @@ const PresentationQueuePage: React.FC = () => {
               roundId={roundId}
               trackId={selectedTrackId}
               trackName={selectedGroup?.group_name}
-              canReviewLate={isCoordinator}
+              canReviewLate={isCoordinator && !isQueueConfigLocked} // TRUYỀN VÀO ĐỂ KHÓA TÍNH NĂNG DUYỆT TRỄ
               onReviewSuccess={handleRefreshAll}
             />
 

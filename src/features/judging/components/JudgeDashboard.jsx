@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react';
+import { 
+  useState, 
+  useEffect 
+} from 'react';
 import { 
   Typography, 
   Row, 
@@ -30,26 +33,45 @@ import {
   BlockOutlined,
   HistoryOutlined
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { judgeService } from '../services/judgeService';
+import { 
+  useNavigate 
+} from 'react-router-dom';
+import { 
+  motion 
+} from 'framer-motion';
+import { 
+  judgeService 
+} from '../services/judgeService';
 import ScoringCountdownCard from '../components/ScoringCountdownCard';
 import CalibrationSessionsPanel from '../components/CalibrationSessionsPanel';
 
-const { Title, Text, Paragraph } = Typography;
+const { 
+  Title, 
+  Text, 
+  Paragraph 
+} = Typography;
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { 
+    opacity: 0, 
+    y: 20 
+  },
   visible: { 
     opacity: 1, 
     y: 0, 
-    transition: { duration: 0.4 } 
+    transition: { 
+      duration: 0.4 
+    } 
   }
 };
 
 const JudgeDashboard = ({ user }) => {
+  // ==========================================
+  // 1. KHỞI TẠO HOOKS VÀ ROUTER
+  // ==========================================
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  
   const [data, setData] = useState({ 
     stats: {}, 
     assignments: [], 
@@ -57,10 +79,14 @@ const JudgeDashboard = ({ user }) => {
     prelimExternalFiltered: 0 
   });
   
+  // State bộ lọc
   const [searchText, setSearchText] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [hackathonFilter, setHackathonFilter] = useState('ALL');
 
+  // ==========================================
+  // 2. FETCH DỮ LIỆU TỪ BACKEND
+  // ==========================================
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -71,51 +97,48 @@ const JudgeDashboard = ({ user }) => {
           judgeService.getScoringSchedule().catch(() => [])
         ]);
 
-        const rawTracks = Array.isArray(tracksRes) ? tracksRes : tracksRes?.items || tracksRes?.data || [];
-        const rawFinals = Array.isArray(finalsRes) ? finalsRes : finalsRes?.items || finalsRes?.data || [];
-        const rawSchedule = Array.isArray(scheduleRes) ? scheduleRes : scheduleRes?.items || scheduleRes?.data || [];
+        const rawTracks = Array.isArray(tracksRes) 
+          ? tracksRes 
+          : tracksRes?.items || tracksRes?.data || [];
+          
+        const rawFinals = Array.isArray(finalsRes) 
+          ? finalsRes 
+          : finalsRes?.items || finalsRes?.data || [];
+          
+        const rawSchedule = Array.isArray(scheduleRes) 
+          ? scheduleRes 
+          : scheduleRes?.items || scheduleRes?.data || [];
 
         const prelimExternalFiltered = rawTracks.filter((item) => {
           const assignmentType = String(item.assignmentType || item.role || '').toUpperCase();
           return assignmentType.includes('EXTERNAL');
         }).length;
 
-        const mappedTracks = rawTracks
-          .filter((item) => {
-            const assignmentType = String(item.assignmentType || item.role || '').toUpperCase();
-            return !assignmentType.includes('EXTERNAL');
-          })
-          .map(item => {
-            const hName = item.hackathonName || item.hackathon_name || 'Hackathon Chưa Rõ Tên';
-            // Cải tiến logic bắt status của Hackathon và Round
-            const hStatus = item.hackathonStatus || item.hackathon_status || (hName.toLowerCase().includes('completed') ? 'COMPLETED' : 'ACTIVE');
-            const rStatus = item.roundStatus || item.round_status || item.status || 'ACTIVE';
-
-            return {
-              id: item.id || item.assignmentId || Math.random(),
-              hackathonId: item.hackathonId || item.hackathon_id || 'unknown',
-              hackathonName: hName,
-              hackathonStatus: hStatus,
-              role: item.role || item.assignmentType || 'Giám khảo',
-              assignmentType: item.assignmentType || item.role,
-              trackName: item.trackName || item.track_name || 'Bảng Sơ loại',
-              roundName: item.roundName || item.round_name || 'Vòng Sơ Loại',
-              roundStatus: rStatus,
-              progress: item.totalTeams > 0
-                ? Math.round(((item.scoredTeams || 0) / item.totalTeams) * 100)
-                : (item.progress || 0),
-              totalTeams: item.totalTeams ?? item.total_teams ?? 0,
-              scoredTeams: item.scoredTeams ?? item.scored_teams ?? 0,
-              roundId: item.roundId || item.round_id,
-              trackId: item.trackId || item.track_id,
-              isFinal: false
-            };
-          });
-
-        const mappedFinals = rawFinals.map(item => {
+        // HÀM HỖ TRỢ XỬ LÝ TIẾN ĐỘ THÔNG MINH
+        const processAssignment = (item, isFinalFlag) => {
           const hName = item.hackathonName || item.hackathon_name || 'Hackathon Chưa Rõ Tên';
-          const hStatus = item.hackathonStatus || item.hackathon_status || (hName.toLowerCase().includes('completed') ? 'COMPLETED' : 'ACTIVE');
+          
+          const hStatus = item.hackathonStatus 
+            || item.hackathon_status 
+            || (hName.toLowerCase().includes('completed') ? 'COMPLETED' : 'ACTIVE');
+            
           const rStatus = item.roundStatus || item.round_status || item.status || 'ACTIVE';
+          
+          const cStatus = item.completionStatus || item.completion_status || 'NOT_STARTED';
+
+          const total = item.totalTeams ?? item.total_teams ?? 0;
+          const scored = item.scoredTeams ?? item.scored_teams ?? 0;
+
+          let calcProgress = item.progress || 0;
+          if (total > 0) {
+            calcProgress = Math.round((scored / total) * 100);
+          } else {
+            if (cStatus === 'COMPLETED') {
+              calcProgress = 100;
+            } else if (cStatus === 'IN_PROGRESS') {
+              calcProgress = 50;
+            }
+          }
 
           return {
             id: item.id || item.assignmentId || Math.random(),
@@ -124,19 +147,29 @@ const JudgeDashboard = ({ user }) => {
             hackathonStatus: hStatus,
             role: item.role || item.assignmentType || 'Giám khảo',
             assignmentType: item.assignmentType || item.role,
-            trackName: 'Tất cả các bảng',
-            roundName: item.roundName || item.round_name || 'Vòng Chung Kết',
+            trackName: isFinalFlag 
+              ? 'Tất cả các bảng' 
+              : (item.trackName || item.track_name || 'Bảng Sơ loại'),
+            roundName: item.roundName || item.round_name || (isFinalFlag ? 'Vòng Chung Kết' : 'Vòng Sơ Loại'),
             roundStatus: rStatus,
-            progress: item.totalTeams > 0
-              ? Math.round(((item.scoredTeams || 0) / item.totalTeams) * 100)
-              : (item.progress || 0),
-            totalTeams: item.totalTeams ?? item.total_teams ?? 0,
-            scoredTeams: item.scoredTeams ?? item.scored_teams ?? 0,
+            completionStatus: cStatus,
+            progress: calcProgress,
+            totalTeams: total,
+            scoredTeams: scored,
             roundId: item.roundId || item.round_id,
-            trackId: null,
-            isFinal: true
+            trackId: isFinalFlag ? null : (item.trackId || item.track_id),
+            isFinal: isFinalFlag
           };
-        });
+        };
+
+        const mappedTracks = rawTracks
+          .filter((item) => {
+            const assignmentType = String(item.assignmentType || item.role || '').toUpperCase();
+            return !assignmentType.includes('EXTERNAL');
+          })
+          .map(item => processAssignment(item, false));
+
+        const mappedFinals = rawFinals.map(item => processAssignment(item, true));
 
         const allAssignments = [...mappedTracks, ...mappedFinals];
 
@@ -184,18 +217,22 @@ const JudgeDashboard = ({ user }) => {
   }
 
   const activeAssignmentForCountdown = data.assignments?.find(a => {
-    const isLocked = ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(a.hackathonStatus) || ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(a.roundStatus);
+    const isLocked = ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(a.hackathonStatus) 
+      || ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(a.roundStatus);
     return !isLocked && a.progress < 100;
   }) || data.assignments?.[0];
   
   const finalAssignment = data.assignments?.find((item) => item.isFinal);
 
-  // === LỌC DỮ LIỆU TÌM KIẾM VÀ TRẠNG THÁI ===
+  // ==========================================
+  // 3. LỌC DỮ LIỆU TÌM KIẾM VÀ TRẠNG THÁI
+  // ==========================================
   const filteredAssignments = (data.assignments || []).filter(item => {
-    // Xác định logic HOÀN THÀNH hoặc ĐÓNG
     const isEventClosed = ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(item.hackathonStatus);
     const isRoundClosed = ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(item.roundStatus);
-    const isScoringFinished = item.progress === 100 || (item.scoredTeams === item.totalTeams && item.totalTeams > 0);
+    const isScoringFinished = item.progress === 100 
+      || (item.scoredTeams === item.totalTeams && item.totalTeams > 0) 
+      || item.completionStatus === 'COMPLETED';
     
     const isCompletedOrClosed = isEventClosed || isRoundClosed || isScoringFinished;
     
@@ -214,7 +251,9 @@ const JudgeDashboard = ({ user }) => {
     return matchStatus && matchSearch && matchHackathon;
   });
 
-  // === GOM NHÓM THEO SỰ KIỆN HACKATHON ĐỂ HIỂN THỊ DẠNG CARD ===
+  // ==========================================
+  // 4. GOM NHÓM THEO SỰ KIỆN HACKATHON
+  // ==========================================
   const groupedAssignments = filteredAssignments.reduce((acc, curr) => {
     const key = curr.hackathonName;
     if (!acc[key]) {
@@ -227,7 +266,9 @@ const JudgeDashboard = ({ user }) => {
   const uniqueHackathons = [...new Set(data.assignments?.map(a => a.hackathonName).filter(Boolean))];
   const assignmentCount = data.assignments?.length || 0;
   
-  // === TẠO CÂU CHÀO MỪNG ĐỘNG ===
+  // ==========================================
+  // 5. TẠO CÂU CHÀO MỪNG ĐỘNG
+  // ==========================================
   let dynamicWelcomeMessage = "Cảm ơn bạn đã tham gia đánh giá. Sự công tâm của bạn là chìa khóa tìm ra những dự án xuất sắc nhất cho cuộc thi.";
   
   if (assignmentCount === 1) {
@@ -238,17 +279,28 @@ const JudgeDashboard = ({ user }) => {
     dynamicWelcomeMessage = `Hiện tại, bạn đang được phân công ${assignmentCount} nhiệm vụ đánh giá thuộc các sự kiện: ${uniqueHackathons.join(', ')}. Vui lòng chọn một sự kiện bên dưới để bắt đầu chấm thi.`;
   }
 
+  // ==========================================
+  // 6. RENDER GIAO DIỆN
+  // ==========================================
   return (
     <motion.div 
       initial="hidden" 
       animate="visible" 
-      variants={{ visible: { transition: { staggerChildren: 0.1 } } }} 
-      style={{ maxWidth: 1400, margin: '0 auto', fontFamily: "'Inter', sans-serif" }}
+      variants={{ 
+        visible: { 
+          transition: { 
+            staggerChildren: 0.1 
+          } 
+        } 
+      }} 
+      style={{ 
+        maxWidth: 1400, 
+        margin: '0 auto', 
+        fontFamily: "'Inter', sans-serif" 
+      }}
     >
       
-      {/* ========================================== */}
-      {/* 1. HERO BANNER */}
-      {/* ========================================== */}
+      {/* KHU VỰC HERO BANNER */}
       <motion.div variants={itemVariants}>
         <div 
           style={{
@@ -284,7 +336,12 @@ const JudgeDashboard = ({ user }) => {
             </Space>
             <Title 
               level={1} 
-              style={{ margin: 0, color: '#ffffff', fontSize: '32px', fontWeight: 800 }}
+              style={{ 
+                margin: 0, 
+                color: '#ffffff', 
+                fontSize: '32px', 
+                fontWeight: 800 
+              }}
             >
               Xin chào {user?.fullName ? `Giám khảo ${user.fullName}` : 'Giám khảo'}!
             </Title>
@@ -303,9 +360,7 @@ const JudgeDashboard = ({ user }) => {
         </div>
       </motion.div>
 
-      {/* ========================================== */}
-      {/* 2. THẺ THỐNG KÊ */}
-      {/* ========================================== */}
+      {/* KHU VỰC THẺ THỐNG KÊ */}
       <motion.div variants={itemVariants}>
         {data.prelimExternalFiltered > 0 && (
           <Card 
@@ -353,9 +408,7 @@ const JudgeDashboard = ({ user }) => {
         </Row>
       </motion.div>
 
-      {/* ========================================== */}
-      {/* 3. BỐ CỤC CHIA 2 CỘT */}
-      {/* ========================================== */}
+      {/* BỐ CỤC CHIA 2 CỘT */}
       <Row gutter={[24, 24]}>
         
         {/* CỘT TRÁI: DANH SÁCH SỰ KIỆN (EVENT CARDS) */}
@@ -363,15 +416,34 @@ const JudgeDashboard = ({ user }) => {
           <motion.div variants={itemVariants}>
             <Card 
               title={
-                <strong style={{ fontSize: '18px', display: 'flex', alignItems: 'center' }}>
-                  <FundProjectionScreenOutlined style={{ color: '#3b82f6', marginRight: 8 }}/>
+                <strong 
+                  style={{ 
+                    fontSize: '18px', 
+                    display: 'flex', 
+                    alignItems: 'center' 
+                  }}
+                >
+                  <FundProjectionScreenOutlined 
+                    style={{ 
+                      color: '#3b82f6', 
+                      marginRight: 8 
+                    }}
+                  />
                   Sự kiện được phân công ({Object.keys(groupedAssignments).length})
                 </strong>
               } 
-              style={{ borderRadius: 16 }}
+              style={{ 
+                borderRadius: 16 
+              }}
               styles={{ 
-                header: { padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }, 
-                body: { padding: '24px', background: '#f8fafc' } 
+                header: { 
+                  padding: '16px 24px', 
+                  borderBottom: '1px solid #f0f0f0' 
+                }, 
+                body: { 
+                  padding: '24px', 
+                  background: '#f8fafc' 
+                } 
               }}
               extra={
                 <Space wrap>
@@ -394,24 +466,48 @@ const JudgeDashboard = ({ user }) => {
               }
             >
               {Object.keys(groupedAssignments).length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
+                <div 
+                  style={{ 
+                    textAlign: 'center', 
+                    padding: '60px 0', 
+                    color: '#94a3b8' 
+                  }}
+                >
                   Không tìm thấy sự kiện nào phù hợp với bộ lọc.
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div 
+                  style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '20px' 
+                  }}
+                >
                   {Object.entries(groupedAssignments).map(([hackathonName, tasks]) => {
-                    // Logic tính toán tiến độ tổng quan của Sự kiện này
                     const totalTeamsEvent = tasks.reduce((sum, t) => sum + (t.totalTeams || 0), 0);
                     const scoredTeamsEvent = tasks.reduce((sum, t) => sum + (t.scoredTeams || 0), 0);
                     
-                    // Kiểm tra xem Event này đã bị đóng hay kết thúc toàn bộ chưa
-                    const isEventLocked = tasks.every(t => 
-                      ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(t.hackathonStatus) || 
-                      ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(t.roundStatus)
-                    );
+                    const isEventLocked = tasks.every((t) => {
+                      return ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(t.hackathonStatus) || 
+                             ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(t.roundStatus);
+                    });
                     
-                    const isAllScored = (totalTeamsEvent > 0 && scoredTeamsEvent === totalTeamsEvent) || tasks.every(t => t.progress === 100);
+                    const isAllScored = (totalTeamsEvent > 0 && scoredTeamsEvent === totalTeamsEvent) || 
+                                        tasks.every(t => t.progress === 100 || t.completionStatus === 'COMPLETED');
+                                        
                     const isEventClosed = isEventLocked || isAllScored;
+
+                    // ĐỒNG BỘ LOGIC TÍNH PHẦN TRĂM THÀNH SỐ CHO GIAO DIỆN
+                    let eventProgressPercent = 0;
+                    if (totalTeamsEvent > 0) {
+                        eventProgressPercent = Math.round((scoredTeamsEvent / totalTeamsEvent) * 100);
+                    } else {
+                        if (isAllScored) {
+                            eventProgressPercent = 100;
+                        } else if (tasks.some(t => t.progress > 0 || t.completionStatus === 'IN_PROGRESS')) {
+                            eventProgressPercent = 50;
+                        }
+                    }
 
                     return (
                       <Card
@@ -423,46 +519,137 @@ const JudgeDashboard = ({ user }) => {
                           boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                           cursor: 'pointer'
                         }}
-                        styles={{ body: { padding: '24px' } }}
-                        // CLICK VÀO EVENT CARD SẼ SANG TRANG LOBBY VÀ MỞ SẴN EVENT ĐÓ
+                        styles={{ 
+                          body: { 
+                            padding: '24px' 
+                          } 
+                        }}
                         onClick={() => navigate('/judge/assignments', { state: { activeEvent: hackathonName } })}
                       >
-                        <Row align="middle" justify="space-between" gutter={[16, 16]}>
+                        <Row 
+                          align="middle" 
+                          justify="space-between" 
+                          gutter={[16, 16]}
+                        >
                           <Col xs={24} md={14}>
-                            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                              <div style={{ 
-                                width: 56, height: 56, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                                background: isEventClosed ? '#f1f5f9' : '#e6f4ff', 
-                                color: isEventClosed ? '#64748b' : '#1677ff' 
-                              }}>
-                                <BlockOutlined style={{ fontSize: 28 }} />
+                            <div 
+                              style={{ 
+                                display: 'flex', 
+                                gap: '16px', 
+                                alignItems: 'center' 
+                              }}
+                            >
+                              <div 
+                                style={{ 
+                                  width: 56, 
+                                  height: 56, 
+                                  borderRadius: 16, 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  background: isEventClosed ? '#f1f5f9' : '#e6f4ff', 
+                                  color: isEventClosed ? '#64748b' : '#1677ff' 
+                                }}
+                              >
+                                <BlockOutlined 
+                                  style={{ 
+                                    fontSize: 28 
+                                  }} 
+                                />
                               </div>
                               <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <Title level={4} style={{ margin: 0, color: isEventClosed ? '#64748b' : '#1e293b' }}>
+                                <div 
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '8px' 
+                                  }}
+                                >
+                                  <Title 
+                                    level={4} 
+                                    style={{ 
+                                      margin: 0, 
+                                      color: isEventClosed ? '#64748b' : '#1e293b' 
+                                    }}
+                                  >
                                     {hackathonName}
                                   </Title>
-                                  {isEventLocked && <Tag color="default" style={{ margin: 0 }}>ĐÃ ĐÓNG</Tag>}
-                                  {!isEventLocked && isAllScored && <Tag color="success" style={{ margin: 0 }}>HOÀN THÀNH</Tag>}
+                                  {isEventLocked && (
+                                    <Tag 
+                                      color="default" 
+                                      style={{ 
+                                        margin: 0 
+                                      }}
+                                    >
+                                      ĐÃ ĐÓNG
+                                    </Tag>
+                                  )}
+                                  {!isEventLocked && isAllScored && (
+                                    <Tag 
+                                      color="success" 
+                                      style={{ 
+                                        margin: 0 
+                                      }}
+                                    >
+                                      HOÀN THÀNH
+                                    </Tag>
+                                  )}
                                 </div>
-                                <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
+                                <Text 
+                                  type="secondary" 
+                                  style={{ 
+                                    display: 'block', 
+                                    marginTop: 4 
+                                  }}
+                                >
                                   Bạn có <strong style={{ color: isEventClosed ? '#64748b' : '#1677ff' }}>{tasks.length}</strong> bảng/vòng được phân công tại đây.
                                 </Text>
                               </div>
                             </div>
                           </Col>
                           
-                          <Col xs={24} md={10} style={{ textAlign: 'right' }}>
-                            <div style={{ marginBottom: 12 }}>
-                              <Text style={{ fontSize: 13, color: '#64748b', marginRight: 8 }}>Tiến độ tổng:</Text>
-                              <Text strong style={{ color: isAllScored ? '#10b981' : (isEventLocked ? '#64748b' : '#1677ff') }}>
-                                {scoredTeamsEvent} / {totalTeamsEvent}
+                          <Col 
+                            xs={24} 
+                            md={10} 
+                            style={{ 
+                              textAlign: 'right' 
+                            }}
+                          >
+                            <div 
+                              style={{ 
+                                marginBottom: 12 
+                              }}
+                            >
+                              <Text 
+                                style={{ 
+                                  fontSize: 13, 
+                                  color: '#64748b', 
+                                  marginRight: 8 
+                                }}
+                              >
+                                Tiến độ tổng:
+                              </Text>
+                              {/* ÉP BUỘC HIỂN THỊ DẠNG PHÂN SỐ X / Y */}
+                              <Text 
+                                strong 
+                                style={{ 
+                                  color: isAllScored 
+                                    ? '#10b981' 
+                                    : (isEventLocked ? '#64748b' : '#1677ff') 
+                                }}
+                              >
+                                {scoredTeamsEvent} / {totalTeamsEvent} đội
                               </Text>
                             </div>
+                            
                             <Button 
                               type={isEventClosed ? "default" : "primary"} 
                               size="large" 
-                              icon={isEventClosed ? <HistoryOutlined /> : <ArrowRightOutlined />}
+                              icon={
+                                isEventClosed 
+                                  ? <HistoryOutlined /> 
+                                  : <ArrowRightOutlined />
+                              }
                               style={{ 
                                 borderRadius: 8, 
                                 fontWeight: 600, 
@@ -476,6 +663,11 @@ const JudgeDashboard = ({ user }) => {
                             </Button>
                           </Col>
                         </Row>
+                        
+                        {/* Thanh Progress ẩn phía dưới (nếu bạn muốn có thể thêm, nhưng thiết kế hiện tại đã rất gọn gàng) */}
+                        <div style={{ display: 'none' }}>
+                            <Progress percent={eventProgressPercent} />
+                        </div>
                       </Card>
                     );
                   })}
@@ -485,14 +677,26 @@ const JudgeDashboard = ({ user }) => {
           </motion.div>
         </Col>
 
-        {/* CỘT PHẢI */}
+        {/* CỘT PHẢI: ĐỒNG HỒ VÀ CALIBRATION */}
         <Col xs={24} lg={8}>
-          <motion.div variants={itemVariants} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <motion.div 
+            variants={itemVariants} 
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '24px' 
+            }}
+          >
             <ScoringCountdownCard 
               activeAssignment={activeAssignmentForCountdown}
               onEnterRoom={(item) => {
-                const isLocked = ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(item.hackathonStatus) || ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(item.roundStatus);
-                const isScoringFinished = item.progress === 100 || (item.scoredTeams === item.totalTeams && item.totalTeams > 0);
+                const isLocked = ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(item.hackathonStatus) 
+                  || ['COMPLETED', 'FINISHED', 'CLOSED', 'INACTIVE'].includes(item.roundStatus);
+                  
+                const isScoringFinished = item.progress === 100 
+                  || (item.scoredTeams === item.totalTeams && item.totalTeams > 0) 
+                  || item.completionStatus === 'COMPLETED';
+                  
                 const readOnly = isLocked || isScoringFinished;
                 
                 navigate(`/judging/${item.id}/scoring`, { 
@@ -514,15 +718,33 @@ const JudgeDashboard = ({ user }) => {
             />
             <Card 
               title={
-                <strong style={{ fontSize: '18px' }}>
-                  <CalendarOutlined style={{ color: '#f59e0b', marginRight: 8 }}/>
+                <strong 
+                  style={{ 
+                    fontSize: '18px' 
+                  }}
+                >
+                  <CalendarOutlined 
+                    style={{ 
+                      color: '#f59e0b', 
+                      marginRight: 8 
+                    }}
+                  />
                   Lịch trình sắp tới
                 </strong>
               } 
-              style={{ borderRadius: 16 }}
+              style={{ 
+                borderRadius: 16 
+              }}
             >
                {(data.upcomingEvents || []).map(event => (
-                  <div key={event.id} style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                  <div 
+                    key={event.id} 
+                    style={{ 
+                      display: 'flex', 
+                      gap: 12, 
+                      marginBottom: 16 
+                    }}
+                  >
                     <div 
                       style={{ 
                         width: 12, 
@@ -533,7 +755,13 @@ const JudgeDashboard = ({ user }) => {
                       }} 
                     />
                     <div>
-                      <Text style={{ display: 'block', fontSize: 12, color: '#64748b' }}>
+                      <Text 
+                        style={{ 
+                          display: 'block', 
+                          fontSize: 12, 
+                          color: '#64748b' 
+                        }}
+                      >
                         {event.time}
                       </Text>
                       <Text strong>
