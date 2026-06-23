@@ -1,3 +1,4 @@
+// src/features/hackathons/pages/HackathonSetupPage.jsx
 import React, { useState, useCallback } from 'react';
 import { Card, Tabs, Typography, Select, Space, Button, Alert } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';

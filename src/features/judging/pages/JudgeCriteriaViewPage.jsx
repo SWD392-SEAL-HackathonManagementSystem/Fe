@@ -1,3 +1,4 @@
+// src/features/judging/pages/JudgeCriteriaViewPage.jsx
 import React, { useState, useEffect } from 'react';
 import { Typography, Card, Select, Table, Tag, Alert, Spin, Space, message } from 'antd';
 import { FileTextOutlined, InfoCircleOutlined } from '@ant-design/icons';

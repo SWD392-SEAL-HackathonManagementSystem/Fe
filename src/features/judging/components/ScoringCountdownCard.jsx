@@ -1,3 +1,4 @@
+// src/features/judging/components/ScoringCountdownCard.jsx
 import React, { useState, useEffect } from 'react';
 import { Card, Typography, Button, Space, Tag } from 'antd';
 import { ClockCircleOutlined, LoginOutlined, AlertOutlined } from '@ant-design/icons';

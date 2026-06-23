@@ -1,3 +1,4 @@
+// src/features/presentation/components/PresentationReadinessPanel.tsx
 import React, { useMemo, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Alert, Button, Space, Spin, Tag, Typography } from 'antd';

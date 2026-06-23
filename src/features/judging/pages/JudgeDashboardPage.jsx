@@ -1,3 +1,4 @@
+// src/features/judging/pages/JudgeDashboardPage.jsx
 import React, { useState, useEffect } from 'react';
 import JudgeDashboard from '../components/JudgeDashboard';
 

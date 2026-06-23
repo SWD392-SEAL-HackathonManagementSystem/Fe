@@ -1,3 +1,4 @@
+// src/features/judging/pages/ScoringLobbyPage.jsx
 import React, { 
   useState, 
   useEffect 

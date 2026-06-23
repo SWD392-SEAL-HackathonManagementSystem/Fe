@@ -1,3 +1,4 @@
+// src/features/presentation/utils/presentationWorkflow.js
 export const COORD_TIMER_WARN_KEY = 'seal_coord_timer_warn_ack';
 
 export const getPresentationRoleHints = ({ role, isController, scoringLocked }) => {

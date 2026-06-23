@@ -1,3 +1,4 @@
+// src/features/rounds/pages/RoundManagementPage.jsx
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Space, Popconfirm, message, Timeline, Tag, Card, Spin, Typography, Modal, Alert, Tooltip, Input } from 'antd';
 import { Plus, Edit, Trash2, Calendar, List, BarChart3, PlayCircle, Lock, UserPlus, Trophy, FileText, History } from 'lucide-react';
@@ -200,7 +201,7 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
       if (partialWarning) {
         message.warning(partialWarning.message || 'Còn bài chưa được chấm điểm — đã force lock theo lý do.');
       }
-      message.success(`Đã khóa chấm điểm cho ${lockingRound.name}. Trạng thái hiện tại: scoring_locked`);
+      message.success(`Đã khóa chấm điểm cho ${lockingRound.name}.`);
       setIsLockModalVisible(false);
       setLockReason('');
       await fetchRounds();
@@ -546,16 +547,16 @@ const RoundManagementPage = ({ hackathonId, hackathon, onHackathonSync }) => {
                 </Tooltip>
               )}
 
-              {!record.is_final && (
               <Tooltip title="Mở hàng đợi thuyết trình">
                 <Button
                   type="text"
                   style={{ color: 'var(--ant-color-primary)' }}
                   icon={<History size={16} />}
-                  onClick={() => navigate(`${ROUTES.PRESENTATION_QUEUE}?roundId=${record.id}`)}
+                  onClick={() => {
+                    navigate(`${ROUTES.PRESENTATION_QUEUE}?roundId=${record.id}`);
+                  }}
                 />
               </Tooltip>
-              )}
 
               {(record.scoring_locked || record.scoringLocked) && !record.is_final && (
                 <Tooltip title="Công bố & chuyển vòng">

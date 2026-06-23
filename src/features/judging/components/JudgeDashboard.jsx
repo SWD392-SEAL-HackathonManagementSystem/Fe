@@ -1,7 +1,12 @@
+<<<<<<< HEAD
 import { 
   useState, 
   useEffect 
 } from 'react';
+=======
+// src/features/judging/components/JudgeDashboard.jsx
+import { useState, useEffect } from 'react';
+>>>>>>> 5754531 (feat(judging): Hoàn thiện UI/UX và logic Live Scoring Giai đoạn 3)
 import { 
   Typography, 
   Row, 

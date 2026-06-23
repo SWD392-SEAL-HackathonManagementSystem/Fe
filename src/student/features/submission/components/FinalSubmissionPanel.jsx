@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// src/student/features/submission/components/FinalSubmissionPanel.jsx
+import React, { useEffect, useState, useCallback } from 'react';
 import { Card, Form, Input, Button, Typography, Tag, Space, Alert, Row, Col, Spin, Upload, Modal, message } from 'antd';
 import {
   CloudUploadOutlined,
@@ -22,7 +23,14 @@ const formatWeight = (weight) => {
   return value <= 1 ? `${(value * 100).toFixed(0)}%` : `${value}%`;
 };
 
-const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
+// ==========================================
+// SUB-COMPONENT CHỨA TOÀN BỘ LOGIC FORM/HOOKS
+// (Đảm bảo không bị vi phạm Rule of Hooks)
+// ==========================================
+const FinalSubmissionForm = ({ 
+  finalRound, existingSubmission, isEligible, isFinalRoundActive, 
+  isAdvanced, isLocked, timeLeft, isSubmitting, submitFinalWork 
+}) => {
   const [form] = Form.useForm();
   const [slideFile, setSlideFile] = useState(null);
   const [criteria, setCriteria] = useState([]);
@@ -31,19 +39,16 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
   const [slideBlobUrl, setSlideBlobUrl] = useState(null);
   const [isLoadingSlide, setIsLoadingSlide] = useState(false);
 
-  const {
-    finalRound,
-    existingSubmission,
-    isEligible,
-    isFinalRoundActive,
-    isAdvanced,
-    isLocked,
-    timeLeft,
-    isSubmitting,
-    isLoading,
-    submitFinalWork,
-  } = useFinalSubmission(teamId, hackathonId);
+  // 1. Dọn dẹp Blob URL
+  useEffect(() => {
+    return () => {
+      if (slideBlobUrl) {
+        URL.revokeObjectURL(slideBlobUrl);
+      }
+    };
+  }, [slideBlobUrl]);
 
+  // 2. Tải Criteria
   useEffect(() => {
     if (!finalRound?.id || !isEligible) {
       setCriteria([]);
@@ -71,59 +76,6 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
     };
   }, [finalRound?.id, isEligible]);
 
-  if (isLoading) {
-    return (
-      <Card style={{ borderRadius: 16, textAlign: 'center', padding: '40px 0' }}>
-        <Spin tip="Đang kiểm tra dữ liệu Vòng Chung kết..." />
-      </Card>
-    );
-  }
-
-  if (!finalRound) {
-    return null;
-  }
-
-  if (!isAdvanced) {
-    return (
-      <Card style={{ borderRadius: 16, border: '1px solid #ffccc7', background: '#fff2f0' }}>
-        <Space align="center">
-          <LockOutlined style={{ fontSize: 24, color: '#cf1322' }} />
-          <div>
-            <Title level={4} style={{ margin: 0, color: '#cf1322' }}>
-              Cổng nộp bài Chung kết
-            </Title>
-            <Text style={{ color: '#cf1322' }}>
-              Đội của bạn chưa đủ điều kiện tham gia Vòng Chung kết hoặc đã dừng bước tại Vòng Sơ loại.
-            </Text>
-          </div>
-        </Space>
-      </Card>
-    );
-  }
-
-  if (!isFinalRoundActive) {
-    return (
-      <Card style={{ borderRadius: 16, border: '1px solid #ffe58f', background: '#fffbe6' }}>
-        <Space align="center">
-          <ClockCircleOutlined style={{ fontSize: 24, color: '#d48806' }} />
-          <div>
-            <Title level={4} style={{ margin: 0, color: '#d48806' }}>
-              Vòng Chung kết chưa mở
-            </Title>
-            <Text style={{ color: '#ad6800' }}>
-              Đội của bạn đã được chọn vào Chung kết. Coordinator sẽ kích hoạt vòng thi — bạn có thể nộp bài sau khi
-              vòng được mở.
-            </Text>
-          </div>
-        </Space>
-      </Card>
-    );
-  }
-
-  if (!isEligible) {
-    return null;
-  }
-
   const submissionIncomplete = existingSubmission?.status === 'INCOMPLETE';
   const hasSavedSlide = Boolean(
     existingSubmission?.hasSlide ??
@@ -134,14 +86,9 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
       existingSubmission?.slide_download_path
   );
   const isSubmitted = Boolean(existingSubmission && !submissionIncomplete && hasSavedSlide);
-  const deadline = finalRound.submissionDeadline || finalRound.submission_deadline;
-  const submittedSlideName =
-    existingSubmission?.slideFile || existingSubmission?.slide_file || 'slide.pdf';
-  const submissionId =
-    existingSubmission?.submissionId ??
-    existingSubmission?.submission_id ??
-    existingSubmission?.id ??
-    null;
+  const deadline = finalRound?.submissionDeadline || finalRound?.submission_deadline;
+  const submittedSlideName = existingSubmission?.slideFile || existingSubmission?.slide_file || existingSubmission?.slideUrl || existingSubmission?.slide_url || 'slide.pdf';
+  const submissionId = existingSubmission?.submissionId ?? existingSubmission?.submission_id ?? existingSubmission?.id ?? null;
 
   const handleViewSubmittedSlide = async () => {
     if (!submissionId) {
@@ -172,15 +119,6 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
       setSlideBlobUrl(null);
     }
   };
-
-  useEffect(
-    () => () => {
-      if (slideBlobUrl) {
-        URL.revokeObjectURL(slideBlobUrl);
-      }
-    },
-    [slideBlobUrl]
-  );
 
   const handleFinish = async (values) => {
     await submitFinalWork({
@@ -300,8 +238,7 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
               Yêu cầu & Tiêu chí
             </Title>
             <Paragraph type="secondary" style={{ fontSize: 13 }}>
-              Sản phẩm của bạn sẽ được đánh giá theo tiêu chí Vòng Chung kết từ hệ thống. Vui lòng đảm bảo slide thể
-              hiện rõ các yếu tố này:
+              Sản phẩm của bạn sẽ được đánh giá theo tiêu chí Vòng Chung kết từ hệ thống. Vui lòng đảm bảo slide thể hiện rõ các yếu tố này:
             </Paragraph>
 
             {criteriaLoading ? (
@@ -343,37 +280,32 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
                 accept=".pdf,application/pdf"
                 maxCount={1}
                 beforeUpload={(file) => {
-                  const isPdf =
-                    file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-                  if (!isPdf) {
-                    return Upload.LIST_IGNORE;
-                  }
+                  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+                  if (!isPdf) return Upload.LIST_IGNORE;
                   setSlideFile(file);
                   return false;
                 }}
                 onRemove={() => setSlideFile(null)}
                 disabled={isLocked || isSubmitted}
               >
-                <Button icon={<CloudUploadOutlined />} disabled={isLocked || isSubmitted}>
-                  Chọn file PDF
-                </Button>
+                <Button icon={<CloudUploadOutlined />} disabled={isLocked || isSubmitted}>Chọn file PDF</Button>
               </Upload>
+              
               {(existingSubmission?.slideFile || existingSubmission?.slide_file || hasSavedSlide) && (
-                <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-                  Đã nộp: {submittedSlideName}
+                <div style={{ marginTop: 12, padding: '10px 14px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8 }}>
+                  <Text style={{ color: '#389e0d', fontWeight: 600, display: 'block' }}>
+                    <CheckCircleOutlined style={{ marginRight: 6 }} />
+                    Slide đã nộp: {submittedSlideName}
+                  </Text>
                   {hasSavedSlide && submissionId && (
-                    <Button
-                      type="link"
-                      size="small"
-                      icon={<EyeOutlined />}
-                      loading={isLoadingSlide}
-                      onClick={handleViewSubmittedSlide}
-                      style={{ marginLeft: 4, padding: 0, height: 'auto' }}
+                    <div 
+                      onClick={handleViewSubmittedSlide} 
+                      style={{ marginTop: 8, color: '#1677ff', cursor: 'pointer', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6, background: '#e6f4ff', padding: '4px 10px', borderRadius: 6 }}
                     >
-                      Xem file đã nộp
-                    </Button>
+                      <EyeOutlined /> Bấm vào đây để xem nội dung PDF
+                    </div>
                   )}
-                </Text>
+                </div>
               )}
             </Form.Item>
 
@@ -471,6 +403,65 @@ const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
       </Modal>
     </Card>
   );
+};
+
+// ==========================================
+// MAIN COMPONENT CHỨA CÁC ĐIỀU KIỆN EARLY RETURN
+// ==========================================
+const FinalSubmissionPanel = ({ teamId, hackathonId }) => {
+  const submissionData = useFinalSubmission(teamId, hackathonId);
+
+  // Early returns (Tuyệt đối không có Hook nào bên dưới dòng này)
+  if (submissionData.isLoading) {
+    return (
+      <Card style={{ borderRadius: 16, textAlign: 'center', padding: '40px 0' }}>
+        <Spin tip="Đang kiểm tra dữ liệu Vòng Chung kết..." />
+      </Card>
+    );
+  }
+
+  if (!submissionData.finalRound) return null;
+
+  if (!submissionData.isAdvanced) {
+    return (
+      <Card style={{ borderRadius: 16, border: '1px solid #ffccc7', background: '#fff2f0' }}>
+        <Space align="center">
+          <LockOutlined style={{ fontSize: 24, color: '#cf1322' }} />
+          <div>
+            <Title level={4} style={{ margin: 0, color: '#cf1322' }}>
+              Cổng nộp bài Chung kết
+            </Title>
+            <Text style={{ color: '#cf1322' }}>
+              Đội của bạn chưa đủ điều kiện tham gia Vòng Chung kết hoặc đã dừng bước tại Vòng Sơ loại.
+            </Text>
+          </div>
+        </Space>
+      </Card>
+    );
+  }
+
+  if (!submissionData.isFinalRoundActive) {
+    return (
+      <Card style={{ borderRadius: 16, border: '1px solid #ffe58f', background: '#fffbe6' }}>
+        <Space align="center">
+          <ClockCircleOutlined style={{ fontSize: 24, color: '#d48806' }} />
+          <div>
+            <Title level={4} style={{ margin: 0, color: '#d48806' }}>
+              Vòng Chung kết chưa mở
+            </Title>
+            <Text style={{ color: '#ad6800' }}>
+              Đội của bạn đã được chọn vào Chung kết. Coordinator sẽ kích hoạt vòng thi — bạn có thể nộp bài sau khi vòng được mở.
+            </Text>
+          </div>
+        </Space>
+      </Card>
+    );
+  }
+
+  if (!submissionData.isEligible) return null;
+
+  // Nếu qua hết các bài test trên, hiển thị Form
+  return <FinalSubmissionForm {...submissionData} />;
 };
 
 export default FinalSubmissionPanel;

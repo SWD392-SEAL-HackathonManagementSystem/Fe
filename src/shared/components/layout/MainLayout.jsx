@@ -1,3 +1,4 @@
+// src/shared/components/layout/MainLayout.jsx
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Layout, Menu, Button, theme, Input, Badge, Avatar, Space, Popover, Typography, Drawer, Grid, Modal } from 'antd';

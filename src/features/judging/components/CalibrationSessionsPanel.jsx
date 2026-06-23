@@ -1,3 +1,4 @@
+// src/features/judging/components/CalibrationSessionsPanel.jsx
 import { useEffect, useState } from 'react';
 import { Card, List, Spin, Tag, Typography, Button } from 'antd';
 import { FundViewOutlined } from '@ant-design/icons';
