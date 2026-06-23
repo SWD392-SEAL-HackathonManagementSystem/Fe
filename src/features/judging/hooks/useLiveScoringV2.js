@@ -6,55 +6,79 @@ import { criteriaService } from '../../criteria/services/criteriaService';
 import { presentationService } from '../services/presentationService';
 
 export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initialAssignmentType) => {
-  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
-  const currentUserId = userInfo.userId || userInfo.id;
-
   const [queueData, setQueueData] = useState(null);
   const [submissionsData, setSubmissionsData] = useState([]);
   const [criteria, setCriteria] = useState([]);
-  
-  // State lưu trữ Form
-  const [currentScores, setCurrentScores] = useState({});
-  const [comment, setComment] = useState('');
-  
-  // State quản lý Điểm đã chốt từ Backend
+
+  const [scoreState, setScoreState] = useState({ submissionId: null, scores: {}, comment: '' });
+
   const [rawMyScores, setRawMyScores] = useState([]);
   const [myScoredSubmissions, setMyScoredSubmissions] = useState({});
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scoringLocked, setScoringLocked] = useState(false);
   const [isTimerActionLoading, setIsTimerActionLoading] = useState(false);
 
-  // KHÓA MUTEX: Chặn tuyệt đối "Bóng ma" UI khi đang thao tác
   const isActionPendingRef = useRef(false);
 
-  const [isController, setIsController] = useState(() => {
+  const isController = useMemo(() => {
     const role = String(initialAssignmentType || '').toUpperCase();
     return role.includes('HEAD') || role.includes('FINAL_EXTERNAL');
-  });
+  }, [initialAssignmentType]);
 
   const [localTimerPhase, setLocalTimerPhase] = useState('IDLE');
   const [localRemainingSeconds, setLocalRemainingSeconds] = useState(0);
 
-  // 1. KIỂM TRA QUYỀN TRƯỞNG BAN
-  const fetchControllerStatus = useCallback(async () => {
-    if (!roundId) return;
-    try {
-      const res = isFinal ? await presentationService.getRoundController(roundId) : await presentationService.getTrackController(trackId);
-      const data = res?.data || res;
-      const controllerId = data?.judgeId ?? data?.judge_id ?? data?.judge?.id ?? data?.user?.id ?? data?.id;
-      if (controllerId && currentUserId) setIsController(Number(currentUserId) === Number(controllerId));
-    } catch (e) {}
-  }, [roundId, trackId, isFinal, currentUserId]);
+  const timerEngineRef = useRef({
+    phase: 'IDLE',
+    originalPhase: 'PRESENTING', 
+    baseSeconds: 0,
+    startTimeMs: 0,
+    intervalId: null
+  });
 
-  // 2. TẢI DỮ LIỆU TĨNH VÀ ĐIỂM ĐÃ CHẤM TỪ DB (GIẢI QUYẾT LỖI MẤT ĐIỂM F5)
+  const syncTimerState = useCallback((phase, seconds) => {
+    timerEngineRef.current.phase = phase;
+    timerEngineRef.current.baseSeconds = seconds;
+    setLocalTimerPhase(phase);
+    setLocalRemainingSeconds(seconds);
+  }, []);
+
+  const applyEngineState = useCallback((newPhase, newSeconds) => {
+    const engine = timerEngineRef.current;
+    
+    if (engine.intervalId) {
+      clearInterval(engine.intervalId);
+      engine.intervalId = null;
+    }
+
+    engine.phase = newPhase;
+    if (newPhase === 'PRESENTING' || newPhase === 'QA') {
+        engine.originalPhase = newPhase;
+    }
+    
+    engine.baseSeconds = newSeconds;
+    engine.startTimeMs = Date.now();
+    
+    setLocalTimerPhase(newPhase);
+    setLocalRemainingSeconds(newSeconds);
+
+    if (newPhase === 'PRESENTING' || newPhase === 'QA') {
+      engine.intervalId = setInterval(() => {
+        const elapsedSeconds = Math.floor((Date.now() - engine.startTimeMs) / 1000);
+        const currentTick = Math.max(0, engine.baseSeconds - elapsedSeconds);
+        setLocalRemainingSeconds(currentTick);
+      }, 1000);
+    }
+  }, []);
+
   const fetchStaticData = useCallback(async () => {
     try {
       const [critRes, subRes, myScoresRes] = await Promise.all([
         isFinal ? criteriaService.listByFinalRound(roundId) : criteriaService.listByTrack(trackId),
         judgeService.getSubmissions({ roundId, trackId: isFinal ? undefined : trackId }),
-        judgeService.getMyScores(roundId).catch(() => []) 
+        judgeService.getMyScores(roundId).catch(() => [])
       ]);
 
       const critData = Array.isArray(critRes) ? critRes : critRes?.items || [];
@@ -62,9 +86,8 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
       setSubmissionsData(Array.isArray(subRes) ? subRes : subRes?.items || subRes?.data || []);
 
       const scoresData = Array.isArray(myScoresRes) ? myScoresRes : myScoresRes?.items || myScoresRes?.data || [];
-      setRawMyScores(scoresData); // Lưu lại điểm thô để lát đổ vào Form
+      setRawMyScores(scoresData);
 
-      // Tính tổng điểm cho Sidebar
       const weightMap = {};
       critData.forEach(c => weightMap[c.id] = c.weight || 0);
 
@@ -72,9 +95,18 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
       scoresData.forEach(s => {
         const subId = String(s.submissionId ?? s.submission_id);
         const critId = String(s.criterionId ?? s.criterion_id);
-        const val = Number(s.scoreValue ?? s.score_value ?? 0);
-        if (!scoredMap[subId]) scoredMap[subId] = 0;
-        scoredMap[subId] += val * (weightMap[critId] || 0);
+        
+        // 🚀 FIX CÚ LỪA TỪ BE: Lấy giá trị thực tế của slider (hỗ trợ đọc từ totalScore nếu BE trả nhầm)
+        const val = Number(s.scoreValue ?? s.score_value ?? s.score ?? s.value ?? s.totalScore ?? s.total_score ?? 0);
+
+        if (critId && critId !== 'undefined' && critId !== 'null') {
+            // Đây là điểm thành phần -> Nhân với trọng số để cộng dồn
+            if (!scoredMap[subId]) scoredMap[subId] = 0;
+            scoredMap[subId] += val * (weightMap[critId] || 0);
+        } else {
+            // Nếu không có criterionId, có thể BE trả sẵn tổng điểm
+            scoredMap[subId] = val;
+        }
       });
 
       const finalScoredMap = {};
@@ -84,11 +116,8 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
     } catch (error) {}
   }, [roundId, trackId, isFinal]);
 
-  // 3. TẢI HÀNG ĐỢI REAL-TIME (CÓ CHỐT KHÓA BÓNG MA)
   const fetchQueue = useCallback(async (force = false) => {
-    // Nếu Trưởng ban đang bấm nút, CHẶN KHÔNG CHO TẢI NGẦM (Trừ khi ép buộc `force = true`)
     if (!roundId || (!force && isActionPendingRef.current)) return;
-    
     try {
       const qRes = await presentationService.getQueue(roundId, isFinal ? null : trackId);
       const qData = qRes?.data || qRes;
@@ -96,38 +125,53 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
 
       const track = isFinal ? qData.groups?.[0] : qData.tracks?.find(t => t.trackId === Number(trackId));
       const presenting = (track?.items || track?.teams || []).find(item => item.status === 'PRESENTING');
-      
+
       if (presenting?.timer) {
-        setLocalTimerPhase(presenting.timer.phase);
-        setLocalRemainingSeconds(presenting.timer.remainingSeconds);
+        const serverPhase = presenting.timer.phase;
+        let serverSeconds = presenting.timer.remainingSeconds;
+        
+        const maxSeconds = (serverPhase === 'QA' || timerEngineRef.current.originalPhase === 'QA') ? 10 : 20;
+           
+        if (serverSeconds > maxSeconds || serverSeconds < 0) {
+            serverSeconds = maxSeconds; 
+        }
+
+        const currentEngine = timerEngineRef.current;
+
+        if (currentEngine.phase !== serverPhase) {
+           applyEngineState(serverPhase, serverSeconds);
+        } 
+        else {
+           if (serverPhase === 'PAUSED' || serverPhase === 'IDLE' || serverPhase === 'SETUP' || serverPhase === 'ENDED') {
+               if (currentEngine.baseSeconds !== serverSeconds) {
+                   syncTimerState(serverPhase, serverSeconds);
+               }
+           }
+        }
       } else {
-        setLocalTimerPhase('IDLE');
-        setLocalRemainingSeconds(0);
+        if (timerEngineRef.current.phase !== 'IDLE') {
+           applyEngineState('IDLE', 0);
+        }
       }
-    } catch (error) {
-    } finally {
+    } catch (error) {} finally {
       setIsLoading(false);
     }
-  }, [roundId, trackId, isFinal]);
+  }, [roundId, trackId, isFinal, applyEngineState, syncTimerState]);
 
   useEffect(() => {
-    fetchControllerStatus();
     fetchStaticData();
     fetchQueue(true);
     const interval = setInterval(() => fetchQueue(false), 3000);
     return () => clearInterval(interval);
-  }, [fetchControllerStatus, fetchStaticData, fetchQueue]);
+  }, [fetchStaticData, fetchQueue]);
 
-  // ĐỒNG HỒ ĐẾM TỪNG GIÂY
   useEffect(() => {
-    let ticker = null;
-    if (localTimerPhase === 'PRESENTING' || localTimerPhase === 'QA') {
-      ticker = setInterval(() => {
-        setLocalRemainingSeconds((prev) => Math.max(0, prev - 1));
-      }, 1000);
-    }
-    return () => clearInterval(ticker);
-  }, [localTimerPhase]);
+    return () => {
+       if (timerEngineRef.current.intervalId) {
+          clearInterval(timerEngineRef.current.intervalId);
+       }
+    };
+  }, []);
 
   const { trackQueue, activeSlot } = useMemo(() => {
     if (!queueData) return { trackQueue: [], activeSlot: null };
@@ -135,136 +179,216 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
     let queueItems = track?.items || track?.teams || [];
     queueItems = queueItems.map(item => {
       const subInfo = submissionsData.find(s => s.submissionId === item.submissionId) || {};
-      return { ...item, slideFile: subInfo.slideFile, repoUrl: subInfo.repoUrl };
+      return { 
+        ...item, 
+        slideFile: subInfo.slideFile, 
+        repoUrl: subInfo.repoUrl,
+        demoUrl: subInfo.demoUrl || subInfo.demo_url 
+      };
     });
     return { trackQueue: queueItems, activeSlot: queueItems.find(item => item.status === 'PRESENTING') };
   }, [queueData, submissionsData, trackId, isFinal]);
 
-  // KIỂM TRA TOÀN BỘ ĐỘI ĐÃ HOÀN THÀNH CHƯA (Hiển thị màn hình Chúc mừng)
+  const currentScores = scoreState.submissionId === activeSlot?.submissionId ? scoreState.scores : {};
+  const comment = scoreState.submissionId === activeSlot?.submissionId ? scoreState.comment : '';
+
   const isAllDone = trackQueue.length > 0 && trackQueue.every(item => item.status === 'DONE');
 
-  // ĐỘI NÀY ĐÃ ĐƯỢC MÌNH CHẤM CHƯA?
   const hasScoredCurrentTeam = useMemo(() => {
     if (!activeSlot?.submissionId) return false;
     return !!myScoredSubmissions[String(activeSlot.submissionId)];
   }, [activeSlot, myScoredSubmissions]);
 
-  // 4. LOGIC LƯU NHÁP (LOCAL STORAGE) & ĐỔI DB VÀO FORM
   useEffect(() => {
-    if (!activeSlot?.submissionId) return;
-    const subIdStr = String(activeSlot.submissionId);
-
-    if (hasScoredCurrentTeam) {
-      // Đã chốt -> Lấy điểm gốc từ Database đổ vào Form (Xem lại)
-      const dbScores = {};
-      let dbComment = '';
-      rawMyScores.forEach(s => {
-        if (String(s.submissionId ?? s.submission_id) === subIdStr) {
-          dbScores[String(s.criterionId ?? s.criterion_id)] = Number(s.scoreValue ?? s.score_value);
-          if (s.comment) dbComment = s.comment;
-        }
-      });
-      setCurrentScores(dbScores);
-      setComment(dbComment);
-    } else {
-      // Chưa chốt -> Lấy điểm Nháp từ Local Storage (Chống mất khi F5)
-      const draftKey = `seal_draft_${assignmentId}_${subIdStr}`;
-      try {
-        const draft = JSON.parse(localStorage.getItem(draftKey));
-        if (draft) {
-          setCurrentScores(draft.scores || {});
-          setComment(draft.comment || '');
-        } else {
-          setCurrentScores({});
-          setComment('');
-        }
-      } catch(e) {
-        setCurrentScores({});
-        setComment('');
-      }
+    if (!activeSlot?.submissionId) {
+       setScoreState({ submissionId: null, scores: {}, comment: '' });
+       return;
     }
-  }, [activeSlot?.submissionId, hasScoredCurrentTeam, rawMyScores, assignmentId]);
-
-  // Tự động Lưu Nháp mỗi khi gõ phím
-  useEffect(() => {
-    if (!activeSlot?.submissionId || hasScoredCurrentTeam) return;
     const subIdStr = String(activeSlot.submissionId);
-    const draftKey = `seal_draft_${assignmentId}_${subIdStr}`;
-    localStorage.setItem(draftKey, JSON.stringify({ scores: currentScores, comment }));
-  }, [currentScores, comment, activeSlot?.submissionId, hasScoredCurrentTeam, assignmentId]);
+    
+    let hasIndividualScoresInDB = false;
+    const dbScores = {};
+    let dbComment = '';
 
-  const canScore = !scoringLocked && activeSlot; 
+    (rawMyScores || []).forEach(s => {
+      if (String(s.submissionId ?? s.submission_id) === subIdStr) {
+        const cId = s.criterionId ?? s.criterion_id;
+        if (cId) {
+            hasIndividualScoresInDB = true;
+            // 🚀 Bổ sung s.totalScore vào Fallback để gỡ lỗi Slider bị tụt về 0
+            dbScores[String(cId)] = Number(s.scoreValue ?? s.score_value ?? s.score ?? s.value ?? s.totalScore ?? s.total_score ?? 0);
+        }
+        if (s.comment) dbComment = s.comment;
+      }
+    });
+
+    const draftKey = `seal_draft_${assignmentId}_${subIdStr}`;
+    let localDraft = null;
+    try { localDraft = JSON.parse(localStorage.getItem(draftKey)); } catch(e) {}
+
+    let finalScores = {};
+    let finalComment = dbComment;
+
+    if (hasIndividualScoresInDB && Object.keys(dbScores).length > 0) {
+       finalScores = dbScores;
+    } else if (localDraft && localDraft.scores && Object.keys(localDraft.scores).length > 0) {
+       finalScores = localDraft.scores;
+       if (!finalComment) finalComment = localDraft.comment || '';
+    }
+
+    setScoreState({
+       submissionId: activeSlot.submissionId,
+       scores: finalScores,
+       comment: finalComment
+    });
+
+  }, [activeSlot?.submissionId, rawMyScores, assignmentId]);
+
+  useEffect(() => {
+    if (!scoreState.submissionId) return;
+    const draftKey = `seal_draft_${assignmentId}_${scoreState.submissionId}`;
+    localStorage.setItem(draftKey, JSON.stringify({ 
+       scores: scoreState.scores, 
+       comment: scoreState.comment 
+    }));
+  }, [scoreState, assignmentId]);
+
+  const canScore = !scoringLocked && activeSlot;
   const canSubmitFinalScore = canScore && ['QA', 'ENDED'].includes(localTimerPhase) && !hasScoredCurrentTeam;
 
-  const handleScoreChange = (criteriaId, value) => setCurrentScores(prev => ({ ...prev, [criteriaId]: value }));
+  const handleScoreChange = useCallback((criteriaId, value) => {
+    setScoreState(prev => ({
+       ...prev,
+       scores: { ...prev.scores, [criteriaId]: value }
+    }));
+  }, []);
 
-  const calculateTotal = () => criteria.reduce((sum, c) => sum + (currentScores[c.id] || 0) * (c.weight || 0), 0).toFixed(2);
+  const handleSetComment = useCallback((val) => {
+    setScoreState(prev => ({ ...prev, comment: val }));
+  }, []);
 
-  // 5. CHỐT ĐIỂM LÊN SERVER
-  const submitScore = async () => {
-    if (hasScoredCurrentTeam) return message.error("Bài thi này đã được chốt, không thể thay đổi điểm.");
-    if (!canSubmitFinalScore) return;
-    if (criteria.some(c => currentScores[c.id] === undefined)) return message.warning("Vui lòng chấm đủ tiêu chí.");
-    
+  const calculateTotal = useCallback(() => {
+    return criteria.reduce((sum, c) => sum + (currentScores[c.id] || 0) * (c.weight || 0), 0).toFixed(2);
+  }, [criteria, currentScores]);
+
+  const submitScore = useCallback(async (isAutoSubmit = false) => {
+    if (hasScoredCurrentTeam) return;
+    if (!canSubmitFinalScore && !isAutoSubmit) return;
+
+    if (!isAutoSubmit && criteria.some(c => currentScores[c.id] === undefined)) {
+        return message.warning("Vui lòng chấm đủ tiêu chí.");
+    }
+
     setIsSubmitting(true);
     try {
-      const promises = criteria.map(c => judgeService.submitScore({
-        submissionId: activeSlot.submissionId, criterionId: c.id, scoreValue: currentScores[c.id] || 0, comment: comment.trim(), scoreType: 'NORMAL'
-      }));
-      await Promise.all(promises);
-      await judgeService.confirmSubmissionScoring(activeSlot.submissionId);
-      
-      message.success("Chốt điểm thành công! Form đã được khóa.");
-      
-      // Xóa Nháp LocalStorage
-      localStorage.removeItem(`seal_draft_${assignmentId}_${activeSlot.submissionId}`);
-      
-      // Load lại Database điểm
-      await fetchStaticData();
-      await fetchQueue(true); 
-    } catch (error) { message.error(error.message || "Lỗi lưu điểm."); } finally { setIsSubmitting(false); }
-  };
+      for (const c of criteria) {
+          await judgeService.submitScore({
+              submissionId: activeSlot.submissionId,
+              criterionId: c.id,
+              scoreValue: currentScores[c.id] || 0,
+              comment: comment.trim(),
+              scoreType: 'NORMAL'
+          });
+      }
 
-  // 6. ĐIỀU KHIỂN ĐỒNG HỒ (SỬA LỖI BÓNG MA 100%)
-  const handleTimerAction = async (actionType) => {
+      await judgeService.confirmSubmissionScoring(activeSlot.submissionId);
+
+      const finalTotal = calculateTotal();
+      
+      setRawMyScores(prev => {
+        const filtered = prev.filter(p => String(p.submissionId ?? p.submission_id) !== String(activeSlot.submissionId));
+        return [
+          ...filtered, 
+          ...criteria.map(c => ({
+             submissionId: activeSlot.submissionId,
+             criterionId: c.id,
+             scoreValue: currentScores[c.id] || 0,
+             comment: comment.trim()
+          }))
+        ];
+      });
+      setMyScoredSubmissions(prev => ({ ...prev, [String(activeSlot.submissionId)]: finalTotal }));
+
+      message.success(isAutoSubmit ? "Đã hết giờ Q&A! Hệ thống tự động nộp bài." : "Chốt điểm thành công! Form đã được khóa.");
+      
+      localStorage.setItem(`seal_draft_${assignmentId}_${activeSlot.submissionId}`, JSON.stringify({ 
+         scores: currentScores, 
+         comment: comment.trim() 
+      }));
+
+      setTimeout(async () => {
+         await fetchStaticData();
+         await fetchQueue(true);
+      }, 2000);
+
+    } catch (error) {
+      message.error(error.message || "Lỗi lưu điểm.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [hasScoredCurrentTeam, canSubmitFinalScore, criteria, currentScores, activeSlot, comment, calculateTotal, fetchStaticData, fetchQueue, assignmentId]);
+
+  useEffect(() => {
+    if (localTimerPhase === 'QA' && localRemainingSeconds === 0 && activeSlot && !hasScoredCurrentTeam) {
+      if (!isActionPendingRef.current && !isSubmitting) {
+        isActionPendingRef.current = true;
+        submitScore(true).finally(() => {
+          isActionPendingRef.current = false;
+        });
+      }
+    }
+  }, [localTimerPhase, localRemainingSeconds, activeSlot, hasScoredCurrentTeam, isSubmitting, submitScore]);
+
+  const handleTimerAction = useCallback(async (actionType) => {
     if (!isController || !activeSlot) return;
-    
-    isActionPendingRef.current = true; // BẬT KHÓA MUTEX: Ép Server chờ
+
+    isActionPendingRef.current = true;
     setIsTimerActionLoading(true);
-    const previousPhase = localTimerPhase;
     
+    const previousEngineState = { ...timerEngineRef.current };
+    
+    let currentTick = previousEngineState.baseSeconds;
+    if (previousEngineState.phase === 'PRESENTING' || previousEngineState.phase === 'QA') {
+        const elapsed = Math.floor((Date.now() - previousEngineState.startTimeMs) / 1000);
+        currentTick = Math.max(0, previousEngineState.baseSeconds - elapsed);
+    }
+
     try {
       if (actionType === 'START_OR_RESUME') {
-        setLocalTimerPhase('PRESENTING'); 
-        if (previousPhase === 'PAUSED') await presentationService.resumeTimer(roundId, trackId);
+        const isResume = previousEngineState.phase === 'PAUSED';
+        const targetPhase = isResume ? previousEngineState.originalPhase : 'PRESENTING';
+
+        applyEngineState(targetPhase, currentTick); 
+        
+        if (isResume) await presentationService.resumeTimer(roundId, trackId);
         else await presentationService.startTimer(roundId, trackId);
-      } 
+      }
       else if (actionType === 'PAUSE') {
-        setLocalTimerPhase('PAUSED'); // DỪNG UI NGAY LẬP TỨC
+        applyEngineState('PAUSED', currentTick); 
         await presentationService.pauseTimer(roundId, trackId);
-      } 
+      }
       else if (actionType === 'QA') {
-        setLocalTimerPhase('QA'); 
+        applyEngineState('QA', 10); 
         await presentationService.qaTimer(roundId, trackId);
-      } 
+      }
       else if (actionType === 'NEXT') {
         await presentationService.advanceNext(roundId, trackId, { currentSubmissionId: activeSlot.submissionId });
       }
-      message.success('Thao tác thành công!');
     } catch (error) {
-      setLocalTimerPhase(previousPhase); // Rollback nếu lỗi
+      applyEngineState(previousEngineState.phase, previousEngineState.baseSeconds);
       message.error(error?.response?.data?.error?.message || error.message || 'Lỗi điều khiển đồng hồ.');
     } finally {
-      // SAU KHI SERVER TRẢ VỀ -> ÉP TẢI LẠI SỐ GIÂY CHUẨN TỪ DB
-      await fetchQueue(true); 
-      isActionPendingRef.current = false; // MỞ KHÓA MUTEX
       setIsTimerActionLoading(false);
+      setTimeout(() => {
+        isActionPendingRef.current = false;
+        fetchQueue(true);
+      }, 1000);
     }
-  };
+  }, [isController, activeSlot, roundId, trackId, fetchQueue, applyEngineState]);
 
   return {
-    isLoading, criteria, currentScores, comment, setComment, handleScoreChange, calculateTotal, submitScore, isSubmitting, 
+    isLoading, criteria, currentScores, comment, setComment: handleSetComment, handleScoreChange, calculateTotal, submitScore, isSubmitting,
     trackQueue, activeSlot, localTimerPhase, localRemainingSeconds, canScore, canSubmitFinalScore, isController, handleTimerAction, isTimerActionLoading,
-    myScoredSubmissions, hasScoredCurrentTeam, isAllDone // <-- Trả thêm cờ isAllDone
+    myScoredSubmissions, hasScoredCurrentTeam, isAllDone
   };
 };

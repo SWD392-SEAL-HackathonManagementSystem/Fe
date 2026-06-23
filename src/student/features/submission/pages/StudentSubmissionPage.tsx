@@ -5,13 +5,13 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { 
-  Spin, theme, Modal, Button, message, Card, Row, Col, 
+  Spin, Modal, Button, message, Card, Row, Col, 
   Typography, Tag, Upload, Space, Divider, Alert, Form, Input
 } from 'antd';
 import { 
   FilePdfOutlined, EyeOutlined, CheckCircleFilled, 
   ClockCircleOutlined, GithubOutlined, LinkOutlined,
-  CloudUploadOutlined, InfoCircleOutlined, LockOutlined
+  CloudUploadOutlined, InfoCircleOutlined, LockOutlined, EditOutlined
 } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { personBApi, SubmissionRequest, SubmissionStatusResponse, DeadlineResponse } from '../../../../api/personB.api';
@@ -44,13 +44,7 @@ const resolveSubmissionId = (data?: any): number | null => {
 // ==========================================
 // 2. SUB-COMPONENTS GIAO DIỆN
 // ==========================================
-
-interface CountdownTimerProps {
-  deadline: string;
-  isOverdue: boolean;
-}
-
-const CountdownTimer: React.FC<CountdownTimerProps> = ({ deadline, isOverdue }) => {
+const CountdownTimer: React.FC<{ deadline: string; isOverdue: boolean }> = ({ deadline, isOverdue }) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
@@ -86,13 +80,7 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ deadline, isOverdue }) 
   );
 };
 
-interface SuccessViewProps {
-  submissionData: any;
-  submittedSlideName: string;
-  onViewPdf: () => void;
-}
-
-const SuccessView: React.FC<SuccessViewProps> = ({ submissionData, submittedSlideName, onViewPdf }) => (
+const SuccessView: React.FC<{ submissionData: any; submittedSlideName: string; onViewPdf: () => void; onEdit: () => void; }> = ({ submissionData, submittedSlideName, onViewPdf, onEdit }) => (
   <Card style={{ borderRadius: 24, border: '1px solid #b7eb8f', background: '#f6ffed', boxShadow: '0 12px 32px rgba(82, 196, 26, 0.1)', height: '100%', display: 'flex', flexDirection: 'column' }} styles={{ body: { padding: 40, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' } }}>
     <div style={{ textAlign: 'center', marginBottom: 40 }}>
       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.5 }}>
@@ -129,6 +117,7 @@ const SuccessView: React.FC<SuccessViewProps> = ({ submissionData, submittedSlid
           <Text type="secondary" style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>Link Demo (Live)</Text>
           <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, background: '#f8fafc', padding: '14px 16px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
             <LinkOutlined style={{ fontSize: 20, color: '#334155' }} />
+            {/* KIỂM TRA CHẶT CHẼ DỮ LIỆU TỪ DB */}
             {(submissionData?.demo_url || submissionData?.demoUrl) ? (
               <a href={submissionData?.demo_url || submissionData?.demoUrl} target="_blank" rel="noreferrer" style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#0f172a' }}>
                 {submissionData?.demo_url || submissionData?.demoUrl}
@@ -140,20 +129,23 @@ const SuccessView: React.FC<SuccessViewProps> = ({ submissionData, submittedSlid
         </Col>
       </Row>
     </div>
+
+    <div style={{ textAlign: 'center', marginTop: 32 }}>
+      <Button type="dashed" size="large" icon={<EditOutlined />} onClick={onEdit} style={{ borderRadius: 12, fontWeight: 700, padding: '0 32px', height: 48, borderColor: '#16a34a', color: '#16a34a', background: '#f0fdf4' }}>
+        Cập Nhật / Thay Đổi Bài Nộp
+      </Button>
+    </div>
   </Card>
 );
-
 
 // ==========================================
 // 3. COMPONENT CHÍNH (MAIN PAGE)
 // ==========================================
 const StudentSubmissionPage: React.FC = () => {
   const queryClient = useQueryClient();
-  
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
   const studentId = userInfo.userId || userInfo.id || 'student-1';
 
-  // --- HOOKS GỌI API ---
   const { data: submissionDataRaw, isLoading: isSubLoading, refetch: refetchSubmission } = useQuery<SubmissionStatusResponse>({
     queryKey: ['studentSubmission', studentId],
     queryFn: () => personBApi.getStudentSubmission(studentId),
@@ -166,15 +158,13 @@ const StudentSubmissionPage: React.FC = () => {
     retry: false,
   });
 
-  // Tắt TypeChecking khắt khe cho phần đọc dữ liệu dự phòng
   const submissionData = submissionDataRaw as any;
 
-  // --- STATE MODAL PDF ---
   const [isSlideModalVisible, setIsSlideModalVisible] = useState(false);
   const [slideBlobUrl, setSlideBlobUrl] = useState<string | null>(null);
   const [isLoadingSlide, setIsLoadingSlide] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // --- LOGIC TRẠNG THÁI ---
   const hasSavedSlide = Boolean(submissionData?.slide_file || submissionData?.slide_url || submissionData?.slideFile || submissionData?.slideUrl || submissionData?.has_slide);
   const isSubmitted = Boolean(submissionData && submissionData.status !== 'INCOMPLETE' && hasSavedSlide);
   const submittedSlideName = submissionData?.slide_file || submissionData?.slideFile || 'slide.pdf';
@@ -185,27 +175,26 @@ const StudentSubmissionPage: React.FC = () => {
     return +new Date(deadlineData.deadline) - +new Date() <= 0;
   }, [deadlineData]);
 
-  // --- FORM CẤU HÌNH ---
   const { control, handleSubmit, reset, formState: { errors } } = useForm<SubmissionFormValues>({
     resolver: zodResolver(submissionSchema),
     defaultValues: { repo_url: '', demo_url: '', slide_file: null },
   });
 
   useEffect(() => {
-    if (submissionData && !isSubmitted) {
+    if (submissionData) {
       reset({
         repo_url: submissionData.repo_url || submissionData.repoUrl || '',
         demo_url: submissionData.demo_url || submissionData.demoUrl || '',
       });
     }
-  }, [submissionData, isSubmitted, reset]);
+  }, [submissionData, isEditing, reset]);
 
-  // --- MUTATION NỘP BÀI ---
   const mutation = useMutation({
     mutationFn: async (data: SubmissionRequest) => personBApi.submitStudentSubmission(studentId, data),
     onSuccess: (data) => {
-      toast.success('Nộp bài thi thành công!');
+      toast.success('Lưu bài dự thi thành công!');
       queryClient.setQueryData(['studentSubmission', studentId], data);
+      setIsEditing(false); 
       refetchSubmission(); 
     },
     onError: (err: any) => {
@@ -218,15 +207,28 @@ const StudentSubmissionPage: React.FC = () => {
       message.error('Vui lòng tải lên file slide PDF.');
       return;
     }
-    mutation.mutate({
+
+    const currentTeamId = submissionData?.teamId || submissionData?.team_id;
+    const currentTrackId = submissionData?.trackId || submissionData?.track_id;
+    const fileToUpload = values.slide_file?.file?.originFileObj || values.slide_file?.file || values.slide_file?.originFileObj || values.slide_file;
+
+    // 🚀 FIX: Ép cứng dữ liệu truyền đi, lót sẵn mọi định dạng tên biến cho Backend
+    const payload = {
+      teamId: currentTeamId,
+      trackId: currentTrackId,
+      repoUrl: values.repo_url,
       repo_url: values.repo_url,
-      demo_url: values.demo_url || undefined,
-      slide_file: values.slide_file?.file || values.slide_file, 
+      demoUrl: values.demo_url,  // <- Backend lấy trường này (từ API Doc)
+      demo_url: values.demo_url,
+      demoLink: values.demo_url,
+      slideFile: fileToUpload,
+      slide_file: fileToUpload,
       late_reason: isOverdue ? 'Nộp muộn do hệ thống ghi nhận' : undefined,
-    });
+    };
+
+    mutation.mutate(payload as any);
   };
 
-  // --- XỬ LÝ XEM PDF ---
   const handleViewPdf = async () => {
     if (!submissionId) {
       message.warning('Dữ liệu đang đồng bộ, vui lòng thử lại sau vài giây.');
@@ -260,9 +262,6 @@ const StudentSubmissionPage: React.FC = () => {
   }, [slideBlobUrl]);
 
 
-  // ==========================================
-  // 4. RENDER GIAO DIỆN CHÍNH
-  // ==========================================
   if (isSubLoading || isDeadlineLoading) {
     return (
       <div style={{ height: '80vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
@@ -275,35 +274,26 @@ const StudentSubmissionPage: React.FC = () => {
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 24px 60px' }}>
       
-      {/* ── HEADER ── */}
       <div style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <Title level={2} style={{ margin: 0, fontWeight: 800, color: '#0f172a' }}>Cổng Nộp Bài Dự Thi</Title>
           <Text type="secondary" style={{ fontSize: 15 }}>Hoàn thiện mã nguồn và tài liệu trình bày cho vòng thi hiện tại.</Text>
         </div>
         <div>
-          {isSubmitted ? (
-            <Tag color="success" icon={<CheckCircleFilled />} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 8, fontWeight: 700 }}>
-              ĐÃ NỘP BÀI THÀNH CÔNG
-            </Tag>
+          {isSubmitted && !isEditing ? (
+            <Tag color="success" icon={<CheckCircleFilled />} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 8, fontWeight: 700 }}>ĐÃ NỘP BÀI THÀNH CÔNG</Tag>
           ) : isOverdue ? (
-            <Tag color="error" icon={<ClockCircleOutlined />} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 8, fontWeight: 700 }}>
-              ĐÃ QUÁ HẠN NỘP
-            </Tag>
+            <Tag color="error" icon={<ClockCircleOutlined />} style={{ padding: '8px 16px', fontSize: 14, borderRadius: 8, fontWeight: 700 }}>ĐÃ QUÁ HẠN NỘP</Tag>
           ) : (
-            <Tag color="processing" style={{ padding: '8px 16px', fontSize: 14, borderRadius: 8, fontWeight: 700 }}>
-              CỔNG ĐANG MỞ
-            </Tag>
+            <Tag color="processing" style={{ padding: '8px 16px', fontSize: 14, borderRadius: 8, fontWeight: 700 }}>CỔNG ĐANG MỞ</Tag>
           )}
         </div>
       </div>
 
       <Row gutter={[32, 32]} align="stretch">
-        {/* ── CỘT TRÁI: ĐỒNG HỒ & HƯỚNG DẪN ── */}
         <Col xs={24} lg={8} style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24, height: '100%' }}>
             
-            {/* Box Đồng Hồ */}
             <Card style={{ borderRadius: 20, border: isOverdue ? '1px solid #fca5a5' : '1px solid #bae0ff', background: isOverdue ? '#fef2f2' : '#f0f8ff', boxShadow: '0 10px 25px rgba(0,0,0,0.03)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 {isOverdue ? <LockOutlined style={{ color: '#ef4444', fontSize: 20 }} /> : <ClockCircleOutlined style={{ color: '#1677ff', fontSize: 20 }} />}
@@ -311,13 +301,11 @@ const StudentSubmissionPage: React.FC = () => {
                   {isOverdue ? 'THỜI GIAN ĐÃ KẾT THÚC' : 'THỜI GIAN CÒN LẠI'}
                 </Text>
               </div>
-              
               {deadlineData?.deadline ? (
                 <CountdownTimer deadline={deadlineData.deadline} isOverdue={isOverdue} />
               ) : (
                 <Alert type="info" message="Chưa có thông tin hạn chót" showIcon style={{ borderRadius: 10 }} />
               )}
-              
               <Divider style={{ margin: '20px 0 16px' }} />
               <div style={{ textAlign: 'center' }}>
                 <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase', fontWeight: 600 }}>Hạn nộp chính thức</Text>
@@ -327,7 +315,6 @@ const StudentSubmissionPage: React.FC = () => {
               </div>
             </Card>
 
-            {/* Box Hướng Dẫn (Kéo dài hết phần còn lại bằng flex: 1) */}
             <Card style={{ borderRadius: 20, background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.02)', flex: 1 }} 
                   title={<span style={{ display: 'flex', alignItems: 'center' }}><InfoCircleOutlined style={{ color: '#8b5cf6', marginRight: 8, fontSize: 18 }}/> Yêu cầu kỹ thuật bắt buộc</span>}>
               <ul style={{ paddingLeft: 18, color: '#334155', fontSize: 15, lineHeight: 1.8, margin: 0 }}>
@@ -341,41 +328,74 @@ const StudentSubmissionPage: React.FC = () => {
           </div>
         </Col>
 
-        {/* ── CỘT PHẢI: KHU VỰC THAO TÁC (FORM / SUCCESS) ── */}
         <Col xs={24} lg={16} style={{ display: 'flex', flexDirection: 'column' }}>
           <AnimatePresence mode="wait">
-            {isSubmitted ? (
+            {isSubmitted && !isEditing ? (
               <motion.div key="success" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }} style={{ height: '100%' }}>
-                <SuccessView submissionData={submissionData} submittedSlideName={submittedSlideName} onViewPdf={handleViewPdf} />
+                <SuccessView 
+                  submissionData={submissionData} 
+                  submittedSlideName={submittedSlideName} 
+                  onViewPdf={handleViewPdf} 
+                  onEdit={() => setIsEditing(true)} 
+                />
               </motion.div>
             ) : (
               <motion.div key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} style={{ height: '100%' }}>
                 <Card style={{ borderRadius: 24, boxShadow: '0 10px 30px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0', height: '100%', display: 'flex', flexDirection: 'column' }} styles={{ body: { padding: '36px 40px', flex: 1, display: 'flex', flexDirection: 'column' } }}>
                   
-                  <div style={{ marginBottom: 32 }}>
-                    <Title level={3} style={{ margin: 0, color: '#0f172a', fontWeight: 800 }}>Biểu Mẫu Nộp Bài</Title>
-                    <Text type="secondary" style={{ fontSize: 15 }}>Cập nhật cẩn thận các liên kết, bạn có thể nộp lại nhiều lần trước hạn chót.</Text>
+                  <div style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <Title level={3} style={{ margin: 0, color: '#0f172a', fontWeight: 800 }}>
+                        {isSubmitted ? 'Cập Nhật Biểu Mẫu' : 'Biểu Mẫu Nộp Bài'}
+                      </Title>
+                      <Text type="secondary" style={{ fontSize: 15 }}>
+                        {isSubmitted ? 'Chỉnh sửa liên kết hoặc tải lên file PDF mới để thay thế bản cũ.' : 'Cập nhật cẩn thận các liên kết, bạn có thể nộp lại nhiều lần trước hạn chót.'}
+                      </Text>
+                    </div>
+                    {isSubmitted && (
+                      <Button onClick={() => setIsEditing(false)} size="large" style={{ borderRadius: 8, fontWeight: 600 }}>Hủy Cập Nhật</Button>
+                    )}
                   </div>
 
                   <Form layout="vertical" onFinish={handleSubmit(onSubmit)} style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <Row gutter={24}>
                       <Col xs={24} md={12}>
                         <Form.Item label={<Text strong style={{ fontSize: 14 }}>Đường dẫn Repository <span style={{color: '#ff4d4f'}}>*</span></Text>} validateStatus={errors.repo_url ? 'error' : ''} help={errors.repo_url?.message as string}>
+                          {/* 🚀 FIX: Ép cứng giá trị onChange và value để lấy chính xác ký tự */}
                           <Controller name="repo_url" control={control} render={({ field }) => (
-                            <Input {...field} prefix={<GithubOutlined style={{ color: '#94a3b8' }}/>} placeholder="https://github.com/team/project" size="large" style={{ borderRadius: 10, padding: '10px 14px' }} />
+                            <Input 
+                                {...field} 
+                                value={field.value || ''} 
+                                onChange={(e) => field.onChange(e.target.value)} 
+                                prefix={<GithubOutlined style={{ color: '#94a3b8' }}/>} 
+                                placeholder="https://github.com/team/project" 
+                                size="large" style={{ borderRadius: 10, padding: '10px 14px' }} 
+                            />
                           )} />
                         </Form.Item>
                       </Col>
                       <Col xs={24} md={12}>
                         <Form.Item label={<Text strong style={{ fontSize: 14 }}>Đường dẫn Demo (Live URL)</Text>} validateStatus={errors.demo_url ? 'error' : ''} help={errors.demo_url?.message as string}>
                           <Controller name="demo_url" control={control} render={({ field }) => (
-                            <Input {...field} prefix={<LinkOutlined style={{ color: '#94a3b8' }}/>} placeholder="https://my-demo.vercel.app" size="large" style={{ borderRadius: 10, padding: '10px 14px' }} />
+                            <Input 
+                                {...field} 
+                                value={field.value || ''} 
+                                onChange={(e) => field.onChange(e.target.value)} 
+                                prefix={<LinkOutlined style={{ color: '#94a3b8' }}/>} 
+                                placeholder="https://my-demo.vercel.app" 
+                                size="large" style={{ borderRadius: 10, padding: '10px 14px' }} 
+                            />
                           )} />
                         </Form.Item>
                       </Col>
                     </Row>
 
-                    <Form.Item label={<Text strong style={{ fontSize: 14 }}>File Slide Thuyết Trình (.PDF) <span style={{color: '#ff4d4f'}}>*</span></Text>} validateStatus={errors.slide_file ? 'error' : ''} help={errors.slide_file?.message as string} style={{ flex: 1, marginBottom: 24 }}>
+                    <Form.Item 
+                      label={<Text strong style={{ fontSize: 14 }}>File Slide Thuyết Trình (.PDF) {!hasSavedSlide && <span style={{color: '#ff4d4f'}}>*</span>}</Text>} 
+                      validateStatus={errors.slide_file ? 'error' : ''} 
+                      help={errors.slide_file?.message as string} 
+                      style={{ flex: 1, marginBottom: 24 }}
+                    >
                       <Controller name="slide_file" control={control} render={({ field: { onChange } }) => (
                         <Dragger
                           accept=".pdf,application/pdf"
@@ -388,17 +408,23 @@ const StudentSubmissionPage: React.FC = () => {
                             <p className="ant-upload-drag-icon"><CloudUploadOutlined style={{ color: '#3b82f6', fontSize: 56 }} /></p>
                             <p className="ant-upload-text" style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginTop: 16 }}>Kéo thả file PDF vào đây hoặc Nhấp để chọn</p>
                             <p className="ant-upload-hint" style={{ color: '#64748b', fontSize: 14 }}>Chỉ hỗ trợ định dạng .PDF (Tối đa 25MB)</p>
+                            
+                            {hasSavedSlide && isEditing && (
+                              <div style={{ marginTop: 16, color: '#16a34a', fontWeight: 600, background: '#dcfce7', padding: '8px 16px', borderRadius: 8, display: 'inline-block' }}>
+                                ✓ Đã lưu File: {submittedSlideName} (Tải file mới nếu muốn thay thế)
+                              </div>
+                            )}
                           </div>
                         </Dragger>
                       )} />
                     </Form.Item>
 
                     {isOverdue && (
-                      <Alert type="warning" showIcon message="Bạn đang nộp bài muộn!" description="Hệ thống sẽ đánh dấu bài nộp là LATE. Quyền phê duyệt thuộc về Ban tổ chức." style={{ marginBottom: 24, borderRadius: 10 }} />
+                      <Alert type="warning" showIcon message="Bạn đang cập nhật bài muộn!" description="Hệ thống sẽ đánh dấu bài nộp là LATE_PENDING. Quyền phê duyệt thuộc về Ban tổ chức." style={{ marginBottom: 24, borderRadius: 10 }} />
                     )}
 
                     <Button type="primary" htmlType="submit" size="large" block loading={mutation.isPending} style={{ height: 60, borderRadius: 14, fontSize: 17, fontWeight: 800, background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', border: 'none', boxShadow: '0 10px 20px -5px rgba(37, 99, 235, 0.4)', marginTop: 'auto' }}>
-                      XÁC NHẬN GỬI BÀI DỰ THI
+                      {isSubmitted ? 'LƯU CẬP NHẬT BÀI THI' : 'XÁC NHẬN GỬI BÀI DỰ THI'}
                     </Button>
                   </Form>
                 </Card>
@@ -408,7 +434,6 @@ const StudentSubmissionPage: React.FC = () => {
         </Col>
       </Row>
 
-      {/* ── MODAL XEM PDF ── */}
       <Modal
         title={<Space><FilePdfOutlined style={{ color: '#ff4d4f', fontSize: 20 }} /><span style={{ fontWeight: 700, fontSize: 18 }}>Chi tiết File: {submittedSlideName}</span></Space>}
         open={isSlideModalVisible}
