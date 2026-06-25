@@ -58,6 +58,15 @@ export const presentationService = {
 
   listRoundJudges: (roundId) =>
     axiosClient.get(`/api/v1/rounds/${roundId}/judges`),
+
+  getDuration: (roundId, trackId) =>
+    axiosClient.get('/api/v1/presentation/duration', { params: { roundId, trackId } }),
+
+  updateDuration: (payload) =>
+    axiosClient.put('/api/v1/presentation/duration', payload),
+
+  clearTrackOverride: (roundId, trackId) =>
+    axiosClient.delete('/api/v1/presentation/duration', { params: { roundId, trackId } }),
 };
 
 export const findPresentingItem = (queueData, trackId) => {

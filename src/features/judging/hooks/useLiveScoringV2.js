@@ -95,16 +95,12 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
       scoresData.forEach(s => {
         const subId = String(s.submissionId ?? s.submission_id);
         const critId = String(s.criterionId ?? s.criterion_id);
-        
-        // 🚀 FIX CÚ LỪA TỪ BE: Lấy giá trị thực tế của slider (hỗ trợ đọc từ totalScore nếu BE trả nhầm)
         const val = Number(s.scoreValue ?? s.score_value ?? s.score ?? s.value ?? s.totalScore ?? s.total_score ?? 0);
 
         if (critId && critId !== 'undefined' && critId !== 'null') {
-            // Đây là điểm thành phần -> Nhân với trọng số để cộng dồn
             if (!scoredMap[subId]) scoredMap[subId] = 0;
             scoredMap[subId] += val * (weightMap[critId] || 0);
         } else {
-            // Nếu không có criterionId, có thể BE trả sẵn tổng điểm
             scoredMap[subId] = val;
         }
       });
@@ -128,13 +124,9 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
 
       if (presenting?.timer) {
         const serverPhase = presenting.timer.phase;
-        let serverSeconds = presenting.timer.remainingSeconds;
-        
-        const maxSeconds = (serverPhase === 'QA' || timerEngineRef.current.originalPhase === 'QA') ? 10 : 20;
-           
-        if (serverSeconds > maxSeconds || serverSeconds < 0) {
-            serverSeconds = maxSeconds; 
-        }
+        // KHÔNG HARDCODE. Lấy 100% thời gian thực tế từ BE
+        let serverSeconds = presenting.timer.remainingSeconds || 0;
+        if (serverSeconds < 0) serverSeconds = 0;
 
         const currentEngine = timerEngineRef.current;
 
@@ -161,7 +153,8 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
   useEffect(() => {
     fetchStaticData();
     fetchQueue(true);
-    const interval = setInterval(() => fetchQueue(false), 3000);
+    // Polling 1s để mượt mà nhất có thể cho buổi demo
+    const interval = setInterval(() => fetchQueue(false), 1000);
     return () => clearInterval(interval);
   }, [fetchStaticData, fetchQueue]);
 
@@ -215,7 +208,6 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
         const cId = s.criterionId ?? s.criterion_id;
         if (cId) {
             hasIndividualScoresInDB = true;
-            // 🚀 Bổ sung s.totalScore vào Fallback để gỡ lỗi Slider bị tụt về 0
             dbScores[String(cId)] = Number(s.scoreValue ?? s.score_value ?? s.score ?? s.value ?? s.totalScore ?? s.total_score ?? 0);
         }
         if (s.comment) dbComment = s.comment;
@@ -319,7 +311,7 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
       setTimeout(async () => {
          await fetchStaticData();
          await fetchQueue(true);
-      }, 2000);
+      }, 1000);
 
     } catch (error) {
       message.error(error.message || "Lỗi lưu điểm.");
@@ -358,6 +350,11 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
         const isResume = previousEngineState.phase === 'PAUSED';
         const targetPhase = isResume ? previousEngineState.originalPhase : 'PRESENTING';
 
+        // Lấy đúng số phút Thuyết trình đã cấu hình * 60s
+        if (!isResume) {
+            currentTick = (activeSlot.timer?.presentationMinutes || 10) * 60;
+        }
+
         applyEngineState(targetPhase, currentTick); 
         
         if (isResume) await presentationService.resumeTimer(roundId, trackId);
@@ -368,7 +365,10 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
         await presentationService.pauseTimer(roundId, trackId);
       }
       else if (actionType === 'QA') {
-        applyEngineState('QA', 10); 
+        // Lấy đúng số phút QA đã cấu hình * 60s
+        const qaSecs = (activeSlot.timer?.qaMinutes || 5) * 60;
+        applyEngineState('QA', qaSecs); 
+        
         await presentationService.qaTimer(roundId, trackId);
       }
       else if (actionType === 'NEXT') {
@@ -376,7 +376,9 @@ export const useLiveScoringV2 = (assignmentId, roundId, trackId, isFinal, initia
       }
     } catch (error) {
       applyEngineState(previousEngineState.phase, previousEngineState.baseSeconds);
-      message.error(error?.response?.data?.error?.message || error.message || 'Lỗi điều khiển đồng hồ.');
+      // Bóc tách lỗi y như file QueuePage
+      const beMsg = error?.response?.data?.error?.message || error?.response?.data?.message || error.message;
+      message.error(beMsg || 'Lỗi điều khiển đồng hồ.');
     } finally {
       setIsTimerActionLoading(false);
       setTimeout(() => {
